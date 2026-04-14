@@ -11,7 +11,10 @@
       "Bash(npx next:*)",
       "Read(//c/Users/aistudio/.claude/projects/d--stock-app-dev-v2/memory//**)",
       "Bash(git -C /d/stock_app_dev_v2 status --short)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)"
     ]
   }
 }

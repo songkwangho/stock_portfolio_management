@@ -1,0 +1,95 @@
+import express from 'express';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+dotenv.config();
+
+// --- Separated Modules ---
+import pool from './db/connection.js';
+import { initSchema } from './db/schema.js';
+import { runMigrations } from './db/migrate.js';
+import { registerInitialData } from './domains/stock/data.js';
+import { setupScheduler, setupCleanup } from './scheduler.js';
+
+// --- Domain Routers ---
+import alertRouter from './domains/alert/router.js';
+import watchlistRouter from './domains/watchlist/router.js';
+import portfolioRouter from './domains/portfolio/router.js';
+import analysisRouter from './domains/analysis/router.js';
+import stockRouter from './domains/stock/router.js';
+import systemRouter from './domains/system/router.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// --- Database Initialization (top-level await; ESM) ---
+// 순서가 중요하다:
+// 1) initSchema: 테이블/인덱스 생성 (멱등)
+// 2) runMigrations: 예상 컬럼 검증 (information_schema 기반 경고만)
+// 3) registerInitialData: stocks/recommended_stocks 시드 (ON CONFLICT로 멱등)
+// 4) setupCleanup / setupScheduler: 주기 작업 시작
+// 5) app.listen
+await initSchema(pool);
+await runMigrations(pool);
+await registerInitialData(pool);
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// CORS whitelist (dev + production origins).
+// 배포 시 Vercel URL은 `FRONTEND_URL` 환경변수로 주입 (16차 버그-E).
+// 여러 도메인이 필요하면 콤마로 구분: `FRONTEND_URL=https://a.vercel.app,https://b.vercel.app`
+const ALLOWED_ORIGINS = [
+    'http://localhost:5173',  // Vite dev server
+    'http://localhost:4173',  // Vite preview
+    'http://localhost:3000',  // alternative dev
+    'capacitor://localhost',  // Capacitor iOS
+    'http://localhost',       // Capacitor Android
+    ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(s => s.trim()).filter(Boolean) : []),
+];
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+}));
+app.use(express.json());
+
+// Rate limiting per device_id (or IP fallback)
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 120, // 120 requests per minute per key
+    keyGenerator: (req) => req.headers['x-device-id'] || req.ip,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+    validate: false,
+});
+app.use('/api/', apiLimiter);
+app.use('/charts', express.static(path.join(__dirname, '..', 'public', 'charts')));
+
+// Cleanup old data + start scheduler (delayed sync on startup + daily 8AM)
+setupCleanup(pool);
+setupScheduler();
+
+// --- Mount Domain Routers ---
+// Path-prefix 라우터(alerts/watchlist/holdings)는 prefix가 겹치지 않아 순서 무관.
+// '/api'에 직접 마운트되는 analysis/stock/system은 specific path를 먼저 둬야 한다 —
+// analysisRouter의 '/stock/:code/indicators'가 stockRouter의 '/stock/:code'에 가로채이지 않도록.
+app.use('/api/alerts', alertRouter);
+app.use('/api/watchlist', watchlistRouter);
+app.use('/api/holdings', portfolioRouter);
+app.use('/api', systemRouter);   // owns /health, /market/indices (no /stock/* conflict)
+app.use('/api', analysisRouter); // owns /stock/:code/{indicators,volatility,financials,news,chart}, /screener, /sector
+app.use('/api', stockRouter);    // owns /stock/:code, /stocks, /search, /recommendations
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});

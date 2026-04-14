@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TrendingUp, Plus, Pencil, Trash2, Check, X, ChevronUp, PlusCircle, Eye, HelpCircle } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
@@ -15,6 +15,14 @@ interface EditState {
 }
 
 export default function PortfolioPage() {
+  return (
+    <Suspense fallback={null}>
+      <PortfolioContent />
+    </Suspense>
+  );
+}
+
+function PortfolioContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focus = searchParams.get('focus');

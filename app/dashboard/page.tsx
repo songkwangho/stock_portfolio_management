@@ -43,13 +43,6 @@ export default function DashboardPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [marketIndices, setMarketIndices] = useState<{ symbol: string; value: number | null; changeRate: string; positive: boolean }[]>([]);
 
-  const onNavigate = (tab: string) => {
-    const map: Record<string, string> = {
-      dashboard: '/dashboard', analysis: '/portfolio', recommendations: '/recommendations',
-      watchlist: '/watchlist', screener: '/screener', major: '/stocks', settings: '/settings',
-    };
-    router.push(map[tab] || '/dashboard');
-  };
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=holding`);
@@ -138,14 +131,14 @@ export default function DashboardPage() {
               <p className="text-xs text-slate-400 leading-relaxed">보유 종목을 등록해 수익률·의견을 받아요.</p>
             </button>
             <button
-              onClick={() => onNavigate('recommendations')}
+              onClick={() => router.push('/recommendations')}
               className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
             >
               <p className="text-sm font-bold text-white mb-1">🔍 살 종목 찾기</p>
               <p className="text-xs text-slate-400 leading-relaxed">알고리즘 점수 기반 추천 종목을 살펴봐요.</p>
             </button>
             <button
-              onClick={() => onNavigate('major')}
+              onClick={() => router.push('/stocks')}
               className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
             >
               <p className="text-sm font-bold text-white mb-1">📚 주식 공부</p>
@@ -158,7 +151,14 @@ export default function DashboardPage() {
         const dates = holdings.map(h => h.last_updated).filter((d): d is string => !!d);
         if (!dates.length) return null;
         const latest = Math.max(...dates.map(d => new Date(d).getTime()));
-        return <p className="text-xs text-slate-600">마지막 업데이트: {getDataFreshnessShort(new Date(latest).toISOString())}</p>;
+        const ageHours = (Date.now() - latest) / 3600000;
+        const stale = ageHours >= 24;
+        return (
+          <p className={`text-xs ${stale ? 'text-amber-400' : 'text-slate-500'}`}>
+            {stale ? '⚠️ ' : ''}마지막 업데이트: {getDataFreshnessShort(new Date(latest).toISOString())}
+            {stale && <span className="ml-1 text-slate-500">· 내일 08:00 이후 새로 고침돼요</span>}
+          </p>
+        );
       })()}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <StatCard
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                   <p className="text-2xl mb-2">📈</p>
                   <p className="text-sm font-bold mb-2">종목을 추가하면 수익률 그래프를 볼 수 있어요</p>
                   <button
-                    onClick={() => onNavigate('analysis')}
+                    onClick={() => router.push('/portfolio')}
                     className="mt-3 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
                   >
                     포트폴리오에 추가하기 →
@@ -274,7 +274,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">내 보유 종목</h3>
               <button
-                onClick={() => onNavigate('analysis')}
+                onClick={() => router.push('/portfolio')}
                 className="text-xs text-blue-400 font-bold flex items-center space-x-1 transition-colors px-4 py-3 min-h-[44px]"
               >
                 <span>포트폴리오 관리</span>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
                 <div className="text-center py-8">
                   <p className="text-slate-600 text-sm mb-3">아직 보유 종목이 없습니다.</p>
                   <button
-                    onClick={() => onNavigate('analysis')}
+                    onClick={() => router.push('/portfolio')}
                     className="text-xs text-blue-400 font-bold transition-colors px-4 py-3 min-h-[44px]"
                   >
                     내 포트폴리오에서 종목 추가하기 →
@@ -379,7 +379,7 @@ export default function DashboardPage() {
       </div>
 
       <button
-        onClick={() => onNavigate('major')}
+        onClick={() => router.push('/stocks')}
         className="w-full p-4 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between transition-colors text-left"
       >
         <div>

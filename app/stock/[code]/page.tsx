@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight
@@ -42,6 +42,14 @@ const CandlestickBar = (props: Record<string, unknown>) => {
 
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
+  return (
+    <Suspense fallback={null}>
+      <StockDetailContent code={code} />
+    </Suspense>
+  );
+}
+
+function StockDetailContent({ code }: { code: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get('from'); // holding | recommendation | watchlist | major | alerts | search
@@ -57,7 +65,8 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
     isHolding ? '보유 종목' :
     from === 'recommendation' ? '추천 종목' :
     from === 'watchlist' ? '관심 종목' :
-    from === 'major' ? '주요 종목' : '';
+    from === 'major' ? '주요 종목' :
+    from === 'alerts' ? '알림 종목' : '';
 
   const stock: StockSummary = holdingMatch
     ? { code, name: holdingMatch.name, category: '보유 종목', avgPrice: holdingMatch.avgPrice, quantity: holdingMatch.quantity, currentPrice: holdingMatch.currentPrice, value: holdingMatch.value, market_opinion: holdingMatch.market_opinion }
@@ -410,8 +419,11 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PER (주가수익비율)</h4>
                   <button onClick={() => setHelpTerm('per')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="PER 도움말">[?]</button>
                 </div>
-                <p className={`text-xl font-bold ${stockDetail?.per && stockDetail.per < 0 ? 'text-yellow-400' : 'text-white'}`}>
-                  {stockDetail?.per ? (stockDetail.per < 0 ? '적자' : `${stockDetail.per}배`) : '---'}
+                <p className={`text-xl font-bold ${stockDetail?.per != null && stockDetail.per <= 0 ? 'text-yellow-400' : 'text-white'}`}>
+                  {stockDetail?.per == null ? '---'
+                    : stockDetail.per < 0 ? '적자'
+                    : stockDetail.per === 0 ? '이익 없음'
+                    : `${stockDetail.per}배`}
                 </p>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   {stockDetail?.per && stockDetail.per < 0
@@ -938,7 +950,7 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
                     <button onClick={async () => {
                       setAdding(true);
                       // 첫 종목인지 미리 스냅샷 — addHolding이 holdings를 갱신하기 전에 확인
-                      const wasFirstStock = usePortfolioStore.getState().holdings.length === 0
+                      const wasFirstStock = holdings.length === 0
                         && !localStorage.getItem('onboarding_first_stock_guided');
                       try {
                         await onAdd({ code: stock.code, name: stockDetail?.name || stock.name,
@@ -962,9 +974,12 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
               )}
 
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 mb-6">
-                <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest text-center italic">Probability</p>
-                <div className="text-3xl font-black text-center text-white">{computeProbability()}%</div>
-                <p className="text-xs text-slate-500 text-center mt-1">상승 예측 확률</p>
+                <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest text-center italic">Signal Score</p>
+                <div className="text-3xl font-black text-center text-white">{computeProbability()}</div>
+                <p className="text-xs text-slate-500 text-center mt-1">종합 신호 점수 (0~100)</p>
+                <p className="text-[11px] text-amber-400/80 text-center mt-2 leading-relaxed">
+                  ⚠️ 목표가 괴리·이평선·변동성 합산 참고 지표예요. 실제 상승 확률이 아니에요.
+                </p>
               </div>
 
               <button onClick={async () => {

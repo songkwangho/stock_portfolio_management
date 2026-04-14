@@ -26,8 +26,9 @@ export default function HeaderBar({ nickname }: Props) {
     };
     fetchUnreadCount();
     fetchIndices();
-    const interval = setInterval(() => { fetchUnreadCount(); fetchIndices(); }, 60000);
-    return () => clearInterval(interval);
+    const alertsInterval = setInterval(fetchUnreadCount, 60000);     // 1분 — 알림
+    const indicesInterval = setInterval(fetchIndices, 300000);        // 5분 — 시장지수
+    return () => { clearInterval(alertsInterval); clearInterval(indicesInterval); };
   }, [fetchUnreadCount]);
 
   useEffect(() => {

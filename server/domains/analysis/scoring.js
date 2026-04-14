@@ -1,0 +1,304 @@
+export function median(arr) {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// computeSMA는 도메인 간 의존성 회피를 위해 ../../helpers/sma.js에 있다 — 중복 정의 금지.
+// 분석 도메인이 SMA를 직접 쓸 일이 생기면 helpers에서 import.
+//
+// PostgreSQL 전환 메모:
+// - DB 접근 함수는 async (첫 인자 pool). calculateHoldingOpinion/calculateTrendScore는 DB 미접근이라 동기 유지.
+// - pg는 NUMERIC을 string으로 반환하므로 Number() 캐스팅 필요.
+
+// Valuation Score: 0.0 ~ 3.0
+export async function calculateValuationScore(pool, code, per, pbr, roe, price, targetPrice, epsCurrent, epsPrevious) {
+    const { rows: stockRows } = await pool.query('SELECT category FROM stocks WHERE code = $1', [code]);
+    const category = stockRows[0]?.category;
+    let per_negative = false;
+    let low_confidence = false;
+
+    let perScore = 0;
+    if (per !== null && per !== undefined && per < 0) {
+        perScore = 0;
+        per_negative = true;
+    } else if (per && per > 0 && category) {
+        const { rows: peerRows } = await pool.query(
+            'SELECT per FROM stocks WHERE category = $1 AND per > 0 AND per < 200 AND code != $2',
+            [category, code]
+        );
+        const peers = peerRows.map(r => Number(r.per));
+        if (peers.length < 5) low_confidence = true;
+        if (peers.length >= 3) {
+            const sectorPer = median(peers);
+            if (per < sectorPer * 0.7) perScore = 1.0;
+            else if (per < sectorPer) perScore = 0.5 + 0.5 * (1 - per / sectorPer);
+            else perScore = Math.max(0, 0.5 - 0.5 * (per / sectorPer - 1));
+        } else if (targetPrice && price < targetPrice) {
+            perScore = Math.min(0.5, (targetPrice - price) / targetPrice);
+        }
+    } else if (targetPrice && price < targetPrice) {
+        perScore = Math.min(0.5, (targetPrice - price) / targetPrice);
+    }
+
+    let pbrScore = 0;
+    if (pbr && pbr > 0 && category) {
+        const { rows: peerRows } = await pool.query(
+            'SELECT pbr FROM stocks WHERE category = $1 AND pbr > 0 AND pbr < 20 AND code != $2',
+            [category, code]
+        );
+        const peers = peerRows.map(r => Number(r.pbr));
+        if (peers.length < 5 && !low_confidence) low_confidence = true;
+        if (peers.length >= 3) {
+            const sectorPbr = median(peers);
+            if (pbr < sectorPbr * 0.7) pbrScore = 1.0;
+            else if (pbr < sectorPbr) pbrScore = 0.5 + 0.5 * (1 - pbr / sectorPbr);
+            else pbrScore = Math.max(0, 0.5 - 0.5 * (pbr / sectorPbr - 1));
+        }
+    }
+
+    let pegScore = 0;
+    let pegInvalid = false;
+    if (epsCurrent && epsPrevious && Math.abs(epsPrevious) > 0 && per && per > 0) {
+        const epsGrowth = (epsCurrent - epsPrevious) / Math.abs(epsPrevious) * 100;
+        if (epsGrowth > 0) {
+            const peg = per / epsGrowth;
+            if (peg < 0.5) pegScore = 1.0;
+            else if (peg < 1.0) pegScore = 0.75;
+            else if (peg < 1.5) pegScore = 0.5;
+            else if (peg < 2.0) pegScore = 0.25;
+        } else {
+            pegInvalid = true;
+        }
+    } else if (roe && roe > 15) {
+        pegScore = 0.5;
+    } else if (roe && roe > 10) {
+        pegScore = 0.25;
+    } else {
+        pegInvalid = true;
+    }
+
+    let total;
+    if (pegInvalid) {
+        total = parseFloat(((perScore + pbrScore) / 2.0 * 3.0).toFixed(2));
+    } else {
+        total = parseFloat((perScore + pbrScore + pegScore).toFixed(2));
+    }
+
+    return {
+        total: Math.min(3.0, total),
+        detail: {
+            perScore: parseFloat(perScore.toFixed(2)),
+            pbrScore: parseFloat(pbrScore.toFixed(2)),
+            pegScore: parseFloat(pegScore.toFixed(2)),
+            per_negative,
+            low_confidence
+        }
+    };
+}
+
+// Technical Score: 0.0 ~ 3.0
+export async function calculateTechnicalScore(pool, code) {
+    const { rows: rawHistory } = await pool.query(
+        'SELECT date, price, open, high, low, volume FROM stock_history WHERE code = $1 ORDER BY date ASC',
+        [code]
+    );
+    // pg는 NUMERIC/BIGINT를 string으로 반환 — 명시적 캐스팅.
+    const history = rawHistory.map(h => ({
+        date: h.date,
+        price: Number(h.price),
+        open: Number(h.open),
+        high: Number(h.high),
+        low: Number(h.low),
+        volume: Number(h.volume),
+    }));
+    if (history.length < 15) return { total: 1.5, detail: {} };
+
+    const prices = history.map(h => h.price);
+    const volumes = history.map(h => h.volume);
+    const latestPrice = prices[prices.length - 1];
+    const prevPrice = prices[prices.length - 2];
+
+    let rsiScore = 0.5;
+    if (prices.length >= 15) {
+        let gains = 0, losses = 0;
+        for (let i = prices.length - 14; i < prices.length; i++) {
+            const diff = prices[i] - prices[i - 1];
+            if (diff > 0) gains += diff; else losses -= diff;
+        }
+        const avgGain = gains / 14, avgLoss = losses / 14;
+        const rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+        rsiScore = Math.max(0, Math.min(1, (70 - rsi) / 40));
+        if (rsi >= 30 && rsi <= 50) {
+            rsiScore += (50 - rsi) / 20 * 0.3;
+            rsiScore = Math.min(1, rsiScore);
+        }
+    }
+
+    let macdScore = 0.5;
+    if (prices.length >= 26) {
+        const ema = (data, period) => {
+            const k = 2 / (period + 1);
+            let v = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+            for (let i = period; i < data.length; i++) v = data[i] * k + v * (1 - k);
+            return v;
+        };
+        const recentMacds = [];
+        for (let i = Math.max(26, prices.length - 20); i <= prices.length; i++) {
+            const slice = prices.slice(0, i);
+            if (slice.length >= 26) recentMacds.push(ema(slice, 12) - ema(slice, 26));
+        }
+        if (recentMacds.length >= 9) {
+            const signal = recentMacds.slice(-9).reduce((a, b) => a + b, 0) / 9;
+            const histCurrent = recentMacds[recentMacds.length - 1] - signal;
+            const histPrev = recentMacds.length >= 10
+                ? recentMacds[recentMacds.length - 2] - (recentMacds.slice(-10, -1).slice(-9).reduce((a, b) => a + b, 0) / 9)
+                : histCurrent;
+            const increasing = histCurrent > histPrev;
+            if (histCurrent > 0 && increasing) macdScore = 1.0;
+            else if (histCurrent > 0) macdScore = 0.6;
+            else if (histCurrent < 0 && increasing) macdScore = 0.4;
+            else macdScore = 0.0;
+        }
+    }
+
+    let bollingerScore = 0.5;
+    if (prices.length >= 20) {
+        const recent20 = prices.slice(-20);
+        const sma20 = recent20.reduce((a, b) => a + b, 0) / 20;
+        const stdDev = Math.sqrt(recent20.reduce((a, p) => a + Math.pow(p - sma20, 2), 0) / 20);
+        if (stdDev > 0) {
+            const upper = sma20 + 2 * stdDev;
+            const lower = sma20 - 2 * stdDev;
+            const percentB = (latestPrice - lower) / (upper - lower) * 100;
+            bollingerScore = Math.max(0, Math.min(1, (80 - percentB) / 80));
+        }
+    }
+
+    let volumeScore = 0.5;
+    if (volumes.length >= 20) {
+        const volMA20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+        if (volMA20 > 0) {
+            const volumeRatio = volumes[volumes.length - 1] / volMA20;
+            const priceUp = latestPrice > prevPrice;
+            if (priceUp && volumeRatio > 1.5) volumeScore = 1.0;
+            else if (priceUp && volumeRatio > 1.0) volumeScore = 0.7;
+            else if (priceUp) volumeScore = 0.4;
+            else if (!priceUp && volumeRatio > 1.5) volumeScore = 0.0;
+            else volumeScore = 0.2;
+        }
+    }
+
+    const weighted = 0.3 * rsiScore + 0.25 * macdScore + 0.2 * bollingerScore + 0.25 * volumeScore;
+    return {
+        total: parseFloat((weighted * 3).toFixed(2)),
+        detail: {
+            rsiScore: parseFloat(rsiScore.toFixed(2)),
+            macdScore: parseFloat(macdScore.toFixed(2)),
+            bollingerScore: parseFloat(bollingerScore.toFixed(2)),
+            volumeScore: parseFloat(volumeScore.toFixed(2))
+        }
+    };
+}
+
+// Supply/Demand Score: 0.0 ~ 2.0 (가중 감쇠 방식)
+// 스코어 계산: 최근 10일 순매수일에 0.8^i 가중치 부여 → 정규화
+// 연속 매수일 카운트: 스코어 계산에 사용하지 않음, UI 표시용으로만 detail에 반환
+export async function calculateSupplyDemandScore(pool, code) {
+    const { rows: rawRows } = await pool.query(
+        'SELECT date, institution, foreign_net FROM investor_history WHERE code = $1 ORDER BY date DESC LIMIT 20',
+        [code]
+    );
+    const rows = rawRows.map(r => ({
+        date: r.date,
+        institution: Number(r.institution),
+        foreign_net: Number(r.foreign_net),
+    }));
+    if (rows.length < 3) return { total: 0, detail: {} };
+
+    const DECAY = 0.8; // 하루마다 20% 감쇠
+
+    // 연속 매수일 카운트 (기존 호환)
+    let consecutiveForeignBuy = 0;
+    for (const r of rows) {
+        if (r.foreign_net > 0) consecutiveForeignBuy++;
+        else break;
+    }
+    let consecutiveInstBuy = 0;
+    for (const r of rows) {
+        if (r.institution > 0) consecutiveInstBuy++;
+        else break;
+    }
+
+    // 가중 감쇠 점수: 최근 10일 대상, 매수일에 decay^i 가중치 부여
+    let foreignWeighted = 0, instWeighted = 0;
+    const lookback = Math.min(10, rows.length);
+    for (let i = 0; i < lookback; i++) {
+        const weight = Math.pow(DECAY, i);
+        if (rows[i].foreign_net > 0) foreignWeighted += weight;
+        if (rows[i].institution > 0) instWeighted += weight;
+    }
+    // 정규화: 10일 모두 매수 시 최대 ~4.46 (geometric sum) → 1.2/0.8 스케일
+    const maxWeighted = (1 - Math.pow(DECAY, lookback)) / (1 - DECAY);
+    const foreignScore = parseFloat(Math.min(1.2, (foreignWeighted / maxWeighted) * 1.2).toFixed(2));
+    const instScore = parseFloat(Math.min(0.8, (instWeighted / maxWeighted) * 0.8).toFixed(2));
+
+    return {
+        total: parseFloat(Math.min(2.0, foreignScore + instScore).toFixed(2)),
+        detail: {
+            foreignConsecutive: consecutiveForeignBuy,
+            instConsecutive: consecutiveInstBuy,
+            foreignScore,
+            instScore
+        }
+    };
+}
+
+// Trend Score: 0.0 ~ 2.0 (DB 미접근, 동기 유지)
+export function calculateTrendScore(latestPrice, sma5, sma20) {
+    if (!sma5 || !sma20) return { total: 1.0, detail: { reason: '이평선 데이터 부족' } };
+    if (latestPrice > sma5 && sma5 > sma20) {
+        return { total: 2.0, detail: { reason: '정배열: 주가 > 5일선 > 20일선' } };
+    } else if (latestPrice > sma5 && sma5 <= sma20) {
+        return { total: 1.0, detail: { reason: '5일선 위이나 역배열 상태' } };
+    } else if (latestPrice > sma20 && latestPrice <= sma5) {
+        return { total: 0.5, detail: { reason: '20일선 위이나 5일선 아래' } };
+    } else {
+        return { total: 0.0, detail: { reason: '주가가 양 이평선 아래' } };
+    }
+}
+
+// Holding Opinion (runtime, not saved to DB — DB 미접근, 동기 유지)
+export function calculateHoldingOpinion(avgPrice, currentPrice, sma5, sma20) {
+    if (!avgPrice || !currentPrice) return '보유';
+    const lossRate = (currentPrice - avgPrice) / avgPrice;
+    const STOP_LOSS = -0.07;
+
+    // 1. 손절 체크 (SMA 불필요)
+    if (lossRate <= STOP_LOSS) return '매도';
+
+    // SMA 데이터 부족 시 손절 외에는 판단 불가 → 보유 유지
+    if (!sma5) return '보유';
+
+    // 2. 이중 이평선 이탈 (sma20 필요)
+    if (sma20 && currentPrice < sma5 && currentPrice < sma20) return '매도';
+
+    // 3. 단기 이탈 + 중기 지지 (sma20 필요)
+    if (sma20 && currentPrice < sma5 && currentPrice >= sma20) return '관망';
+
+    // sma20 없으면 5일선만으로 판단
+    if (!sma20) {
+        if (currentPrice < sma5) return '관망';
+        if (currentPrice >= sma5 && currentPrice <= sma5 * 1.01) return '추가매수';
+        return '보유';
+    }
+
+    // 4. 5일선 근접 지지
+    if (currentPrice >= sma5 && currentPrice <= sma5 * 1.01) return '추가매수';
+
+    // 5. 정배열 유지
+    if (currentPrice > sma5 && sma5 > sma20) return '보유';
+
+    return '보유';
+}

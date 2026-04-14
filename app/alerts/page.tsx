@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -32,15 +32,32 @@ const ALERT_TYPE_LABELS: Record<string, { label: string; icon: string; color: st
 export default function AlertsPage() {
   const router = useRouter();
   const { alerts, fetchAlerts, markAllRead, deleteAlert } = useAlertStore();
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     fetchAlerts();
     markAllRead();
+    if (typeof window !== 'undefined' && !localStorage.getItem('onboarding_alerts_explained')) {
+      setShowGuide(true);
+      localStorage.setItem('onboarding_alerts_explained', '1');
+    }
   }, [fetchAlerts, markAllRead]);
 
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold mb-4">알림</h2>
+      {showGuide && (
+        <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+          <p className="text-sm font-bold text-blue-300 mb-2">📬 알림은 어떻게 동작하나요?</p>
+          <ul className="text-xs text-slate-400 space-y-1.5 leading-relaxed">
+            <li>• 보유·관심 종목에 주요 변화가 생기면 알려드려요</li>
+            <li>• 하루 1회 갱신이에요 (실시간이 아니에요)</li>
+            <li>• 동일 종목당 하루 최대 2건만 전송해요</li>
+            <li>• 이평선 관련 알림은 보유 종목에만 발생해요</li>
+          </ul>
+          <button onClick={() => setShowGuide(false)} className="mt-3 text-xs text-blue-400 font-bold">알겠어요</button>
+        </div>
+      )}
       {alerts.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
           <p className="text-3xl mb-4">🔔</p>
@@ -68,7 +85,7 @@ export default function AlertsPage() {
               <p className="text-xs text-slate-500 leading-relaxed pl-7">{alert.message}</p>
               <p className="text-xs text-slate-600 mt-1 pl-7">{getDataFreshnessShort(alert.created_at)}</p>
               <div className="pl-7 mt-2">
-                <button onClick={() => router.push(`/stock/${alert.code}`)} className="text-xs font-bold px-4 py-2 min-h-[44px] bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors">
+                <button onClick={() => router.push(`/stock/${alert.code}?from=alerts`)} className="text-xs font-bold px-4 py-2 min-h-[44px] bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors">
                   지금 확인하기
                 </button>
               </div>
