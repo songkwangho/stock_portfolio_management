@@ -17,7 +17,8 @@
       "Read(//tmp/**)",
       "Bash(grep -n \"tickFormatter.*k\\\\`\\\\|volume\\\\|거래량\" /d/stock_app_dev_v2/app/stock/\\\\[code\\\\]/page.tsx)",
       "Bash(DATABASE_URL=\"\" npx next build)",
-      "Bash(echo \"tsc=$?\")"
+      "Bash(echo \"tsc=$?\")",
+      "Bash(git -C /d/stock_app_dev_v2 diff --stat tsconfig.json)"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -13,7 +13,7 @@
 ## 기술 스택
 
 ### 프론트엔드
-- **프레임워크**: Next.js 15 (App Router)
+- **프레임워크**: Next.js 16 (App Router)
 - **언어**: TypeScript
 - **스타일**: Tailwind CSS v4
 - **차트**: Recharts v3 (`'use client'` 격리) + lightweight-charts (캔들차트, `dynamic ssr:false`)
@@ -222,7 +222,7 @@ PC (md: 이상):
 ### Phase 3 — Next.js 재개발 + 배포 (현재)
 
 **1차 이전 완료 (2026-04-14)**
-- [x] Next.js 15.3 + React 19 + Tailwind v4 초기화
+- [x] Next.js 15.3 + React 19 + Tailwind v4 초기화 (2026-04-15 Next 16.2로 업그레이드 — `next build` EISDIR 이슈 해소)
 - [x] 라우팅 구조 (9개 페이지)
 - [x] 공유 모듈 이전 (types, lib, stores)
 - [x] 레이아웃 셸 7종 (AppShell, HealthGate, Sidebar, MobileTabBar, HeaderBar, DisclaimerModal, ToastHost)
@@ -271,7 +271,8 @@ PC (md: 이상):
 - [x] **[UX-I]** "보유 전략" → "내 종목 상태" (초보자 과도한 의미 부여 방지)
 - [x] **[UX-L]** 대시보드 보유종목 카드 — `holding_opinion` 뱃지 + "분석 중" 상태 추가
 - [x] **[UX-N]** `/alerts` 빈 상태 — 알림 트리거 조건(5일 평균선 이탈·목표가 근접·저평가) + 갱신 시각(매일 08:00) 명시
-- [ ] **[C2]** Vercel 빌드 검증 — **Build Command 반드시 `npm install && cd server && npm install`** (루트 + server 의존성 분리). git push 후 Vercel 대시보드 로그 확인
+- [x] **[C2-local]** 로컬 `next build --turbopack` 통과 확인 (Next 16.2, 11개 라우트, tsconfig.json 자동 업데이트 `jsx: react-jsx` 포함)
+- [ ] **[C2-vercel]** Vercel 배포 검증 — **Build Command 반드시 `npm install && cd server && npm install`** (루트 + server 의존성 분리). git push 후 Vercel 대시보드 로그 확인
 - [ ] **[C3]** Neon 마이그레이션 + backfill-history
   - `DATABASE_URL` 설정 후 `node server/db/migrate.js`
   - SQLite(`stocks.db`) 덤프 → Neon 적재 스크립트 작성·실행
@@ -350,7 +351,7 @@ PC (md: 이상):
 4. **useNavigationStore 제거**: `useRouter/usePathname` 대체. pendingFocus → `?focus=` searchParams.
 5. **알림 단일화**: 헤더 드롭다운 제거. `/alerts` 단일 라우트.
 6. **`?from=` 컨텍스트**: 전체 호출처에서 searchParams 전달.
-7. **Turbopack**: Windows+Node24 webpack 이슈 우회.
+7. **Turbopack**: Windows+Node24 webpack 이슈 우회 (Next 16 업그레이드로 해소, Turbopack은 유지).
 8. **타입 우회 임시**: `ignoreBuildErrors: true`. Sprint 1 [C1]에서 제거.
 9. **단일 레포 이식 (신규)**: `server/`를 Next.js 레포 루트로 이식. `scripts/` 포함.
 
