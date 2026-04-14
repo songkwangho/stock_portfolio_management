@@ -275,11 +275,13 @@ PC (md: 이상):
 - [x] **[C2-vercel]** Vercel 배포 성공 확인 (2026-04-15) — Next 15.3 → 16.2 업그레이드로 그간 실패 원인 해소
 - [x] **[C-GATE/Fix-GATE]** HealthGate — `fetch` + `AbortController` 25초 타임아웃 도입 (Render cold start 30~50초 1회 재시도로 커버) + UX-O "커피 한 모금 ☕" 문구. `stockApi.getHealth` 타임아웃 6s → 25s 통일
 - [x] **[M-1/Fix-7]** 미사용 `chartType` state + `CandlestickBar` 컴포넌트 제거 (Sprint 3 lightweight-charts 전환 시 재도입)
-- [ ] **[C3]** Neon 마이그레이션 + backfill-history (SQLite 덤프 불필요 — 서버가 자동 시드)
-  - Neon 프로젝트 생성 → `DATABASE_URL` 확보
-  - `DATABASE_URL=postgres://... node server/server.js` 1회 기동 → `initSchema`/`registerInitialData`가 97 종목 자동 시드 (즉시 Ctrl+C로 종료 가능)
-  - `DATABASE_URL=postgres://... node scripts/backfill-history.js` — 3년치 히스토리 수집 (~1.6분, 네이버 fchart API 1회/종목)
-  - 완료 검증 SQL: `SELECT code, COUNT(*) days FROM stock_history GROUP BY code HAVING COUNT(*) < 600 ORDER BY days ASC;` (600일 이하 경고 — 공휴일 반영)
+- [x] **[C3]** Neon 마이그레이션 + backfill-history 완료 (2026-04-15)
+  - Neon: AWS ap-southeast-1(Singapore) `ep-holy-dawn-a1v2z6yo` (pooler 엔드포인트)
+  - 서버 의존성 추가 설치: `express-rate-limit` (`server/package.json` 누락분 보완)
+  - `initSchema` → 테이블 전체 생성 완료
+  - `registerInitialData` → **97 종목** + **20 추천** 시드 완료
+  - `backfill-history.js` → **70,135행** 적재 완료 (97/97 종목, 평균 728일)
+  - 검증 SQL `HAVING COUNT(*) < 600` → 1종목만 경고: **쌍용C&E(003410)** 300일 (2024-08 **상장폐지**로 이후 데이터 없음 → `majorStocks`에서 제거 필요, 3.5차 이관)
 - [ ] Vercel + Render 배포 + `FRONTEND_URL` CORS 설정
   - **순서 고정**: Neon 마이그레이션 → backfill → Render 배포(API URL 확정) → Vercel 환경변수 설정 → Vercel 빌드 → E2E
   - **HealthGate 타임아웃 상향** (현재 15초 → 25초) 또는 Render Health Check `/api/health` 설정으로 cold start 대응
@@ -295,6 +297,7 @@ PC (md: 이상):
 - [ ] **[UX-NEW7]** 섹터 비교 테이블 — 현재 종목 자동 스크롤 또는 최상단 고정
 - [ ] **[UX-NEW8]** 포트폴리오 등록 폼 "비중(%)" 필드 — 레이블 재작성("총 자산의 몇 %") + "잘 모르겠으면 비워두세요" 힌트
 - [ ] **[UX-F]** 재무제표 테이블 — periods 정렬 방향(최신 → 과거) 헤더에 명시
+- [ ] **[Cleanup-1]** `server/domains/stock/data.js` `majorStocks` 목록에서 상장폐지 종목 제거 — 쌍용C&E(003410) 등
 
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
 - [ ] **[M1]** 차트 `components/charts/` 분리 + dynamic import 공유 청크화
