@@ -289,9 +289,9 @@ PC (md: 이상):
 
 ## 로드맵
 
-### Phase 3 — Next.js 재개발 + 배포 (현재, 1차 이전 완료 · 2026-04-14)
+### Phase 3 — Next.js 재개발 + 배포 (현재)
 
-**완료**
+**1차 이전 완료 (2026-04-14)**
 - [x] Next.js 15.3 + React 19 + Tailwind v4 App Router 초기화 (`package.json`, `tsconfig`, `postcss`)
 - [x] 라우팅 구조 구축: `/dashboard`, `/portfolio`, `/recommendations`, `/watchlist`, `/screener`, `/stocks`, `/settings`, `/stock/[code]`, `/alerts`
 - [x] 공유 모듈 이전 (`types/stock.ts`, `lib/deviceId.ts` SSR-safe, `lib/stockApi.ts` 클라이언트 격리, `lib/dataFreshness.ts`)
@@ -303,49 +303,72 @@ PC (md: 이상):
 - [x] 개발 서버 기동 확인 (`next dev --turbopack`, HTTP 200)
 - [x] GitHub 배포 (`origin/main` 푸시)
 
-**미완료 (Phase 3 잔여 과제)**
-- [ ] Server Component + ISR 설정 — 현재 모든 페이지가 `'use client'` CSR. `revalidate = 86400` 적용 대상: `/stocks`, `/recommendations`, `/stock/[code]` 기본 정보
-- [ ] 차트 컴포넌트 분리 — `components/charts/` 디렉터리로 분리 (PortfolioChart, AssetPieChart, VolumeBarChart, InvestorBarChart). 현재는 페이지 인라인
-- [ ] lightweight-charts 캔들차트 도입 (`CandleChart.tsx`, `dynamic ssr:false`) — 현재 캔들은 Recharts `CandlestickBar` 커스텀 shape 사용
-- [ ] TypeScript 엄격 모드 통과 — `next.config.ts`의 `typescript.ignoreBuildErrors` / `eslint.ignoreDuringBuilds` 제거. Recharts v3 Tooltip formatter 타입 등 정리
-- [ ] 프로덕션 빌드 통과 — 현재 로컬 Windows + Node 24 환경에서 `next build` 페이지 데이터 수집 단계 `readlink EISDIR` 이슈. pnpm 전환 또는 Node LTS(20/22) 검증 필요
-- [ ] Vercel + Render 배포
-- [ ] SQLite → Neon 데이터 마이그레이션
-- [ ] backfill-history 실행 (97종목 × 3년)
-- [ ] 백엔드 기동 상태에서 전체 페이지 E2E 수동 검증 (포트폴리오 CRUD, 추천, 스크리너, 종목상세, 알림)
+**2차 — UX 복구 완료 (Sprint 2, 2026-04-14)**
+- [x] **[H3]** 알림 진입점 일원화 — 헤더 드롭다운 제거, 아이콘 클릭 시 `/alerts` 라우팅 (모바일/PC 통일 · Phase 5 middleware 친화) — `components/layout/HeaderBar.tsx`
+- [x] **[H1/H2]** 온보딩 2단계 플로우 + pendingFocus 대체 — searchParams 기반 (`/portfolio?focus=add-holding`, `/portfolio?focus=first-stock-guide`) — `components/layout/DisclaimerModal.tsx`, `app/portfolio/page.tsx`
+- [x] **[H4]** `/stock/[code]` 컨텍스트 손실 완화 — `?from=holding|recommendation|watchlist|major|search|alerts` searchParams + 즉시 카테고리 뱃지 — `app/stock/[code]/page.tsx` 및 모든 호출처
+- [x] **[UX1]** 온보딩 목적 재설계 — "어떻게 사용하실 건가요?" 3갈래 분기 (보유 관리 / 종목 찾기 / 공부 시작) — `DisclaimerModal` purpose step
+- [x] **[UX2]** 대시보드 빈 상태 3-CTA 카드 (내 주식 관리 / 살 종목 찾기 / 주식 공부) — `app/dashboard/page.tsx`
+- [x] **[UX5]** 알림 메시지 초보자 친화 리라이트 — `/alerts`에서 5개 type별 description 치환 (sell_signal · sma5_break · sma5_touch · target_near · undervalued) — `app/alerts/page.tsx`
+- [x] **[UX6]** "분석 중" 뱃지 D+N 안내 — `last_updated` 기준 경과일 + 5영업일 누적 안내 — `app/portfolio/page.tsx`
+- [x] **[UX7]** `RecommendedStockCard` reason 항상 노출 (line-clamp-2)
 
-**보완 과제 (재이전 과정에서 신규 도출)**
-- [ ] 온보딩 2단계 플로우 (`onboarding_step` 1/2) 복구 — Phase 3 1차 이전 시 `DisclaimerModal`만 이전, 2단계 온보딩 모달은 생략됨
-- [ ] 알림 최초 진입 가이드 카드 (`onboarding_alerts_explained`) 복구 — `HeaderBar`에서 누락
-- [ ] `HoldingsAnalysisPage`의 `pendingFocus` 처리 (`add-holding-search`, `first-stock-guide`) — `useNavigationStore.consumePendingFocus` 제거에 따라 대체 수단 필요 (searchParams `?focus=...` 등)
-- [ ] `useNavigationStore` 폐기에 따른 `selectedStock` 카테고리 컨텍스트 보존 방식 결정 — 현재 `/stock/[code]`는 URL code만 받아 `usePortfolioStore`로 보유 여부를 추론
-- [ ] 모바일 탭바의 `/alerts` 독립 페이지 ↔ 헤더 알림 드롭다운 UX 일원화 (현재는 두 곳 모두 존재)
-- [ ] 검색 드롭다운 빈 결과 CTA의 "종목코드로 추가" 이동 대상 재정의 (기존 settings 내 해당 기능 확인 필요)
+**3차 — 배포 전 필수 (Sprint 1, ~3일, 외부 리뷰 반영)**
+- [ ] **[C0]** 백엔드 경로 일원화 결정 — 현재 `server/`와 `scripts/backfill-history.js`는 **원본 `C:\Users\aistudio\Documents\stock_app_dev\`에만 존재**. 신규 디렉터리로 이식할지, 원본 경로에서 그대로 돌릴지 결정 필요. Render 배포 단위·레포 단일화를 고려하면 이식 권장
+- [ ] **[C1]** TypeScript 엄격 모드 복원 — `tsc --noEmit`로 오류 목록 확보 → Recharts `Tooltip.formatter` `ContentType` 캐스팅 등 수정 → `next.config.ts`의 `ignoreBuildErrors` / `eslint.ignoreDuringBuilds` 제거
+- [ ] **[C2]** Vercel 빌드 검증 — 로컬 Windows+Node24의 `readlink EISDIR`과 무관. git push 후 Vercel 대시보드 로그 확인이 단일 신뢰 경로
+- [ ] **[C3]** Neon 마이그레이션 + backfill-history 선행
+  - `DATABASE_URL` 설정 후 `server/db/migrate.js`
+  - SQLite(`stocks.db`) 덤프 → Neon 적재 스크립트 작성·실행
+  - backfill-history 97종목 × 3년 배치 3개씩 (~6시간 예상)
+  - 완료 검증 스크립트: `stock_history` 레코드 수 = 97 × (영업일 × 3년) ± 허용 오차
+- [ ] Vercel(프론트) + Render(API) 배포
+- [ ] 백엔드 기동 상태에서 전체 페이지 E2E 수동 검증 (포트폴리오 CRUD, 추천, 스크리너, 종목상세, 알림, 온보딩 3갈래)
+
+**4차 — 성능 최적화 (Sprint 3, ~2일, 배포 후 가능)**
+- [ ] **[M1]** 차트 `components/charts/` 분리 + `dynamic ssr:false` 공유 청크화 (Recharts 1회 로드)
+- [ ] **[M3]** ISR 적용 — `/stocks`, `/recommendations` 우선. `/stock/[code]`는 `generateStaticParams`(97종목) 빌드 시간 영향 고려해 마지막
+- [ ] **[M4]** 모바일 대시보드 상단 KOSPI/KOSDAQ 노출 (헤더 공간 부족 대체)
+- [ ] **[M2]** 캔들차트 lightweight-charts 전환 — 별도 차수 (성능·확대축소 인터랙션 개선)
+
+**5차 — 후속 UX 개선 (Sprint 4, 배포 후)**
+- [ ] **[UX3]** `/stock/[code]` 탭 구조 ([요약] [차트] [분석] [기업]) — 정보 과부하 해소
+- [ ] **[UX4]** 수익/손실 숫자 맥락 제공 (KOSPI 동기간 비교 또는 6구간 메시지 포트폴리오 카드 적용)
+- [ ] 검색 드롭다운 빈 결과 "종목코드로 추가" 이동 대상 재정의
 
 - 목표 사용자: **50명**
 
-### Phase 4 — 데이터 누적 + 백테스팅 (Phase 3과 병행)
+### Phase 4 — 데이터 누적 + 백테스팅 (원계획 조정)
 - [ ] 스코어 임계값 백테스팅 (7/4점 → 데이터 기반)
 - [ ] 섹터별 스코어링 가중치 (바이오·금융 우선)
+- [ ] backfill 완료 검증 스크립트 (`stock_history` 레코드 수 기준)
+- **조정**: Phase 3 배포 즉시 병행이 아닌, **backfill 완료 + 최소 2개월 실서비스 데이터 누적 후** 시작. 그 이전의 백테스팅은 표본 부족
 - 목표: 임계값 실증 검증
 
 ### Phase 5 — 소셜 로그인 + 구독 (50명 달성 후)
-- [ ] Kakao OAuth (3~4일) + Google OAuth (+1~2일)
-- [ ] device_id → user_id B안 병합 (UX 단절 없음)
+- [ ] **Google OAuth 먼저** (즉시 활성화, 1~2일) — Kakao 심사 대기(영업일 3~7일) 블로킹 회피
+- [ ] Kakao OAuth 심사 병행 신청 → 승인 후 추가 연동
+- [ ] device_id → user_id B안 병합 + **"이 기기의 기존 데이터를 내 계정으로 가져올까요? [예/아니요]" 확인 UI** (동일 기기 다계정 로그인 시 데이터 중복/혼재 방지)
 - [ ] JWT (`Authorization: Bearer`, 1h + 14일 refresh)
 - [ ] Next.js middleware로 보호 라우트 처리
-- [ ] Toss Payments 구독 (월 9,900원)
+- [ ] 구독 DB 스키마 설계 (상태·만료·환불 이력)
+- [ ] Toss Payments 구독 (월 9,900원) — 웹훅 처리, 만료 처리, 이용약관
 - [ ] Claude Haiku AI 분석 리포트 (종목별 일 1회 캐시 + 월 10회 개인)
+- **조정**: 구현 순서는 **Google OAuth → 구독 DB → Toss → Haiku** 순차. 동시 병행 시 3~4주 초과 위험
 - 목표 사용자: **200명**
 
-### Phase 6 — 데이터 소스 안정화 (Phase 5 이후)
-- [ ] KRX REST API로 네이버 스크래핑 대체
+### Phase 6 — 데이터 소스 안정화 (Phase 5 이후, 목표 재설정)
+- [ ] **가격/거래량**: KRX OpenAPI 전환 (일봉만 제공)
+- [ ] **재무지표(PER/PBR/EPS 등)**: FinanceDataReader 또는 네이버 부분 유지 — KRX 단독으로는 불가
 - [ ] Vercel 단일 배포 검토 (Express → Route Handlers 점진 이전)
-- 목표: 스크래핑 의존도 제거
+- **조정**: 원계획 "스크래핑 완전 제거" → **"스크래핑 의존도 축소"** 로 목표 현실화
 
-### Phase 7 — 실시간 분석 (구독자 100명+)
+### Phase 7 — 실시간 분석 (구독자 100명+, 비용 구조 재검토 필요)
+- [ ] 서버 아키텍처 결정: **Express WebSocket 레이어 확장 우선 검토** vs FastAPI 별도 파이프라인
+  - 100명 × 9,900원 = 월 990,000원 수익
+  - 비용: KIS 서버 $25+ (장외 시간도 상시) + Neon paid + Vercel Pro
+  - 마진이 생각보다 좁음 → FastAPI 별도 프로세스는 수익성 검증 후 도입
 - [ ] KIS WebSocket API (장중 1분봉)
-- [ ] FastAPI 실시간 파이프라인 서버 (상시 실행, 유료 서버)
 - [ ] SSE 알림 즉시 푸시
 - [ ] 실시간 기능 프리미엄 전용 포지셔닝
 
@@ -385,17 +408,17 @@ PC (md: 이상):
 - **원 계획**: "기존 Zustand 스토어 이전 (코드 변경 없음)".
 - **현 상태**: `useNavigationStore`는 제거. App Router의 `useRouter().push()` / `usePathname()`로 대체. `handleDetailClick(stock)` → `router.push('/stock/<code>')`.
 - **사유**: Next.js 라우팅과 중복되는 탭 상태 머신을 유지할 필요 없음.
-- **부작용**: `consumePendingFocus`(온보딩 플로우에서 포트폴리오 페이지의 자동 폼 노출, 첫 종목 가이드 카드 트리거)가 사라짐. Phase 3 "보완 과제"에서 searchParams 기반으로 대체 예정.
+- **부작용**: `consumePendingFocus`(온보딩 플로우에서 포트폴리오 페이지의 자동 폼 노출, 첫 종목 가이드 카드 트리거)가 사라짐.
+- **해결 (Sprint 2)**: `app/portfolio/page.tsx`에서 `useSearchParams()` 기반 `?focus=add-holding` / `?focus=first-stock-guide` 처리로 대체 완료.
 
 ### 6. `/stock/[code]` 페이지의 stock 컨텍스트 복원 방식
 - **원 계획**: 상세 페이지가 부모로부터 `stock: StockSummary` prop을 받음(카테고리=`'보유 종목'` / `'주요 종목'` 등 포함).
-- **현 상태**: URL param `code`만 받아 `usePortfolioStore.holdings`에서 보유 여부·메타를 역조회. 보유가 아닌 경우 `{ code, name: code, category: '' }` 로 시작한 뒤 서버 응답으로 덮어씀.
-- **부작용**: "추천에서 진입했는지 / 보유 종목에서 진입했는지"가 URL에 표현되지 않음. 현재 로직은 `isHolding` 판정에만 사용되므로 큰 문제 없으나, 추천 분석 우대 동작이 있다면 `searchParams`(`?from=recommendations`)로 확장 필요.
+- **현 상태**: URL param `code` + `searchParams.get('from')`으로 진입 컨텍스트 복원. 보유 여부는 `usePortfolioStore.holdings`로 재검증, 비보유 케이스는 `from` 값(`holding|recommendation|watchlist|major|search|alerts`)으로 초기 카테고리 결정 후 서버 응답으로 덮어씀.
+- **해결 (Sprint 2)**: 모든 호출처(dashboard, portfolio, recommendations, watchlist, screener, stocks, HeaderBar 검색)에서 `?from=` 쿼리 전달.
 
-### 7. 헤더 알림 드롭다운과 `/alerts` 페이지 병존
+### 7. 알림 진입점 일원화 — 헤더 드롭다운 제거
 - **원 계획**: 모바일 탭바 5개 중 "알림"은 드롭다운(`handleToggleAlerts`) 또는 전체 화면 모달.
-- **현 상태**: 모바일 탭바는 독립된 `/alerts` 라우트로 이동시키되, PC 헤더의 드롭다운은 유지. 결과적으로 두 진입점이 공존.
-- **후속**: 하나로 일원화할지, 두 진입점을 의도적 유지할지 결정 필요("보완 과제" 참조).
+- **해결 (Sprint 2)**: PC 헤더 드롭다운 제거, PC/모바일 모두 `/alerts` 라우트로 단일화. `HeaderBar`는 뱃지 + 라우팅만 담당. Phase 5 middleware 보호 라우트 설계도 단순해짐.
 
 ### 8. 검색 시장지수의 데스크톱 한정 노출
 - **원 계획**: 헤더 좌측에 시장지수(KOSPI/KOSDAQ 등) 노출.

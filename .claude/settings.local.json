@@ -8,7 +8,10 @@
       "Bash(npm run:*)",
       "Bash(wait)",
       "Bash(npm --version)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Read(//c/Users/aistudio/.claude/projects/d--stock-app-dev-v2/memory//**)",
+      "Bash(git -C /d/stock_app_dev_v2 status --short)",
+      "Bash(git diff:*)"
     ]
   }
 }

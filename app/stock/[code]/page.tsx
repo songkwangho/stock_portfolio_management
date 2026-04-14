@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight
 } from 'lucide-react';
@@ -43,15 +43,25 @@ const CandlestickBar = (props: Record<string, unknown>) => {
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from'); // holding | recommendation | watchlist | major | alerts | search
   const onBack = () => router.back();
   const onAdd = usePortfolioStore(s => s.addHolding);
   const onUpdate = usePortfolioStore(s => s.updateHolding);
   const holdings = usePortfolioStore(s => s.holdings);
-  const isHolding = holdings.some(h => h.code === code);
   const holdingMatch = holdings.find(h => h.code === code);
+  const isHolding = !!holdingMatch || from === 'holding';
+
+  // 진입 컨텍스트 → 초기 카테고리 결정 (보유 여부는 store로 재검증)
+  const categoryFromContext =
+    isHolding ? '보유 종목' :
+    from === 'recommendation' ? '추천 종목' :
+    from === 'watchlist' ? '관심 종목' :
+    from === 'major' ? '주요 종목' : '';
+
   const stock: StockSummary = holdingMatch
     ? { code, name: holdingMatch.name, category: '보유 종목', avgPrice: holdingMatch.avgPrice, quantity: holdingMatch.quantity, currentPrice: holdingMatch.currentPrice, value: holdingMatch.value, market_opinion: holdingMatch.market_opinion }
-    : { code, name: code, category: '' };
+    : { code, name: code, category: categoryFromContext };
 
   const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -938,7 +948,7 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
                           // StockDetailView(추천/검색에서 진입한 케이스)에서 첫 종목 추가 시:
                           // HoldingsAnalysisPage로 이동하면서 첫 종목 가이드 카드 노출 트리거.
                           // 현재 페이지에 머무르면 사용자는 분석 결과·원금 비중을 확인할 새 진입점을 놓치게 된다.
-                          router.push('/portfolio');
+                          router.push('/portfolio?focus=first-stock-guide');
                         } else {
                           onBack();
                         }

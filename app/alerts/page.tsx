@@ -6,12 +6,27 @@ import { Trash2 } from 'lucide-react';
 import { useAlertStore } from '@/stores/useAlertStore';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
 
-const ALERT_TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  sell_signal: { label: '가격 하락 경고', icon: '🔴', color: 'text-red-400 bg-red-500/10' },
-  sma5_break: { label: '단기 하락 알림', icon: '📉', color: 'text-red-400 bg-red-500/10' },
-  sma5_touch: { label: '가격 지지 알림', icon: '💡', color: 'text-emerald-400 bg-emerald-500/10' },
-  target_near: { label: '목표가 근접 알림', icon: '🎯', color: 'text-yellow-400 bg-yellow-500/10' },
-  undervalued: { label: '저평가 분석 결과', icon: '💎', color: 'text-blue-400 bg-blue-500/10' },
+const ALERT_TYPE_LABELS: Record<string, { label: string; icon: string; color: string; description: string }> = {
+  sell_signal: {
+    label: '가격 하락 경고', icon: '🔴', color: 'text-red-400 bg-red-500/10',
+    description: '평단가 대비 -7% 이상 하락해 손절 기준에 닿았어요. 분석을 다시 확인해 보세요.',
+  },
+  sma5_break: {
+    label: '단기 하락 알림', icon: '📉', color: 'text-red-400 bg-red-500/10',
+    description: '5일 평균선 아래로 떨어졌어요. 단기 하락 흐름일 수 있으니 추세를 지켜보세요.',
+  },
+  sma5_touch: {
+    label: '가격 지지 알림', icon: '💡', color: 'text-emerald-400 bg-emerald-500/10',
+    description: '5일 평균선 근처에서 지지받고 있어요. 반등 가능 구간일 수 있어요.',
+  },
+  target_near: {
+    label: '목표가 근접 알림', icon: '🎯', color: 'text-yellow-400 bg-yellow-500/10',
+    description: '애널리스트 목표가에 가까워졌어요. 차익 실현 시점을 고민해 볼 때예요.',
+  },
+  undervalued: {
+    label: '저평가 분석 결과', icon: '💎', color: 'text-blue-400 bg-blue-500/10',
+    description: '밸류에이션·지표상 저평가 구간으로 분석됐어요. 상세 분석을 확인해 보세요.',
+  },
 };
 
 export default function AlertsPage() {
@@ -34,7 +49,7 @@ export default function AlertsPage() {
         </div>
       ) : (
         alerts.map((alert) => {
-          const typeInfo = ALERT_TYPE_LABELS[alert.type] || { label: alert.type, icon: '📋', color: 'text-slate-400 bg-slate-500/10' };
+          const typeInfo = ALERT_TYPE_LABELS[alert.type] || { label: alert.type, icon: '📋', color: 'text-slate-400 bg-slate-500/10', description: '' };
           return (
             <div key={alert.id} className="px-5 py-3 bg-slate-900/50 border border-slate-800 rounded-2xl">
               <div className="flex items-start justify-between mb-1">
@@ -47,7 +62,10 @@ export default function AlertsPage() {
                   <Trash2 size={14} />
                 </button>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed pl-7">{alert.message}</p>
+              {typeInfo.description && (
+                <p className="text-xs text-slate-300 leading-relaxed pl-7 mb-1">{typeInfo.description}</p>
+              )}
+              <p className="text-xs text-slate-500 leading-relaxed pl-7">{alert.message}</p>
               <p className="text-xs text-slate-600 mt-1 pl-7">{getDataFreshnessShort(alert.created_at)}</p>
               <div className="pl-7 mt-2">
                 <button onClick={() => router.push(`/stock/${alert.code}`)} className="text-xs font-bold px-4 py-2 min-h-[44px] bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors">

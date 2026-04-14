@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TrendingUp, Plus, Pencil, Trash2, Check, X, ChevronUp, PlusCircle, Eye, HelpCircle } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
@@ -16,6 +16,8 @@ interface EditState {
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focus = searchParams.get('focus');
   const holdings = usePortfolioStore(s => s.holdings);
   const onAdd = usePortfolioStore(s => s.addHolding);
   const onUpdate = usePortfolioStore(s => s.updateHolding);
@@ -23,7 +25,10 @@ export default function PortfolioPage() {
   const portfolioError = usePortfolioStore(s => s.error);
   const refetchHoldings = usePortfolioStore(s => s.fetchHoldings);
 
-  const onDetailClick = (stock: StockSummary) => router.push(`/stock/${stock.code}`);
+  const onDetailClick = (stock: StockSummary) => {
+    const isHolding = stock.category === '보유 종목';
+    router.push(`/stock/${stock.code}?from=${isHolding ? 'holding' : 'watchlist'}`);
+  };
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
@@ -39,6 +44,18 @@ export default function PortfolioPage() {
   useEffect(() => {
     refetchHoldings();
   }, [refetchHoldings]);
+
+  // H1/H2: searchParams 기반 포커스 처리
+  useEffect(() => {
+    if (focus === 'add-holding') {
+      setShowAddForm(true);
+    }
+    if (focus === 'first-stock-guide' && holdings.length > 0 && !localStorage.getItem('onboarding_first_stock_guided')) {
+      const just = holdings[0];
+      setFirstStockGuide({ code: just.code, name: just.name });
+      localStorage.setItem('onboarding_first_stock_guided', '1');
+    }
+  }, [focus, holdings]);
 
   const showToast = (type: 'success' | 'error', text: string, action?: { label: string; onClick: () => void }) => {
     setToast({ type, text, action });
@@ -302,12 +319,20 @@ export default function PortfolioPage() {
 
               {(stock.holding_opinion || stock.market_opinion) && (
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {stock.holding_opinion && stock.sma_available === false ? (
-                    <div className="text-xs font-bold px-2.5 py-1.5 rounded-lg border bg-slate-500/10 text-slate-400 border-slate-500/20">
-                      분석 중
-                      <span className="font-normal text-slate-500 ml-1">이평선 데이터를 수집 중이에요. 잠시 후 다시 확인해보세요.</span>
-                    </div>
-                  ) : stock.holding_opinion && (() => {
+                  {stock.holding_opinion && stock.sma_available === false ? (() => {
+                    const days = stock.last_updated
+                      ? Math.max(0, Math.floor((Date.now() - new Date(stock.last_updated).getTime()) / 86400000))
+                      : null;
+                    const dLabel = days !== null ? `D+${days}` : null;
+                    return (
+                      <div className="text-xs font-bold px-2.5 py-1.5 rounded-lg border bg-slate-500/10 text-slate-400 border-slate-500/20">
+                        분석 중{dLabel && <span className="text-slate-500 ml-1">({dLabel})</span>}
+                        <span className="font-normal text-slate-500 ml-1">
+                          이평선 데이터를 수집 중이에요. 5영업일 이상 누적되면 의견이 표시돼요.
+                        </span>
+                      </div>
+                    );
+                  })() : stock.holding_opinion && (() => {
                     const displayLabel =
                       stock.holding_opinion === '매도' ? '주의 필요' :
                       stock.holding_opinion === '추가매수' ? '추가 검토' :

@@ -27,7 +27,7 @@ export default function MajorStocksPage() {
   const [deleting, setDeleting] = useState(false);
 
   const onDetailClick = (stock: StockSummary) => {
-    router.push(`/stock/${stock.code}`);
+    router.push(`/stock/${stock.code}?from=major`);
   };
 
   const fetchStocks = async () => {

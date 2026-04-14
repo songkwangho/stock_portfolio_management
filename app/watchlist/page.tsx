@@ -7,7 +7,7 @@ import type { StockSummary } from '@/types/stock';
 export default function WatchlistPage() {
   const router = useRouter();
   const onDetailClick = (stock: StockSummary) => {
-    router.push(`/stock/${stock.code}`);
+    router.push(`/stock/${stock.code}?from=watchlist`);
   };
 
   return (

@@ -14,7 +14,7 @@ export default function RecommendationsPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const onDetailClick = (stock: StockSummary) => {
-    router.push(`/stock/${stock.code}`);
+    router.push(`/stock/${stock.code}?from=recommendation`);
   };
 
   useEffect(() => {

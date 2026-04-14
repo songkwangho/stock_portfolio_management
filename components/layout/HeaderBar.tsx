@@ -2,19 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Bell, X, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, Bell } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import { useAlertStore } from '@/stores/useAlertStore';
-import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import type { StockSummary, MarketIndex } from '@/types/stock';
-
-const ALERT_TYPE_LABELS: Record<string, { label: string; icon: string; color: string; priority: string }> = {
-  sell_signal: { label: '가격 하락 경고', icon: '🔴', color: 'text-red-400 bg-red-500/10', priority: 'high' },
-  sma5_break: { label: '단기 하락 알림', icon: '📉', color: 'text-red-400 bg-red-500/10', priority: 'medium' },
-  sma5_touch: { label: '가격 지지 알림', icon: '💡', color: 'text-emerald-400 bg-emerald-500/10', priority: 'medium' },
-  target_near: { label: '목표가 근접 알림', icon: '🎯', color: 'text-yellow-400 bg-yellow-500/10', priority: 'high' },
-  undervalued: { label: '저평가 분석 결과', icon: '💎', color: 'text-blue-400 bg-blue-500/10', priority: 'low' },
-};
 
 interface Props {
   nickname: string;
@@ -22,12 +13,11 @@ interface Props {
 
 export default function HeaderBar({ nickname }: Props) {
   const router = useRouter();
-  const { alerts, unreadCount, fetchAlerts, fetchUnreadCount, markAllRead, deleteAlert } = useAlertStore();
+  const { unreadCount, fetchUnreadCount } = useAlertStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StockSummary[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
 
   useEffect(() => {
@@ -55,15 +45,7 @@ export default function HeaderBar({ nickname }: Props) {
   const handleSearchSelect = (stock: StockSummary) => {
     setSearchQuery('');
     setSearchResults([]);
-    router.push(`/stock/${stock.code}`);
-  };
-
-  const handleToggleAlerts = async () => {
-    if (!showAlerts) {
-      await fetchAlerts();
-      await markAllRead();
-    }
-    setShowAlerts(!showAlerts);
+    router.push(`/stock/${stock.code}?from=search`);
   };
 
   return (
@@ -154,90 +136,20 @@ export default function HeaderBar({ nickname }: Props) {
       </div>
 
       <div className="flex items-center space-x-5">
-        <div className="relative">
-          <button
-            title="알림 확인"
-            onClick={handleToggleAlerts}
-            className="bg-slate-900/50 p-2.5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all relative"
-          >
-            <Bell size={20} className="text-slate-400" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-slate-950 flex items-center justify-center text-xs font-bold text-white px-1">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          {showAlerts && (
-            <>
-              <div className="md:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setShowAlerts(false)} />
-              <div className="fixed inset-0 z-50 flex flex-col bg-slate-900 md:absolute md:inset-auto md:top-full md:right-0 md:mt-2 md:w-[400px] md:max-h-[80vh] md:bg-slate-900 md:border md:border-slate-800 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 shrink-0">
-                  <h4 className="text-base md:text-sm font-bold">알림</h4>
-                  <button onClick={() => setShowAlerts(false)} className="text-slate-500 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="알림 닫기">
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-auto md:max-h-96">
-                  {alerts.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <p className="text-2xl mb-2">🔔</p>
-                      <p className="text-slate-400 font-bold mb-1">아직 알림이 없어요</p>
-                      <p className="text-slate-600 text-xs">보유·관심 종목에 주요 변화가 생기면 알려드려요</p>
-                    </div>
-                  ) : (
-                    alerts.map((alert) => {
-                      const typeInfo = ALERT_TYPE_LABELS[alert.type] || { label: alert.type, icon: '📋', color: 'text-slate-400 bg-slate-500/10', priority: 'low' };
-                      return (
-                        <div key={alert.id} className={`px-5 py-3 border-b border-slate-800/50 ${typeInfo.priority === 'high' ? 'border-l-2 border-l-red-500/50' : ''}`}>
-                          <div className="flex items-start justify-between mb-1">
-                            <div className="flex items-center space-x-2 flex-wrap">
-                              <span className="text-sm">{typeInfo.icon}</span>
-                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${typeInfo.color}`}>{typeInfo.label}</span>
-                              <span className="text-xs text-slate-500 font-bold">{alert.name}</span>
-                              {alert.source === 'holding' ? (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">보유 중</span>
-                              ) : alert.source === 'watchlist' ? (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">관심 종목</span>
-                              ) : (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">알림</span>
-                              )}
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteAlert(alert.id); }}
-                              className="text-red-400/60 active:text-red-400 transition-all p-1 min-w-[32px] min-h-[32px] flex items-center justify-center"
-                              aria-label="알림 삭제"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-400 leading-relaxed pl-7">{alert.message}</p>
-                          <p className="text-xs text-slate-600 mt-1 pl-7">{getDataFreshnessShort(alert.created_at)}</p>
-                          <div className="flex items-center space-x-2 pl-7 mt-2">
-                            <button
-                              onClick={() => { router.push(`/stock/${alert.code}`); setShowAlerts(false); }}
-                              className="text-xs font-bold px-4 py-2 min-h-[44px] bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors"
-                            >
-                              지금 확인하기
-                            </button>
-                            <button
-                              onClick={() => setShowAlerts(false)}
-                              className="text-xs font-bold px-4 py-2 min-h-[44px] text-slate-400 hover:text-white transition-colors"
-                            >
-                              나중에 볼게요
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </>
+        <button
+          title="알림"
+          onClick={() => router.push('/alerts')}
+          className="bg-slate-900/50 p-2.5 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all relative"
+        >
+          <Bell size={20} className="text-slate-400" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-slate-950 flex items-center justify-center text-xs font-bold text-white px-1">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
           )}
-        </div>
-        <div className="h-6 w-px bg-slate-800"></div>
-        <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => router.push('/portfolio')}>
+        </button>
+        <div className="h-6 w-px bg-slate-800 hidden md:block"></div>
+        <div className="hidden md:flex items-center space-x-3 cursor-pointer group" onClick={() => router.push('/portfolio')}>
           <div className="text-right">
             <p className="text-sm font-bold leading-none mb-1 group-hover:text-blue-400 transition-colors">{nickname || '투자자'}</p>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-tighter">내 포트폴리오</p>

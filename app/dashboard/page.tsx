@@ -52,7 +52,7 @@ export default function DashboardPage() {
   };
 
   const onDetailClick = (stock: StockSummary) => {
-    router.push(`/stock/${stock.code}`);
+    router.push(`/stock/${stock.code}?from=holding`);
   };
 
   useEffect(() => {
@@ -124,17 +124,32 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {holdings.length === 0 && onboardingDone && (
-        <div className="bg-gradient-to-br from-blue-600/10 to-emerald-600/10 border border-blue-500/20 rounded-3xl p-8 text-center">
-          <h2 className="text-xl font-bold mb-3">주식 분석을 시작해 보세요!</h2>
-          <p className="text-slate-400 text-sm mb-6 leading-relaxed max-w-md mx-auto">
-            보유 종목을 추가하면 수익률 추적, 매수/매도 의견, 알림을 받을 수 있어요.
+        <div className="bg-gradient-to-br from-blue-600/10 to-emerald-600/10 border border-blue-500/20 rounded-3xl p-6 md:p-8">
+          <h2 className="text-xl font-bold mb-2 text-center">무엇부터 시작해 볼까요?</h2>
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed text-center max-w-md mx-auto">
+            목적에 맞게 골라주세요. 나중에 다른 기능도 전부 쓰실 수 있어요.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button onClick={() => onNavigate('analysis')} className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-colors">
-              종목 추가하기
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button
+              onClick={() => router.push('/portfolio?focus=add-holding')}
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+            >
+              <p className="text-sm font-bold text-white mb-1">📊 내 주식 관리</p>
+              <p className="text-xs text-slate-400 leading-relaxed">보유 종목을 등록해 수익률·의견을 받아요.</p>
             </button>
-            <button onClick={() => onNavigate('recommendations')} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-bold transition-colors">
-              추천 종목 둘러보기
+            <button
+              onClick={() => onNavigate('recommendations')}
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+            >
+              <p className="text-sm font-bold text-white mb-1">🔍 살 종목 찾기</p>
+              <p className="text-xs text-slate-400 leading-relaxed">알고리즘 점수 기반 추천 종목을 살펴봐요.</p>
+            </button>
+            <button
+              onClick={() => onNavigate('major')}
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+            >
+              <p className="text-sm font-bold text-white mb-1">📚 주식 공부</p>
+              <p className="text-xs text-slate-400 leading-relaxed">주요 97종목과 용어로 기본기를 익혀요.</p>
             </button>
           </div>
         </div>

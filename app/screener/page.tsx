@@ -68,7 +68,7 @@ export default function ScreenerPage() {
   });
 
   const onDetailClick = (stock: StockSummary) => {
-    router.push(`/stock/${stock.code}`);
+    router.push(`/stock/${stock.code}?from=search`);
   };
 
   const handleSearch = async (filterOverride?: Record<string, string | number>) => {
