@@ -95,8 +95,8 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── scrapers/                 # 네이버 증권
 │   ├── domains/                  # 도메인별 서비스
 │   ├── scheduler.js
-│   ├── stocks.db                 # SQLite (Neon 마이그레이션 시 덤프 소스)
 │   └── package.json              # 별도 의존성 — `cd server && npm install` 필요
+│   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
 │
 └── scripts/
     └── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
@@ -273,11 +273,13 @@ PC (md: 이상):
 - [x] **[UX-N]** `/alerts` 빈 상태 — 알림 트리거 조건(5일 평균선 이탈·목표가 근접·저평가) + 갱신 시각(매일 08:00) 명시
 - [x] **[C2-local]** 로컬 `next build --turbopack` 통과 확인 (Next 16.2, 11개 라우트, tsconfig.json 자동 업데이트 `jsx: react-jsx` 포함)
 - [x] **[C2-vercel]** Vercel 배포 성공 확인 (2026-04-15) — Next 15.3 → 16.2 업그레이드로 그간 실패 원인 해소
-- [ ] **[C3]** Neon 마이그레이션 + backfill-history
-  - `DATABASE_URL` 설정 후 `node server/db/migrate.js`
-  - SQLite(`stocks.db`) 덤프 → Neon 적재 스크립트 작성·실행
-  - `node scripts/backfill-history.js` (97종목 × 3년, 배치 3개씩, ~6시간)
-  - 완료 검증 SQL: `SELECT code, COUNT(*) days FROM stock_history GROUP BY code HAVING COUNT(*) < 600 ORDER BY days ASC;`
+- [x] **[C-GATE/Fix-GATE]** HealthGate — `fetch` + `AbortController` 25초 타임아웃 도입 (Render cold start 30~50초 1회 재시도로 커버) + UX-O "커피 한 모금 ☕" 문구. `stockApi.getHealth` 타임아웃 6s → 25s 통일
+- [x] **[M-1/Fix-7]** 미사용 `chartType` state + `CandlestickBar` 컴포넌트 제거 (Sprint 3 lightweight-charts 전환 시 재도입)
+- [ ] **[C3]** Neon 마이그레이션 + backfill-history (SQLite 덤프 불필요 — 서버가 자동 시드)
+  - Neon 프로젝트 생성 → `DATABASE_URL` 확보
+  - `DATABASE_URL=postgres://... node server/server.js` 1회 기동 → `initSchema`/`registerInitialData`가 97 종목 자동 시드 (즉시 Ctrl+C로 종료 가능)
+  - `DATABASE_URL=postgres://... node scripts/backfill-history.js` — 3년치 히스토리 수집 (~1.6분, 네이버 fchart API 1회/종목)
+  - 완료 검증 SQL: `SELECT code, COUNT(*) days FROM stock_history GROUP BY code HAVING COUNT(*) < 600 ORDER BY days ASC;` (600일 이하 경고 — 공휴일 반영)
 - [ ] Vercel + Render 배포 + `FRONTEND_URL` CORS 설정
   - **순서 고정**: Neon 마이그레이션 → backfill → Render 배포(API URL 확정) → Vercel 환경변수 설정 → Vercel 빌드 → E2E
   - **HealthGate 타임아웃 상향** (현재 15초 → 25초) 또는 Render Health Check `/api/health` 설정으로 cold start 대응

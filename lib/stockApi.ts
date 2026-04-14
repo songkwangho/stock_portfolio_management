@@ -68,7 +68,8 @@ export const stockApi = {
   getChartData: async (code: string, timeframe: 'weekly' | 'monthly') =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/chart/${timeframe}`)).data,
   getHealth: async () => {
-    const r = await axios.get(`${API_BASE_URL}/health`, { timeout: 6000 });
+    // 25s: Render free-tier cold start(30~50s) 대응. HealthGate는 fetch+AbortController 직접 사용.
+    const r = await axios.get(`${API_BASE_URL}/health`, { timeout: 25000 });
     return r.data as { api: boolean; database: boolean; lastSync: string | null };
   },
 };

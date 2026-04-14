@@ -18,7 +18,16 @@
       "Bash(grep -n \"tickFormatter.*k\\\\`\\\\|volume\\\\|거래량\" /d/stock_app_dev_v2/app/stock/\\\\[code\\\\]/page.tsx)",
       "Bash(DATABASE_URL=\"\" npx next build)",
       "Bash(echo \"tsc=$?\")",
-      "Bash(git -C /d/stock_app_dev_v2 diff --stat tsconfig.json)"
+      "Bash(git -C /d/stock_app_dev_v2 diff --stat tsconfig.json)",
+      "Bash(sqlite3 --version)",
+      "Bash(node -e \"const Database = require\\('better-sqlite3'\\); try { const db = new Database\\('d:/stock_app_dev_v2/server/stocks.db', {readonly:true}\\); const tables = db.prepare\\(\\\\\"SELECT name FROM sqlite_master WHERE type='table'\\\\\"\\).all\\(\\); console.log\\(tables.map\\(t=>t.name\\).join\\(', '\\)\\); for \\(const t of tables\\) { const c = db.prepare\\(\\\\`SELECT COUNT\\(*\\) as n FROM \\\\${t.name}\\\\`\\).get\\(\\); console.log\\(t.name, c.n\\); } } catch\\(e\\) { console.log\\('error:', e.message\\); }\")",
+      "Bash(sqlite3 /d/stock_app_dev_v2/server/stocks.db \".tables\")",
+      "Bash(sqlite3 /d/stock_app_dev_v2/server/stocks.db 'SELECT COUNT\\(*\\) FROM __TRACKED_VAR__')",
+      "Bash(sqlite3 /d/stock_app_dev_v2/server/stocks.db \"SELECT code, COUNT\\(*\\) FROM stock_history GROUP BY code\")",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_JpOlFcMo9bn5@ep-holy-dawn-a1v2z6yo-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" NODE_ENV=production timeout 30 node server/server.js)",
+      "Bash(grep -rEh \"^import .* from ['\\\\\"][^./]\" /d/stock_app_dev_v2/server/*.js /d/stock_app_dev_v2/server/**/*.js)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_JpOlFcMo9bn5@ep-holy-dawn-a1v2z6yo-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" NODE_ENV=production node scripts/backfill-history.js)",
+      "Bash(node -e ':*)"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -16,30 +16,6 @@ import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomShe
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 
-// Custom candlestick shape for ComposedChart
-const CandlestickBar = (props: Record<string, unknown>) => {
-  const { x, y, width, height, payload } = props as {
-    x: number; y: number; width: number; height: number;
-    payload: { open: number; price: number; high: number; low: number; yHigh: number; yLow: number; yOpen: number; yClose: number };
-  };
-  if (!payload || payload.open === undefined) return null;
-
-  const isUp = payload.price >= payload.open;
-  const fill = isUp ? '#10b981' : '#ef4444';
-  const bodyTop = isUp ? (y) : (y);
-  const bodyHeight = Math.max(1, Math.abs(height));
-
-  // Wick (high-low line)
-  const xCenter = x + width / 2;
-
-  return (
-    <g>
-      <line x1={xCenter} y1={payload.yHigh} x2={xCenter} y2={payload.yLow} stroke={fill} strokeWidth={1} />
-      <rect x={x + width * 0.15} y={bodyTop} width={width * 0.7} height={bodyHeight} fill={fill} rx={1} />
-    </g>
-  );
-};
-
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
   return (
@@ -86,7 +62,6 @@ function StockDetailContent({ code }: { code: string }) {
   const [volatility, setVolatility] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
-  const [chartType, setChartType] = useState<'line' | 'candle'>('line');
   const [helpTerm, setHelpTerm] = useState<HelpTermKey | null>(null);
   const [news, setNews] = useState<NewsItem[] | null>(null);
   const [financials, setFinancials] = useState<FinancialData | null>(null);
@@ -353,16 +328,12 @@ function StockDetailContent({ code }: { code: string }) {
               </h3>
               {/* 16차 5-6: SMA 의미를 한 줄로 더 구체적으로 설명 — 초보자가 "평균선"의 의미와 해석 규칙을 모르는 경우 대비 */}
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 mb-4 text-xs text-blue-300 leading-relaxed">
-                {chartType === 'line' ? (
-                  <>
-                    <p className="font-bold mb-1">💡 이평선(이동평균선) 보는 법</p>
-                    <p>
-                      <span className="text-blue-400 font-bold">파란선</span>(5일 평균, 단기 흐름) /
-                      <span className="text-yellow-400 font-bold"> 노란선</span>(20일 평균, 중기 흐름). <br />
-                      주가 &gt; 파란선 = 단기 상승 흐름 · 파란선 &gt; 노란선 = 정배열(긍정적 추세).
-                    </p>
-                  </>
-                ) : helpTexts.candle}
+                <p className="font-bold mb-1">💡 이평선(이동평균선) 보는 법</p>
+                <p>
+                  <span className="text-blue-400 font-bold">파란선</span>(5일 평균, 단기 흐름) /
+                  <span className="text-yellow-400 font-bold"> 노란선</span>(20일 평균, 중기 흐름). <br />
+                  주가 &gt; 파란선 = 단기 상승 흐름 · 파란선 &gt; 노란선 = 정배열(긍정적 추세).
+                </p>
               </div>
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -378,15 +349,7 @@ function StockDetailContent({ code }: { code: string }) {
                         return [`₩${v?.toLocaleString() || '---'}`, labels[n] || n];
                       }) as never} />
                     <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                    {chartType === 'candle' ? (
-                      <Bar dataKey="price" name="종가" shape={<CandlestickBar />} isAnimationActive={false}>
-                        {chartData.map((entry, index) => (
-                          <Cell key={index} fill={(entry.price || 0) >= (entry.open || 0) ? '#10b981' : '#ef4444'} />
-                        ))}
-                      </Bar>
-                    ) : (
-                      <Line type="monotone" dataKey="price" name="종가" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                    )}
+                    <Line type="monotone" dataKey="price" name="종가" stroke="#3b82f6" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="sma5" name="5일 평균" stroke="#10b981" strokeWidth={1} dot={false} strokeDasharray="5 5" />
                     <Line type="monotone" dataKey="sma20" name="20일 평균" stroke="#f59e0b" strokeWidth={1} dot={false} strokeDasharray="3 3" />
                   </ComposedChart>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { RefreshCw, Zap } from 'lucide-react';
-import { stockApi } from '@/lib/stockApi';
+import { API_BASE_URL } from '@/lib/stockApi';
 
 type HealthState = 'checking' | 'ok' | 'timeout';
 
@@ -11,22 +11,37 @@ interface Props {
   onReady?: (lastSync: string | null) => void;
 }
 
+const TIMEOUT_MS = 25000; // Render cold start 대응 (첫 요청 30~50초 → 재시도 1회 포함 여유)
+
 export default function HealthGate({ children, onReady }: Props) {
   const [healthState, setHealthState] = useState<HealthState>('checking');
 
-  const checkHealth = async () => {
+  const checkHealth = () => {
     setHealthState('checking');
-    try {
-      const body = await stockApi.getHealth();
-      onReady?.(body?.lastSync || null);
-      setHealthState('ok');
-    } catch {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
       setHealthState('timeout');
-    }
+    }, TIMEOUT_MS);
+
+    fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then((body: { lastSync?: string | null }) => {
+        clearTimeout(timer);
+        onReady?.(body?.lastSync || null);
+        setHealthState('ok');
+      })
+      .catch((err: Error) => {
+        clearTimeout(timer);
+        if (err.name !== 'AbortError') setHealthState('timeout');
+      });
+
+    return () => { clearTimeout(timer); controller.abort(); };
   };
 
   useEffect(() => {
-    checkHealth();
+    const cleanup = checkHealth();
+    return cleanup;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -45,13 +60,18 @@ export default function HealthGate({ children, onReady }: Props) {
               <RefreshCw className="animate-spin mr-2" size={18} />
               <span className="text-sm">데이터를 불러오는 중이에요...</span>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">서버가 잠시 후 응답할 거예요.</p>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              처음 접속할 땐 준비 시간이 필요해요. (보통 30초 이내)<br />
+              커피 한 모금 하고 오셔도 괜찮아요 ☕
+            </p>
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-300 leading-relaxed">서버가 깨어나는 중이에요.</p>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              서버가 아직 깨어나는 중이에요.
+            </p>
             <p className="text-xs text-slate-500 leading-relaxed">
-              약 30초 후 <span className="font-bold text-slate-300">다시 시도</span>를 눌러주세요.<br />
+              잠시 후 <span className="font-bold text-slate-300">다시 시도</span>를 눌러주세요.<br />
               (무료 서버 특성상 첫 접속 시 시간이 걸릴 수 있어요.)
             </p>
             <button
