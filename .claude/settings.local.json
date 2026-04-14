@@ -15,7 +15,9 @@
       "Bash(npx tsc:*)",
       "Bash(echo \"exit=$?\")",
       "Read(//tmp/**)",
-      "Bash(grep -n \"tickFormatter.*k\\\\`\\\\|volume\\\\|거래량\" /d/stock_app_dev_v2/app/stock/\\\\[code\\\\]/page.tsx)"
+      "Bash(grep -n \"tickFormatter.*k\\\\`\\\\|volume\\\\|거래량\" /d/stock_app_dev_v2/app/stock/\\\\[code\\\\]/page.tsx)",
+      "Bash(DATABASE_URL=\"\" npx next build)",
+      "Bash(echo \"tsc=$?\")"
     ],
     "additionalDirectories": [
       "\\tmp"

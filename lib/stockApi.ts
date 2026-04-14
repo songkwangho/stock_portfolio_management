@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { getDeviceId } from './deviceId';
-import type { UpdateHoldingPayload } from '@/types/stock';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
 
@@ -43,7 +42,7 @@ export const stockApi = {
   getHoldings: async () => (await axios.get(`${API_BASE_URL}/holdings`)).data,
   addHolding: async (stock: { code: string; name: string; avgPrice: number; weight: number; quantity?: number }) =>
     (await axios.post(`${API_BASE_URL}/holdings`, stock)).data,
-  updateHolding: async (stock: UpdateHoldingPayload) =>
+  updateHolding: async (stock: { code: string; avgPrice: number; quantity?: number }) =>
     (await axios.put(`${API_BASE_URL}/holdings/${stock.code}`, { avgPrice: stock.avgPrice, quantity: stock.quantity })).data,
   deleteHolding: async (code: string) => (await axios.delete(`${API_BASE_URL}/holdings/${code}`)).data,
   searchStocks: async (query: string) => (await axios.get(`${API_BASE_URL}/search`, { params: { q: query } })).data,

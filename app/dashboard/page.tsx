@@ -109,11 +109,6 @@ export default function DashboardPage() {
     : null;
   const assetChangePositive = assetChange !== null ? parseFloat(assetChange) >= 0 : true;
 
-  const [onboardingDone, setOnboardingDone] = useState(false);
-  useEffect(() => {
-    setOnboardingDone(!!localStorage.getItem('onboarding_done'));
-  }, []);
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {holdings.length === 0 && (
@@ -295,9 +290,23 @@ export default function DashboardPage() {
                         {stock.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-wrap">
                           <p className="text-sm font-bold">{stock.name}</p>
                           <p className="text-xs text-slate-500 bg-slate-900 px-1.5 rounded">{stock.value}%</p>
+                          {stock.sma_available === false ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">분석 중</span>
+                          ) : stock.holding_opinion && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              stock.holding_opinion === '매도' ? 'bg-red-500/10 text-red-400' :
+                              stock.holding_opinion === '관망' ? 'bg-yellow-500/10 text-yellow-400' :
+                              stock.holding_opinion === '추가매수' ? 'bg-emerald-500/10 text-emerald-400' :
+                              'bg-blue-500/10 text-blue-400'
+                            }`}>
+                              {stock.holding_opinion === '매도' ? '주의 필요' :
+                               stock.holding_opinion === '추가매수' ? '추가 검토' :
+                               stock.holding_opinion}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2 flex-wrap">
                           <p className="text-xs text-slate-500">

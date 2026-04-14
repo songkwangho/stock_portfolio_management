@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { stockApi } from '@/lib/stockApi';
-import type { Holding, MarketOpinion, HoldingOpinion } from '@/types/stock';
+import type { Holding, MarketOpinion, HoldingOpinion, AddHoldingPayload, UpdateHoldingPayload } from '@/types/stock';
 
 interface PortfolioState {
   holdings: Holding[];
@@ -10,8 +10,8 @@ interface PortfolioState {
 
 interface PortfolioActions {
   fetchHoldings: () => Promise<void>;
-  addHolding: (stock: { code: string; name: string; value: number; avgPrice: number; quantity?: number }) => Promise<void>;
-  updateHolding: (stock: { code: string; name: string; value: number; avgPrice: number; quantity?: number }) => Promise<void>;
+  addHolding: (stock: AddHoldingPayload) => Promise<void>;
+  updateHolding: (stock: UpdateHoldingPayload) => Promise<void>;
   deleteHolding: (code: string) => Promise<void>;
 }
 

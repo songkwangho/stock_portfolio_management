@@ -32,11 +32,15 @@ export interface Holding {
   last_updated?: string;
 }
 
-export interface UpdateHoldingPayload {
+export interface AddHoldingPayload {
   code: string;
+  name: string;
+  value: number;
   avgPrice: number;
   quantity?: number;
 }
+
+export type UpdateHoldingPayload = AddHoldingPayload;
 
 export interface Recommendation {
   code: string;

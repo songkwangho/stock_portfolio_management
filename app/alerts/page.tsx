@@ -60,10 +60,13 @@ export default function AlertsPage() {
         </div>
       )}
       {alerts.length === 0 ? (
-        <div className="text-center py-20 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-16 px-6 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
           <p className="text-3xl mb-4">🔔</p>
           <p className="text-slate-300 font-bold">아직 알림이 없어요</p>
-          <p className="text-slate-500 text-sm mt-2">보유·관심 종목에 주요 변화가 생기면 알려드려요</p>
+          <p className="text-slate-500 text-sm mt-3 leading-relaxed max-w-md mx-auto">
+            보유·관심 종목에 <span className="text-slate-300">5일 평균선 이탈</span>, <span className="text-slate-300">목표가 근접</span>, <span className="text-slate-300">저평가 구간 진입</span> 등이 감지되면 알려드려요.
+          </p>
+          <p className="text-slate-600 text-xs mt-3">매일 오전 8시 이후 갱신돼요.</p>
         </div>
       ) : (
         alerts.map((alert) => {

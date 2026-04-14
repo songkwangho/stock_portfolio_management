@@ -265,7 +265,13 @@ PC (md: 이상):
 - [x] **[UX-E]** 대시보드 빈 상태 CTA — `onboardingDone` 의존 제거 (온보딩 건너뛴 유저도 CTA 노출)
 - [x] **[UX-G]** `/alerts` source 뱃지 — 'holding' → [보유 중] / 'watchlist' → [관심 종목]
 - [x] **[UX-H]** 거래량 Y축 — `k` → `만`/`백만` 한국식 단위
-- [ ] **[C2]** Vercel 빌드 검증 — git push 후 Vercel 대시보드 로그 확인
+- [x] **[C-NEW3/Fix-Vercel-2]** `dashboard/page.tsx` 미사용 `onboardingDone` state 제거
+- [x] **[H-NEW1/Fix-8]** Recharts `CandlestickBar` wick 좌표 버그 → 캔들 차트 토글 버튼 숨김 (Sprint 3 [M2] lightweight-charts 전환 시 재도입)
+- [x] **[C-NEW1/C-NEW2]** `types/stock.ts` 정리 — `AddHoldingPayload` 신설 + `UpdateHoldingPayload` alias, store/stockApi 참조 정합성 확보
+- [x] **[UX-I]** "보유 전략" → "내 종목 상태" (초보자 과도한 의미 부여 방지)
+- [x] **[UX-L]** 대시보드 보유종목 카드 — `holding_opinion` 뱃지 + "분석 중" 상태 추가
+- [x] **[UX-N]** `/alerts` 빈 상태 — 알림 트리거 조건(5일 평균선 이탈·목표가 근접·저평가) + 갱신 시각(매일 08:00) 명시
+- [ ] **[C2]** Vercel 빌드 검증 — **Build Command 반드시 `npm install && cd server && npm install`** (루트 + server 의존성 분리). git push 후 Vercel 대시보드 로그 확인
 - [ ] **[C3]** Neon 마이그레이션 + backfill-history
   - `DATABASE_URL` 설정 후 `node server/db/migrate.js`
   - SQLite(`stocks.db`) 덤프 → Neon 적재 스크립트 작성·실행

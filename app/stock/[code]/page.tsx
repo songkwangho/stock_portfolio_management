@@ -339,10 +339,8 @@ function StockDetailContent({ code }: { code: string }) {
               <h3 className="text-lg font-semibold mb-2 flex items-center justify-between">
                 <span>주가 차트</span>
                 <div className="flex items-center space-x-1">
-                  <button onClick={() => setChartType(chartType === 'line' ? 'candle' : 'line')}
-                    className="px-3 py-2.5 min-h-[44px] rounded-lg text-xs font-bold bg-slate-800 text-slate-400 hover:text-white transition-colors mr-2">
-                    {chartType === 'line' ? '캔들 차트' : '라인 차트'}
-                  </button>
+                  {/* 캔들 차트 토글: Recharts 커스텀 shape의 wick 좌표 버그로 비활성.
+                      Sprint 3 [M2] lightweight-charts 전환 시 재도입 예정. */}
                   {(['daily', 'weekly', 'monthly'] as const).map(tf => (
                     <button key={tf} onClick={() => setChartTimeframe(tf)}
                       className={`px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-bold transition-colors ${
@@ -854,7 +852,7 @@ function StockDetailContent({ code }: { code: string }) {
                             ho === '추가매수' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                             'bg-blue-500/10 text-blue-400 border-blue-500/20'
                           }`}>{display}</span>
-                          <span className="text-xs text-slate-500">보유 전략</span>
+                          <span className="text-xs text-slate-500">내 종목 상태</span>
                         </div>
                       );
                     })()}
