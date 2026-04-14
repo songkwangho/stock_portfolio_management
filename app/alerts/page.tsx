@@ -41,7 +41,8 @@ export default function AlertsPage() {
       setShowGuide(true);
       localStorage.setItem('onboarding_alerts_explained', '1');
     }
-  }, [fetchAlerts, markAllRead]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -74,6 +75,12 @@ export default function AlertsPage() {
                   <span className="text-sm">{typeInfo.icon}</span>
                   <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${typeInfo.color}`}>{typeInfo.label}</span>
                   <span className="text-xs text-slate-500 font-bold">{alert.name}</span>
+                  {alert.source === 'holding' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">보유 중</span>
+                  )}
+                  {alert.source === 'watchlist' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">관심 종목</span>
+                  )}
                 </div>
                 <button onClick={() => deleteAlert(alert.id)} className="text-red-400/60 active:text-red-400 p-1" aria-label="알림 삭제">
                   <Trash2 size={14} />

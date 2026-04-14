@@ -88,6 +88,8 @@ export interface StockDetail {
   analysis?: string;
   advice?: string;
   market_opinion?: MarketOpinion;
+  holding_opinion?: HoldingOpinion;
+  last_updated?: string;
   tossUrl?: string;
   scoringBreakdown?: ScoringBreakdown;
 }

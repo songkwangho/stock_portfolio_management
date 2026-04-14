@@ -253,6 +253,18 @@ PC (md: 이상):
 - [x] **[P5/UX-NEW1]** `computeProbability` 라벨 "상승 예측 확률" → **"종합 신호 점수 (0~100)"** + amber 면책 배너
 - [x] **[UX-NEW2]** PER 0/음수/null 분기 — '이익 없음' / '적자' / '---'
 - [x] **[UX-NEW6]** 대시보드 "마지막 업데이트" 24h 초과 시 amber + "내일 08:00 이후 새로 고침" 안내
+- [x] **[Fix-1]** `StockDetail`에 `holding_opinion` / `last_updated` 필드 정식 추가 → `as unknown as` 캐스트 제거
+- [x] **[Fix-2]** `/stock/[code]` 내부 Suspense `fallback={null}` → 스피너+문구 스켈레톤
+- [x] **[Fix-3]** `next.config.ts` — 개발 환경 `/api/*` → `http://localhost:3001` 프록시 rewrites 복원
+- [x] **[Fix-4]** `/alerts` useEffect 의존성 `[fetchAlerts, markAllRead]` → `[]` (마운트 1회)
+- [x] **[Fix-5]** 대시보드 KOSPI 툴팁 — 내부 용어 "Phase 4 백테스팅 모듈" 제거
+- [x] **[UX-A]** 종합 신호 점수 설명 — "10점 점수 + 목표가·이평선·변동성으로 환산한 보조 지표" 문구 추가
+- [x] **[UX-B]** "실시간 데이터 업데이트" → "데이터 새로 고침" (실시간 오해 방지)
+- [x] **[UX-C]** "투자 조언" → "알고리즘 분석 요약" (투자 권유 오해 방지)
+- [x] **[UX-D]** `/stock/[code]/loading.tsx` "데이터 분석 중..." → "종목 정보를 불러오는 중이에요..."
+- [x] **[UX-E]** 대시보드 빈 상태 CTA — `onboardingDone` 의존 제거 (온보딩 건너뛴 유저도 CTA 노출)
+- [x] **[UX-G]** `/alerts` source 뱃지 — 'holding' → [보유 중] / 'watchlist' → [관심 종목]
+- [x] **[UX-H]** 거래량 Y축 — `k` → `만`/`백만` 한국식 단위
 - [ ] **[C2]** Vercel 빌드 검증 — git push 후 Vercel 대시보드 로그 확인
 - [ ] **[C3]** Neon 마이그레이션 + backfill-history
   - `DATABASE_URL` 설정 후 `node server/db/migrate.js`
@@ -260,15 +272,20 @@ PC (md: 이상):
   - `node scripts/backfill-history.js` (97종목 × 3년, 배치 3개씩, ~6시간)
   - 완료 검증 SQL: `SELECT code, COUNT(*) days FROM stock_history GROUP BY code HAVING COUNT(*) < 600 ORDER BY days ASC;`
 - [ ] Vercel + Render 배포 + `FRONTEND_URL` CORS 설정
+  - **순서 고정**: Neon 마이그레이션 → backfill → Render 배포(API URL 확정) → Vercel 환경변수 설정 → Vercel 빌드 → E2E
+  - **HealthGate 타임아웃 상향** (현재 15초 → 25초) 또는 Render Health Check `/api/health` 설정으로 cold start 대응
 - [ ] E2E 수동 검증 (포트폴리오 CRUD, 추천, 스크리너, 종목상세, 알림, 온보딩 3갈래)
 
 **3.5차 — 잔여 보완 (Sprint 1.5, 배포 후 우선순위 가능)**
 - [ ] **[H-NEW2/P10]** `app/portfolio/page.tsx` 로컬 toast → `useToastStore` 통일
 - [ ] **[H-NEW3]** `/stock/[code]` `stockApi.deleteStock` 직접 호출 → store 경유로 변경 (로컬 상태 동기화 보장)
+- [ ] **[Fix-6]** 시장지수 중복 fetch 해소 — HeaderBar + dashboard 각자 호출 → `useMarketStore` 신설 또는 Zustand 구독 패턴
+- [ ] **[Fix-7/M2]** Recharts 커스텀 `CandlestickBar` wick 미동작 → Sprint 3에서 lightweight-charts 전환 우선 검토
 - [ ] **[UX-NEW3]** `profitHelpCode` 팝업 외부 클릭 닫기 (mousedown 리스너)
 - [ ] **[UX-NEW5]** `RecommendedStockCard` reason 2줄 초과 시 "더 보기" 토글
 - [ ] **[UX-NEW7]** 섹터 비교 테이블 — 현재 종목 자동 스크롤 또는 최상단 고정
 - [ ] **[UX-NEW8]** 포트폴리오 등록 폼 "비중(%)" 필드 — 레이블 재작성("총 자산의 몇 %") + "잘 모르겠으면 비워두세요" 힌트
+- [ ] **[UX-F]** 재무제표 테이블 — periods 정렬 방향(최신 → 과거) 헤더에 명시
 
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
 - [ ] **[M1]** 차트 `components/charts/` 분리 + dynamic import 공유 청크화
@@ -295,13 +312,16 @@ PC (md: 이상):
 - [ ] device_id → user_id B안 병합 + 데이터 이전 확인 UI
 - [ ] **device_id 소실 케이스 방침** — 브라우저 캐시 클리어 시 고아 데이터 발생. "데이터 없음" 안내 + 서버측 cleanup 스크립트 필요
 - [ ] JWT (1h + 14일 refresh) + Next.js middleware 보호 라우트 (Phase 3~4 동안 비활성, 구조만 선행 분리)
+  - **Edge 호환 JWT 라이브러리 사전 결정 필수** — Express `jsonwebtoken`은 Edge Runtime 미지원. middleware는 `jose` 사용
+- [ ] **Kakao Redirect URI 사전 등록** — 개발/스테이징/프로덕션 URI 전부 Kakao Developers에 등록 (Vercel Preview URL은 배포마다 변경되므로 Production URL만 OAuth 허용)
 - [ ] 구독 DB 스키마 (상태·만료·환불 이력) → Toss Payments → Claude Haiku AI 리포트 (순차)
 - [ ] **Toss Payments 웹훅 멱등성** — `payment_id` 기준 중복 차단, 최대 5회 재전송(지수 backoff) 대응
 - [ ] KIS OpenAPI 신청 **병행 시작** (Phase 7 착수 전 심사 완료 필요, 영업일 1~3일)
 - 목표: **200명**
 
 ### Phase 6 — 데이터 소스 안정화
-- [ ] 가격/거래량: KRX OpenAPI 전환 — **CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계** (기존 naver EUC-KR 파서와 인터페이스 매칭)
+- [ ] **가격·거래량·투자자 매매동향**: KRX OpenAPI 전환 — CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계
+- [ ] **PER/PBR/목표가**: KRX 월별 공시라 실시간 불가 → **네이버 스크래핑 유지** (Phase 6 범위 축소)
 - [ ] 재무지표: FinanceDataReader(Python) — Node `child_process` 또는 별도 Python 마이크로서비스로 격리
 - **목표**: 스크래핑 의존도 축소 (완전 제거 불가)
 

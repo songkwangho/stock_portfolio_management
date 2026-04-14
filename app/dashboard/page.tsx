@@ -116,7 +116,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {holdings.length === 0 && onboardingDone && (
+      {holdings.length === 0 && (
         <div className="bg-gradient-to-br from-blue-600/10 to-emerald-600/10 border border-blue-500/20 rounded-3xl p-6 md:p-8">
           <h2 className="text-xl font-bold mb-2 text-center">무엇부터 시작해 볼까요?</h2>
           <p className="text-slate-400 text-sm mb-6 leading-relaxed text-center max-w-md mx-auto">
@@ -193,7 +193,7 @@ export default function DashboardPage() {
             if (!kospi || !kospi.changeRate) return undefined;
             return {
               label: `오늘 KOSPI ${kospi.positive ? '+' : ''}${kospi.changeRate}`,
-              text: 'KOSPI는 오늘 하루 변동률이에요. 내 수익률(매입 이후 전체 기간)과 직접 비교하기 어려워요. 정밀한 같은 기간 비교는 Phase 4 백테스팅 모듈에서 도입돼요.',
+              text: 'KOSPI는 오늘 하루 변동률이에요. 내 수익률(매입 이후 전체 기간)과는 기준 기간이 달라 직접 비교하기 어려워요.',
             };
           })()}
         />

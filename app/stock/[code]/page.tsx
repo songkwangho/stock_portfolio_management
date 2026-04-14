@@ -43,7 +43,12 @@ const CandlestickBar = (props: Record<string, unknown>) => {
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
+        <div className="w-4 h-4 mr-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        종목 정보를 불러오는 중이에요...
+      </div>
+    }>
       <StockDetailContent code={code} />
     </Suspense>
   );
@@ -234,9 +239,9 @@ function StockDetailContent({ code }: { code: string }) {
             <h2 className="text-4xl font-bold">{stockDetail?.name || stock.name}</h2>
             <div className="flex items-center space-x-2 mt-1">
               <p className="text-slate-500 font-mono">{stock.code}</p>
-              {(stockDetail as unknown as { last_updated?: string })?.last_updated && (
+              {stockDetail?.last_updated && (
                 <span className="text-xs text-slate-600">
-                  {getDataFreshnessLabel((stockDetail as unknown as { last_updated: string }).last_updated)}
+                  {getDataFreshnessLabel(stockDetail.last_updated)}
                 </span>
               )}
             </div>
@@ -401,7 +406,11 @@ function StockDetailContent({ code }: { code: string }) {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={volumeData}>
                     <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} hide />
-                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => {
+                      if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}백만`;
+                      if (v >= 10_000) return `${Math.round(v / 10_000)}만`;
+                      return v.toLocaleString();
+                    }} />
                     <Bar dataKey="volume" isAnimationActive={false}>
                       {volumeData.map((entry, index) => (
                         <Cell key={index} fill={entry.isUp ? '#10b98140' : '#ef444440'} />
@@ -835,7 +844,7 @@ function StockDetailContent({ code }: { code: string }) {
                     </div>
                     {/* Holding Opinion (보유 기준, 보유 시에만) — 명령어 → 상태 라벨 변환 */}
                     {isHolding && stock.avgPrice && (() => {
-                      const ho = (stockDetail as unknown as { holding_opinion?: string })?.holding_opinion || '보유';
+                      const ho = stockDetail?.holding_opinion || '보유';
                       const display = ho === '매도' ? '주의 필요' : ho === '추가매수' ? '추가 검토' : ho;
                       return (
                         <div className="flex items-center space-x-1.5">
@@ -873,7 +882,7 @@ function StockDetailContent({ code }: { code: string }) {
                   <div>
                     <p className="font-bold text-blue-300/80 mb-2 flex items-center space-x-2">
                       <Zap size={16} className="text-blue-500" />
-                      <span>투자 조언:</span>
+                      <span>알고리즘 분석 요약:</span>
                     </p>
                     <p className="text-slate-400 pl-6 leading-relaxed">
                       {stockDetail?.advice || '현재 시점에서는 시장 변동성을 고려한 신중한 접근이 필요합니다.'}
@@ -977,8 +986,11 @@ function StockDetailContent({ code }: { code: string }) {
                 <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest text-center italic">Signal Score</p>
                 <div className="text-3xl font-black text-center text-white">{computeProbability()}</div>
                 <p className="text-xs text-slate-500 text-center mt-1">종합 신호 점수 (0~100)</p>
-                <p className="text-[11px] text-amber-400/80 text-center mt-2 leading-relaxed">
-                  ⚠️ 목표가 괴리·이평선·변동성 합산 참고 지표예요. 실제 상승 확률이 아니에요.
+                <p className="text-[11px] text-slate-400 text-center mt-2 leading-relaxed">
+                  💡 위 시장 분석 10점 점수에 목표가 괴리·이평선·변동성을 더해 0~100으로 환산한 보조 지표예요.
+                </p>
+                <p className="text-[11px] text-amber-400/80 text-center mt-1 leading-relaxed">
+                  ⚠️ 실제 상승 확률이 아니에요.
                 </p>
               </div>
 
@@ -993,7 +1005,7 @@ function StockDetailContent({ code }: { code: string }) {
               }} disabled={refreshing}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center space-x-2">
                 {refreshing && <RefreshCw className="animate-spin" size={14} />}
-                <span>{refreshing ? '업데이트 중...' : '실시간 데이터 업데이트'}</span>
+                <span>{refreshing ? '업데이트 중...' : '데이터 새로 고침'}</span>
               </button>
             </div>
           </div>
