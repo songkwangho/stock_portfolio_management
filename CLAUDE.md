@@ -289,16 +289,39 @@ PC (md: 이상):
 
 ## 로드맵
 
-### Phase 3 — Next.js 재개발 + 배포 (현재)
-- [ ] Next.js 15 App Router 프로젝트 초기화
-- [ ] 라우팅 구조 (`/dashboard`, `/portfolio`, `/stock/[code]` 등)
-- [ ] Server Component + ISR 설정 (종목 목록, 추천, 종목 상세)
-- [ ] 기존 컴포넌트 이전 ('use client' 격리)
-- [ ] 기존 Zustand 스토어 이전 (코드 변경 없음)
-- [ ] 기존 차트 이전 (Recharts 'use client' + 캔들만 lightweight-charts)
+### Phase 3 — Next.js 재개발 + 배포 (현재, 1차 이전 완료 · 2026-04-14)
+
+**완료**
+- [x] Next.js 15.3 + React 19 + Tailwind v4 App Router 초기화 (`package.json`, `tsconfig`, `postcss`)
+- [x] 라우팅 구조 구축: `/dashboard`, `/portfolio`, `/recommendations`, `/watchlist`, `/screener`, `/stocks`, `/settings`, `/stock/[code]`, `/alerts`
+- [x] 공유 모듈 이전 (`types/stock.ts`, `lib/deviceId.ts` SSR-safe, `lib/stockApi.ts` 클라이언트 격리, `lib/dataFreshness.ts`)
+- [x] Zustand 스토어 이전 (`usePortfolioStore`, `useAlertStore`, `useWatchlistStore`, `useToastStore`)
+- [x] 레이아웃 셸 (`AppShell` + `HealthGate` + `Sidebar` + `MobileTabBar` + `HeaderBar` + `DisclaimerModal` + `ToastHost`)
+- [x] 리프 컴포넌트 이전 (`ErrorBanner`, `StatCard`, `NavButton`, `HelpBottomSheet`, `StockSearchInput`, `RecommendedStockCard`, `ScoringBreakdownPanel`, `WatchlistContent`)
+- [x] 기존 페이지 이전 (DashboardPage · HoldingsAnalysisPage → `/portfolio` · RecommendationsPage · WatchlistPage · ScreenerPage · MajorStocksPage → `/stocks` · SettingsPage · StockDetailView → `/stock/[code]`)
+- [x] Recharts 컴포넌트 `'use client'` 격리 (페이지 내부 인라인)
+- [x] 개발 서버 기동 확인 (`next dev --turbopack`, HTTP 200)
+- [x] GitHub 배포 (`origin/main` 푸시)
+
+**미완료 (Phase 3 잔여 과제)**
+- [ ] Server Component + ISR 설정 — 현재 모든 페이지가 `'use client'` CSR. `revalidate = 86400` 적용 대상: `/stocks`, `/recommendations`, `/stock/[code]` 기본 정보
+- [ ] 차트 컴포넌트 분리 — `components/charts/` 디렉터리로 분리 (PortfolioChart, AssetPieChart, VolumeBarChart, InvestorBarChart). 현재는 페이지 인라인
+- [ ] lightweight-charts 캔들차트 도입 (`CandleChart.tsx`, `dynamic ssr:false`) — 현재 캔들은 Recharts `CandlestickBar` 커스텀 shape 사용
+- [ ] TypeScript 엄격 모드 통과 — `next.config.ts`의 `typescript.ignoreBuildErrors` / `eslint.ignoreDuringBuilds` 제거. Recharts v3 Tooltip formatter 타입 등 정리
+- [ ] 프로덕션 빌드 통과 — 현재 로컬 Windows + Node 24 환경에서 `next build` 페이지 데이터 수집 단계 `readlink EISDIR` 이슈. pnpm 전환 또는 Node LTS(20/22) 검증 필요
 - [ ] Vercel + Render 배포
 - [ ] SQLite → Neon 데이터 마이그레이션
 - [ ] backfill-history 실행 (97종목 × 3년)
+- [ ] 백엔드 기동 상태에서 전체 페이지 E2E 수동 검증 (포트폴리오 CRUD, 추천, 스크리너, 종목상세, 알림)
+
+**보완 과제 (재이전 과정에서 신규 도출)**
+- [ ] 온보딩 2단계 플로우 (`onboarding_step` 1/2) 복구 — Phase 3 1차 이전 시 `DisclaimerModal`만 이전, 2단계 온보딩 모달은 생략됨
+- [ ] 알림 최초 진입 가이드 카드 (`onboarding_alerts_explained`) 복구 — `HeaderBar`에서 누락
+- [ ] `HoldingsAnalysisPage`의 `pendingFocus` 처리 (`add-holding-search`, `first-stock-guide`) — `useNavigationStore.consumePendingFocus` 제거에 따라 대체 수단 필요 (searchParams `?focus=...` 등)
+- [ ] `useNavigationStore` 폐기에 따른 `selectedStock` 카테고리 컨텍스트 보존 방식 결정 — 현재 `/stock/[code]`는 URL code만 받아 `usePortfolioStore`로 보유 여부를 추론
+- [ ] 모바일 탭바의 `/alerts` 독립 페이지 ↔ 헤더 알림 드롭다운 UX 일원화 (현재는 두 곳 모두 존재)
+- [ ] 검색 드롭다운 빈 결과 CTA의 "종목코드로 추가" 이동 대상 재정의 (기존 settings 내 해당 기능 확인 필요)
+
 - 목표 사용자: **50명**
 
 ### Phase 4 — 데이터 누적 + 백테스팅 (Phase 3과 병행)
@@ -329,6 +352,67 @@ PC (md: 이상):
 ### Phase 8 — AI 실시간 분석 (장기)
 - [ ] Claude Haiku 실시간 패턴 감지
 - [ ] 상업 데이터 제공사 검토 (FnGuide 등)
+
+---
+
+## Phase 3 재개발 — 원계획 대비 변경점
+
+원 계획(본 문서 상단 "프로젝트 구조", "핵심 아키텍처 원칙")과 달라진 부분만 기록. 후속 패스에서 조정할지 여부를 판단할 때 이 섹션을 우선 참조.
+
+### 1. Server Component / ISR 유보
+- **원 계획**: `/stocks`, `/recommendations`, `/stock/[code]` 기본 정보를 Server Component + `revalidate = 86400` ISR로 구성.
+- **현 상태**: 전체 페이지가 `'use client'` CSR. 개인 데이터(`/dashboard`, `/portfolio`, `/settings`)뿐 아니라 공용 데이터 페이지도 기존 Vite 구현을 가능한 그대로 옮기는 것을 우선시함.
+- **사유**: 기존 페이지가 `useEffect` 기반 fetch와 Zustand를 깊게 전제로 작성되어 Server Component로 쪼개면 일괄 이전이 어려움. 1차 작동 확보 후 분리가 비용 대비 효과가 더 큼.
+- **후속**: Phase 3 잔여 과제 "Server Component + ISR 설정"에서 처리.
+
+### 2. 차트 컴포넌트 디렉터리 분리 미적용
+- **원 계획**: `components/charts/PortfolioChart.tsx`, `AssetPieChart.tsx`, `VolumeBarChart.tsx`, `InvestorBarChart.tsx`, `CandleChart.tsx`로 분리. 캔들은 lightweight-charts + `dynamic ssr:false`.
+- **현 상태**: 각 페이지 내부에 Recharts를 인라인 import. 캔들은 Recharts 기반 커스텀 `CandlestickBar` shape 그대로.
+- **사유**: 인라인 유지가 기존 동작과 1:1 대응되어 회귀 위험이 최소. 분리는 별도 리팩터링 단계로 분리.
+- **후속**: Phase 3 잔여 과제 "차트 컴포넌트 분리" / "lightweight-charts 도입".
+
+### 3. `components/layout/` 구성 차이
+- **원 계획**: `Sidebar`, `MobileTabBar`, `HealthGate` 3종.
+- **현 상태**: 위 3종 + `AppShell`(컴포지션 컨테이너), `HeaderBar`(검색·알림·시장지수·프로필), `DisclaimerModal`, `ToastHost`를 추가 분리. 기존 App.tsx의 헤더·토스트·면책 모달 책임을 `AppShell` 하위로 옮김.
+- **사유**: App Router에서 `layout.tsx`가 Server Component이므로 상태를 가진 셸을 별도 Client Component로 떼어내는 편이 안전. 또한 부분별 파일 분리가 1차 이전 이후 유지보수에 유리.
+- **후속**: 구조 굳혀서 docs/NEXTJS.md에 반영 필요.
+
+### 4. `components/ui/NavButton.tsx` 위치 변경
+- **원 계획**: `components/ui/NavButton.tsx`.
+- **현 상태**: 동일 위치로 이전 (변경 없음). 단 사이드바/모바일탭바 내부 메뉴 선언은 `Sidebar.tsx` / `MobileTabBar.tsx`로 이동(원 App.tsx 인라인에서 분리).
+
+### 5. 라우팅 기반 내비게이션으로 전환 — `useNavigationStore` 제거
+- **원 계획**: "기존 Zustand 스토어 이전 (코드 변경 없음)".
+- **현 상태**: `useNavigationStore`는 제거. App Router의 `useRouter().push()` / `usePathname()`로 대체. `handleDetailClick(stock)` → `router.push('/stock/<code>')`.
+- **사유**: Next.js 라우팅과 중복되는 탭 상태 머신을 유지할 필요 없음.
+- **부작용**: `consumePendingFocus`(온보딩 플로우에서 포트폴리오 페이지의 자동 폼 노출, 첫 종목 가이드 카드 트리거)가 사라짐. Phase 3 "보완 과제"에서 searchParams 기반으로 대체 예정.
+
+### 6. `/stock/[code]` 페이지의 stock 컨텍스트 복원 방식
+- **원 계획**: 상세 페이지가 부모로부터 `stock: StockSummary` prop을 받음(카테고리=`'보유 종목'` / `'주요 종목'` 등 포함).
+- **현 상태**: URL param `code`만 받아 `usePortfolioStore.holdings`에서 보유 여부·메타를 역조회. 보유가 아닌 경우 `{ code, name: code, category: '' }` 로 시작한 뒤 서버 응답으로 덮어씀.
+- **부작용**: "추천에서 진입했는지 / 보유 종목에서 진입했는지"가 URL에 표현되지 않음. 현재 로직은 `isHolding` 판정에만 사용되므로 큰 문제 없으나, 추천 분석 우대 동작이 있다면 `searchParams`(`?from=recommendations`)로 확장 필요.
+
+### 7. 헤더 알림 드롭다운과 `/alerts` 페이지 병존
+- **원 계획**: 모바일 탭바 5개 중 "알림"은 드롭다운(`handleToggleAlerts`) 또는 전체 화면 모달.
+- **현 상태**: 모바일 탭바는 독립된 `/alerts` 라우트로 이동시키되, PC 헤더의 드롭다운은 유지. 결과적으로 두 진입점이 공존.
+- **후속**: 하나로 일원화할지, 두 진입점을 의도적 유지할지 결정 필요("보완 과제" 참조).
+
+### 8. 검색 시장지수의 데스크톱 한정 노출
+- **원 계획**: 헤더 좌측에 시장지수(KOSPI/KOSDAQ 등) 노출.
+- **현 상태**: `HeaderBar`에서 시장지수를 `hidden md:flex`로 PC 전용화. 모바일은 검색창만 표시하여 헤더 과밀 해소.
+- **사유**: 모바일 헤더 폭 한계. 필요 시 모바일 대시보드 상단으로 이동 고려.
+
+### 9. 빌드 스크립트 Turbopack 기본 사용
+- **원 계획**: 명시 없음(기본 `next build`).
+- **현 상태**: `package.json` 스크립트를 `next dev --turbopack` / `next build --turbopack`로 지정.
+- **사유**: 현 개발 환경(Windows + Node 24 + npm)에서 기본 webpack 빌드가 `readlink EISDIR`로 실패. Turbopack 컴파일은 정상.
+- **후속**: pnpm 전환이나 Node LTS 환경에서 webpack 빌드 재검증 후 필요 시 플래그 제거.
+
+### 10. 임시 타입·Lint 우회
+- **원 계획**: 명시 없음(기본 엄격).
+- **현 상태**: `next.config.ts`에서 `typescript.ignoreBuildErrors: true`, `eslint.ignoreDuringBuilds: true`로 설정.
+- **사유**: 1차 대량 이전에서 누적된 Recharts v3 타입 엄격화 등 주변 타입 오류가 빌드를 차단. 코드 회귀 위험을 낮추기 위해 일시 허용.
+- **후속**: Phase 3 잔여 과제 "TypeScript 엄격 모드 통과"에서 제거.
 
 ---
 
