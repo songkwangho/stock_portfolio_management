@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"C:/Users/aistudio/Documents/stock_app_dev/src/App.tsx\" \"C:/Users/aistudio/Documents/stock_app_dev/src/components/\"*.tsx \"C:/Users/aistudio/Documents/stock_app_dev/src/pages/\"*.tsx)",
+      "Bash(npm install:*)",
+      "Bash(mkdir -p \"d:/stock_app_dev_v2/app/stock/[code]\")",
+      "Bash(cp \"C:/Users/aistudio/Documents/stock_app_dev/src/components/StockDetailView.tsx\" \"d:/stock_app_dev_v2/app/stock/[code]/page.tsx\")",
+      "Bash(npm run:*)",
+      "Bash(wait)",
+      "Bash(npm --version)",
+      "Bash(npx next:*)"
+    ]
+  }
+}
