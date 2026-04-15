@@ -40,8 +40,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS whitelist (dev + production origins).
-// 배포 시 Vercel URL은 `FRONTEND_URL` 환경변수로 주입 (16차 버그-E).
-// 여러 도메인이 필요하면 콤마로 구분: `FRONTEND_URL=https://a.vercel.app,https://b.vercel.app`
+// `FRONTEND_URL`은 콤마 분리로 여러 origin 지정 가능.
+// `FRONTEND_URL_PATTERN`은 정규식(한 개). Vercel Preview URL처럼 hash가 바뀌는 도메인에 사용.
+//   예: `^https://stock-portfolio-management(-[a-z0-9]+)*-crossofjc-9688s-projects\.vercel\.app$`
 const ALLOWED_ORIGINS = [
     'http://localhost:5173',  // Vite dev server
     'http://localhost:4173',  // Vite preview
@@ -50,14 +51,20 @@ const ALLOWED_ORIGINS = [
     'http://localhost',       // Capacitor Android
     ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(s => s.trim()).filter(Boolean) : []),
 ];
+let ORIGIN_PATTERN = null;
+if (process.env.FRONTEND_URL_PATTERN) {
+    try { ORIGIN_PATTERN = new RegExp(process.env.FRONTEND_URL_PATTERN); }
+    catch (e) { console.error('Invalid FRONTEND_URL_PATTERN:', e.message); }
+}
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, etc.)
-        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+        // Allow requests with no origin (mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        if (ORIGIN_PATTERN && ORIGIN_PATTERN.test(origin)) return callback(null, true);
+        // CORS 거부는 에러 throw 대신 false로 반환 — 500 대신 정상 401-ish 흐름.
+        console.warn(`CORS blocked origin: ${origin}`);
+        return callback(null, false);
     },
 }));
 app.use(express.json());

@@ -10,9 +10,11 @@ interface RecommendedStockCardProps {
 
 const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProps) => {
   const [showSourceInfo, setShowSourceInfo] = useState(false);
+  const [reasonExpanded, setReasonExpanded] = useState(false);
   const upside = stock.currentPrice && stock.fairPrice
     ? ((stock.fairPrice - stock.currentPrice) / stock.currentPrice * 100).toFixed(1)
     : null;
+  const reasonLong = (stock.reason?.length ?? 0) > 80;
 
   return (
     <div
@@ -40,9 +42,19 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
       </div>
 
       {/* Reason */}
-      <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-2 flex-grow">
-        {stock.reason}
-      </p>
+      <div className="mb-4 flex-grow">
+        <p className={`text-xs text-slate-400 leading-relaxed ${reasonExpanded ? '' : 'line-clamp-2'}`}>
+          {stock.reason}
+        </p>
+        {reasonLong && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setReasonExpanded(v => !v); }}
+            className="mt-1 text-[11px] font-bold text-blue-400 hover:text-blue-300"
+          >
+            {reasonExpanded ? '접기' : '더 보기'}
+          </button>
+        )}
+      </div>
 
       {/* Price Row: 현재가 → 적정가 (상승여력) */}
       <div className="bg-slate-950/60 rounded-xl p-3 mb-3">

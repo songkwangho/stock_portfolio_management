@@ -14,6 +14,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import { stockApi } from '@/lib/stockApi';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
+import { useMarketStore } from '@/stores/useMarketStore';
 import type { StockSummary } from '@/types/stock';
 
 // 한국식 금액 단위 포매터 — Y축/툴팁 공용 (16차 5-2).
@@ -41,7 +42,8 @@ export default function DashboardPage() {
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [marketIndices, setMarketIndices] = useState<{ symbol: string; value: number | null; changeRate: string; positive: boolean }[]>([]);
+  const marketIndices = useMarketStore(s => s.indices);
+  const fetchMarketIndices = useMarketStore(s => s.fetchIndices);
 
 
   const onDetailClick = (stock: StockSummary) => {
@@ -50,8 +52,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchHoldings();
-    stockApi.getMarketIndices?.().then(setMarketIndices).catch(() => {});
-  }, [fetchHoldings]);
+    fetchMarketIndices();
+  }, [fetchHoldings, fetchMarketIndices]);
 
   const fetchHistory = async () => {
     setHistoryError(null);

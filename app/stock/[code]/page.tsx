@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use, Suspense } from 'react';
+import { useState, useEffect, useRef, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight
@@ -15,6 +15,7 @@ import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
+import { useToastStore } from '@/stores/useToastStore';
 
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -37,7 +38,10 @@ function StockDetailContent({ code }: { code: string }) {
   const onBack = () => router.back();
   const onAdd = usePortfolioStore(s => s.addHolding);
   const onUpdate = usePortfolioStore(s => s.updateHolding);
+  const onDeleteHolding = usePortfolioStore(s => s.deleteHolding);
+  const fetchHoldings = usePortfolioStore(s => s.fetchHoldings);
   const holdings = usePortfolioStore(s => s.holdings);
+  const addToast = useToastStore(s => s.addToast);
   const holdingMatch = holdings.find(h => h.code === code);
   const isHolding = !!holdingMatch || from === 'holding';
 
@@ -68,6 +72,13 @@ function StockDetailContent({ code }: { code: string }) {
   const [sectorData, setSectorData] = useState<SectorComparison | null>(null);
   const [chartTimeframe, setChartTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
+  const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (sectorData && currentSectorRowRef.current) {
+      currentSectorRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [sectorData]);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -203,7 +214,18 @@ function StockDetailContent({ code }: { code: string }) {
               {!isHolding && (
                 <button onClick={async () => {
                   if (window.confirm('이 종목을 전체 목록에서 삭제하시겠습니까?')) {
-                    try { await stockApi.deleteStock(stock.code); onBack(); } catch { alert('종목 삭제에 실패했습니다.'); }
+                    try {
+                      if (holdingMatch) {
+                        await onDeleteHolding(stock.code);
+                      } else {
+                        await stockApi.deleteStock(stock.code);
+                        await fetchHoldings();
+                      }
+                      addToast(`${stock.name} 종목이 삭제되었습니다.`, 'success');
+                      onBack();
+                    } catch {
+                      addToast('종목 삭제에 실패했습니다.', 'error');
+                    }
                   }
                 }} className="flex items-center space-x-1 text-slate-500 hover:text-red-500 transition-colors px-4 py-2.5 min-h-[44px]" title="종목 전체 삭제">
                   <Trash2 size={16} />
@@ -713,7 +735,11 @@ function StockDetailContent({ code }: { code: string }) {
                       {sectorData.stocks.map(s => {
                         const isCurrent = s.code === stock.code;
                         return (
-                          <tr key={s.code} className={`border-b border-slate-800/30 ${isCurrent ? 'bg-blue-600/10' : ''}`}>
+                          <tr
+                            key={s.code}
+                            ref={isCurrent ? currentSectorRowRef : undefined}
+                            className={`border-b border-slate-800/30 ${isCurrent ? 'bg-blue-600/10' : ''}`}
+                          >
                             <td className="py-2 px-3">
                               <span className={isCurrent ? 'text-blue-400 font-bold' : 'text-slate-300'}>{s.name}</span>
                               {isCurrent && <span className="text-xs text-blue-500 ml-1">← 현재</span>}
@@ -903,14 +929,14 @@ function StockDetailContent({ code }: { code: string }) {
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-300 mb-1 block font-bold">비중 (%)</label>
-                        <input type="number" title="포트폴리오 내 목표 비중" value={addForm.weight}
+                        <label className="text-xs text-slate-300 mb-1 block font-bold">총 자산의 몇 %예요?</label>
+                        <input type="number" placeholder="선택" title="총 자산(현금+주식 전체) 중 이 종목이 차지하는 비중" value={addForm.weight}
                           onChange={(e) => setAddForm({ ...addForm, weight: e.target.value })}
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      평균 매수가: 여러 번 나눠 샀다면 평균을 입력해요. 수량은 증권사 앱에서 확인 가능.
+                      평균 매수가: 여러 번 나눠 샀다면 평균을 입력해요. 수량은 증권사 앱에서 확인 가능. <span className="text-slate-400">비중은 잘 모르겠으면 비워두세요.</span>
                     </p>
                     {addForm.quantity !== '0' && addForm.avgPrice !== '0' && (
                       <p className="text-xs text-slate-500">

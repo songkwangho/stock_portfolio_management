@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TrendingUp, Plus, Pencil, Trash2, Check, X, ChevronUp, PlusCircle, Eye, HelpCircle } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
+import { useToastStore } from '@/stores/useToastStore';
 import type { Holding, StockSummary } from '@/types/stock';
 
 interface EditState {
@@ -32,6 +33,7 @@ function PortfolioContent() {
   const onDelete = usePortfolioStore(s => s.deleteHolding);
   const portfolioError = usePortfolioStore(s => s.error);
   const refetchHoldings = usePortfolioStore(s => s.fetchHoldings);
+  const addToast = useToastStore(s => s.addToast);
 
   const onDetailClick = (stock: StockSummary) => {
     const isHolding = stock.category === '보유 종목';
@@ -44,10 +46,21 @@ function PortfolioContent() {
   const [newStock, setNewStock] = useState<{ code: string; name: string } | null>(null);
   const [newForm, setNewForm] = useState({ avgPrice: '', quantity: '' });
   const [searchResetKey, setSearchResetKey] = useState(0);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string; action?: { label: string; onClick: () => void } } | null>(null);
   const [subTab, setSubTab] = useState<'holdings' | 'watchlist'>('holdings');
   const [firstStockGuide, setFirstStockGuide] = useState<{ code: string; name: string } | null>(null);
   const [profitHelpCode, setProfitHelpCode] = useState<string | null>(null);
+  const profitHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profitHelpCode) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (profitHelpRef.current && !profitHelpRef.current.contains(e.target as Node)) {
+        setProfitHelpCode(null);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [profitHelpCode]);
 
   useEffect(() => {
     refetchHoldings();
@@ -65,11 +78,6 @@ function PortfolioContent() {
     }
   }, [focus, holdings]);
 
-  const showToast = (type: 'success' | 'error', text: string, action?: { label: string; onClick: () => void }) => {
-    setToast({ type, text, action });
-    setTimeout(() => setToast(null), 5000);
-  };
-
   const handleAdd = async () => {
     if (!newStock || !newForm.avgPrice) return;
     const justAdded = newStock;
@@ -86,9 +94,9 @@ function PortfolioContent() {
         setFirstStockGuide({ code: justAdded.code, name: justAdded.name });
         localStorage.setItem('onboarding_first_stock_guided', '1');
       } else {
-        showToast(
-          'success',
+        addToast(
           `${justAdded.name}을(를) 추가했어요! 🎉 종목 상세에서 분석 결과를 확인해보세요.`,
+          'success',
           { label: '보러가기', onClick: () => onDetailClick({ ...justAdded, category: '보유 종목' }) },
         );
       }
@@ -96,7 +104,7 @@ function PortfolioContent() {
       setNewForm({ avgPrice: '', quantity: '' });
       setSearchResetKey(k => k + 1);
     } catch {
-      showToast('error', '종목 추가에 실패했습니다.');
+      addToast('종목 추가에 실패했습니다.', 'error');
     }
   };
 
@@ -115,9 +123,9 @@ function PortfolioContent() {
         value: 0,
       });
       setEditingCode(null);
-      showToast('success', `${stock.name} 보유 정보가 수정되었습니다.`);
+      addToast(`${stock.name} 보유 정보가 수정되었습니다.`, 'success');
     } catch {
-      showToast('error', '수정에 실패했습니다.');
+      addToast('수정에 실패했습니다.', 'error');
     }
   };
 
@@ -125,9 +133,9 @@ function PortfolioContent() {
     if (!window.confirm(`${stock.name}을(를) 포트폴리오에서 삭제하시겠습니까?`)) return;
     try {
       await onDelete(stock.code);
-      showToast('success', `${stock.name}이(가) 삭제되었습니다.`);
+      addToast(`${stock.name}이(가) 삭제되었습니다.`, 'success');
     } catch {
-      showToast('error', '삭제에 실패했습니다.');
+      addToast('삭제에 실패했습니다.', 'error');
     }
   };
 
@@ -138,19 +146,6 @@ function PortfolioContent() {
 
   return (
     <div className="space-y-8">
-      {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-2xl text-sm font-semibold shadow-2xl max-w-sm ${
-          toast.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-        }`}>
-          <p className="leading-relaxed">{toast.text}</p>
-          {toast.action && (
-            <button onClick={() => { toast.action!.onClick(); setToast(null); }} className="mt-2 px-3 py-1.5 bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg text-xs font-bold">
-              {toast.action.label} →
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold mb-2">내 종목 관리</h2>
@@ -299,7 +294,7 @@ function PortfolioContent() {
                     </button>
                   </div>
                   {profitHelpCode === stock.code && (
-                    <div className="absolute right-0 top-7 z-10 w-64 bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-xl text-left">
+                    <div ref={profitHelpRef} className="absolute right-0 top-7 z-10 w-64 bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-xl text-left">
                       <p className="text-xs text-slate-300 leading-relaxed">수익률 = (현재가 - 평단가) ÷ 평단가 × 100</p>
                       <p className="text-xs text-slate-500 leading-relaxed mt-2">예: 평단가 70,000원, 현재가 73,500원<br />→ (73,500 - 70,000) ÷ 70,000 × 100 = <span className="text-emerald-400 font-bold">+5.0%</span></p>
                       <button onClick={() => setProfitHelpCode(null)} className="text-xs text-blue-400 font-bold mt-2">알겠어요</button>

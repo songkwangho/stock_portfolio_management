@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Search, RefreshCw, Bell } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import { useAlertStore } from '@/stores/useAlertStore';
-import type { StockSummary, MarketIndex } from '@/types/stock';
+import { useMarketStore } from '@/stores/useMarketStore';
+import type { StockSummary } from '@/types/stock';
 
 interface Props {
   nickname: string;
@@ -18,18 +19,16 @@ export default function HeaderBar({ nickname }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StockSummary[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
+  const marketIndices = useMarketStore(s => s.indices);
+  const fetchIndices = useMarketStore(s => s.fetchIndices);
 
   useEffect(() => {
-    const fetchIndices = async () => {
-      try { setMarketIndices(await stockApi.getMarketIndices()); } catch {}
-    };
     fetchUnreadCount();
     fetchIndices();
     const alertsInterval = setInterval(fetchUnreadCount, 60000);     // 1분 — 알림
-    const indicesInterval = setInterval(fetchIndices, 300000);        // 5분 — 시장지수
+    const indicesInterval = setInterval(() => fetchIndices(true), 300000); // 5분 — 시장지수
     return () => { clearInterval(alertsInterval); clearInterval(indicesInterval); };
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, fetchIndices]);
 
   useEffect(() => {
     const timer = setTimeout(async () => {

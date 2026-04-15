@@ -10,14 +10,23 @@ export default function ToastHost() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          onClick={() => removeToast(t.id)}
-          className={`px-5 py-3 rounded-2xl text-sm font-medium shadow-lg cursor-pointer ${
+          className={`px-5 py-3 rounded-2xl text-sm font-medium shadow-lg ${
             t.type === 'error' ? 'bg-red-500/90 text-white' :
             t.type === 'success' ? 'bg-emerald-500/90 text-white' :
             'bg-blue-500/90 text-white'
           }`}
         >
-          {t.message}
+          <div className="flex items-start gap-3">
+            <p className="flex-1 leading-relaxed cursor-pointer" onClick={() => removeToast(t.id)}>{t.message}</p>
+            {t.action && (
+              <button
+                onClick={() => { t.action!.onClick(); removeToast(t.id); }}
+                className="shrink-0 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold whitespace-nowrap"
+              >
+                {t.action.label} →
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>
