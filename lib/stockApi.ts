@@ -14,6 +14,8 @@ function ensureInterceptors() {
   axios.interceptors.request.use((config) => {
     const id = getDeviceId();
     if (id) config.headers['X-Device-Id'] = id;
+    // 모든 요청 기본 타임아웃 30s — Render cold start + 스크래핑 지연 보호
+    if (config.timeout === 0 || config.timeout === undefined) config.timeout = 30000;
     return config;
   });
 
@@ -21,12 +23,26 @@ function ensureInterceptors() {
     (response) => response,
     async (error) => {
       const url = error.config?.url || '';
-      const silent = url.includes('/health') || url.includes('/search') || url.includes('/unread-count');
+      // 보조 정보 폴링은 실패해도 사용자 흐름 방해 없음 → 토스트 억제
+      const silent =
+        url.includes('/health') ||
+        url.includes('/search') ||
+        url.includes('/unread-count') ||
+        url.includes('/market/indices') ||
+        url.includes('/volatility') ||
+        url.includes('/news');
       if (!silent) {
         try {
           const { useToastStore } = await import('@/stores/useToastStore');
-          const msg = error.response?.data?.error || '서버와 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.';
-          useToastStore.getState().addToast(msg, 'error');
+          const status = error.response?.status as number | undefined;
+          const friendly =
+            status === 400 ? '입력 값을 다시 확인해 주세요.' :
+            status === 401 ? '로그인이 필요해요.' :
+            status === 404 ? '요청한 데이터를 찾을 수 없어요.' :
+            status === 429 ? '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.' :
+            status && status >= 500 ? '서버에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.' :
+            '연결에 문제가 생겼어요. 인터넷 연결을 확인해 주세요.';
+          useToastStore.getState().addToast(friendly, 'error');
         } catch {}
       }
       return Promise.reject(error);

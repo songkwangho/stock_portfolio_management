@@ -297,7 +297,10 @@ PC (md: 이상):
 - [ ] **[UX-NEW7]** 섹터 비교 테이블 — 현재 종목 자동 스크롤 또는 최상단 고정
 - [ ] **[UX-NEW8]** 포트폴리오 등록 폼 "비중(%)" 필드 — 레이블 재작성("총 자산의 몇 %") + "잘 모르겠으면 비워두세요" 힌트
 - [ ] **[UX-F]** 재무제표 테이블 — periods 정렬 방향(최신 → 과거) 헤더에 명시
-- [ ] **[Cleanup-1]** `server/domains/stock/data.js` `majorStocks` 목록에서 상장폐지 종목 제거 — 쌍용C&E(003410) 등
+- [x] **[Cleanup-1]** 쌍용C&E(003410) `majorStocks` 제거 + Neon에서 stock_history 300행 + stocks 1행 삭제 (96종목/69,835행)
+- [x] **[UX-T]** 에러 인터셉터 — HTTP 상태 코드별 한국어 친화 메시지 매핑 (400/401/404/429/5xx + 기본)
+- [x] **[UX-U]** silent 목록 확장 — `/market/indices`, `/volatility`, `/news` 추가 (보조 폴링 실패 토스트 억제)
+- [x] **[M-1]** Axios 글로벌 기본 타임아웃 30s — Render cold start + 스크래핑 지연 보호
 
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
 - [ ] **[M1]** 차트 `components/charts/` 분리 + dynamic import 공유 청크화
