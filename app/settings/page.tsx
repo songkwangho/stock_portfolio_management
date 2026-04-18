@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { PlusCircle, ShieldCheck, Settings, RefreshCw, User } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import StockSearchInput from '@/components/stock/StockSearchInput';
 
 interface HealthStatus {
   api: boolean;
@@ -16,7 +15,7 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'dev';
 export default function SettingsPage() {
   const [nickname, setNickname] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [resetKey, setResetKey] = useState(0);
+  const [stockCode, setStockCode] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -46,13 +45,21 @@ export default function SettingsPage() {
     checkHealth();
   }, []);
 
-  const handleAddStock = async (stock: { code: string; name: string }) => {
+  const handleAddStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const code = stockCode.trim();
+    if (!code) return;
+
     setMessage(null);
     setIsAdding(true);
 
     try {
-      console.log('🔵 종목 추가 시작:', stock);
-      const result = await stockApi.addStock(stock.code);
+      console.log('🔵 종목 추가 시작:', code);
+
+      // 네이버 API로 종목 데이터 크롤링 후 DB 추가 (getStockData 업서트)
+      const result = await stockApi.addStock(code);
+
       console.log('🟢 종목 추가 성공:', result);
 
       setMessage({
@@ -60,16 +67,13 @@ export default function SettingsPage() {
         text: `✅ ${result.name} (${result.code})이(가) 전체 종목 목록에 추가되었습니다!`,
       });
 
-      // 성공 메시지를 먼저 보여준 뒤 0.5초 뒤 입력창 초기화 — 동시 소거로 인한 피드백 소실 방지
-      setTimeout(() => {
-        setResetKey(k => k + 1);
-      }, 500);
+      setStockCode('');
     } catch (error: unknown) {
       console.error('🔴 종목 추가 실패:', error);
       const axiosError = error as { response?: { data?: { error?: string } } };
       setMessage({
         type: 'error',
-        text: axiosError.response?.data?.error || '종목 추가에 실패했습니다.',
+        text: axiosError.response?.data?.error || '종목 추가에 실패했습니다. 종목 코드를 확인해주세요.',
       });
     } finally {
       setIsAdding(false);
@@ -97,30 +101,53 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            관심 있는 종목을 검색해서 추가하면, 자동으로 주가·재무지표·기술적 분석 데이터를 수집하기 시작합니다.
-            추가된 종목은 대시보드와 추천 탭에서 확인할 수 있어요.
+            DB에 없는 새로운 종목을 추가합니다. 종목 코드를 입력하면 네이버 금융 API에서 데이터를 가져와 자동으로 등록합니다.
           </p>
 
-          <StockSearchInput
-            placeholder="추가할 종목명을 검색하세요 (예: 삼성전자)"
-            onSelect={handleAddStock}
-            resetKey={resetKey}
-            className="mb-4"
-          />
-
-          {isAdding && (
-            <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-sm text-blue-300 flex items-center space-x-2">
-              <RefreshCw size={14} className="animate-spin" />
-              <span>종목을 추가하는 중이에요...</span>
+          <form onSubmit={handleAddStock} className="space-y-4">
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 focus-within:border-blue-500 transition-colors">
+              <input
+                type="text"
+                placeholder="종목 코드 입력 (예: 005930)"
+                value={stockCode}
+                onChange={(e) => setStockCode(e.target.value)}
+                disabled={isAdding}
+                inputMode="numeric"
+                maxLength={6}
+                className="bg-transparent border-none focus:outline-none text-sm w-full placeholder:text-slate-600 disabled:opacity-60"
+              />
+              {isAdding && <RefreshCw size={16} className="animate-spin text-blue-400 ml-2" />}
             </div>
-          )}
 
-          {message && (
-            <div className={`p-4 rounded-2xl text-sm font-medium ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            {isAdding && (
+              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-sm text-blue-300 flex items-center space-x-2">
+                <RefreshCw size={14} className="animate-spin" />
+                <span>네이버 API에서 종목 데이터를 가져오는 중...</span>
+              </div>
+            )}
+
+            {message && (
+              <div className={`p-4 rounded-2xl text-sm font-medium ${
+                message.type === 'success'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
               }`}>
-              {message.text}
-            </div>
-          )}
+                {message.text}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isAdding || !stockCode.trim()}
+              className="w-full py-3 min-h-[44px] bg-blue-600 active:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-sm font-bold transition-colors"
+            >
+              {isAdding ? '추가 중...' : '종목 추가'}
+            </button>
+          </form>
+
+          <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+            💡 종목 코드는 네이버 금융에서 확인할 수 있습니다. (예: 삼성전자 005930)
+          </p>
         </div>
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
