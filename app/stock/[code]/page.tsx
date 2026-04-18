@@ -74,6 +74,11 @@ function StockDetailContent({ code }: { code: string }) {
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
   const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
 
+  // 종목 진입 시 스크롤 최상단으로 강제 — 이전 페이지 스크롤 위치 잔재 방지
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [code]);
+
   useEffect(() => {
     if (sectorData && currentSectorRowRef.current) {
       currentSectorRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });

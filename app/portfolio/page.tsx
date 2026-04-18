@@ -71,12 +71,17 @@ function PortfolioContent() {
     if (focus === 'add-holding') {
       setShowAddForm(true);
     }
-    if (focus === 'first-stock-guide' && holdings.length > 0 && !localStorage.getItem('onboarding_first_stock_guided')) {
+    // 조건 강화: holdings.length === 1 (정확히 첫 종목 추가 직후에만 노출)
+    if (focus === 'first-stock-guide' && holdings.length === 1 && !localStorage.getItem('onboarding_first_stock_guided')) {
       const just = holdings[0];
       setFirstStockGuide({ code: just.code, name: just.name });
       localStorage.setItem('onboarding_first_stock_guided', '1');
     }
-  }, [focus, holdings]);
+    // 종목 0개로 떨어지면 가이드 카드 즉시 제거
+    if (holdings.length === 0 && firstStockGuide) {
+      setFirstStockGuide(null);
+    }
+  }, [focus, holdings, firstStockGuide]);
 
   const handleAdd = async () => {
     if (!newStock || !newForm.avgPrice) return;

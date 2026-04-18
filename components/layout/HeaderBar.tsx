@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Search, RefreshCw, Bell } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -14,6 +14,7 @@ interface Props {
 
 export default function HeaderBar({ nickname }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const { unreadCount, fetchUnreadCount } = useAlertStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,6 +22,12 @@ export default function HeaderBar({ nickname }: Props) {
   const [isSearching, setIsSearching] = useState(false);
   const marketIndices = useMarketStore(s => s.indices);
   const fetchIndices = useMarketStore(s => s.fetchIndices);
+
+  // 라우트 변경 시 검색 입력·드롭다운 초기화 — 잔재 오버레이 방지
+  useEffect(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+  }, [pathname]);
 
   useEffect(() => {
     fetchUnreadCount();
