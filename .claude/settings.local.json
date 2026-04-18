@@ -27,7 +27,12 @@
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_JpOlFcMo9bn5@ep-holy-dawn-a1v2z6yo-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" NODE_ENV=production timeout 30 node server/server.js)",
       "Bash(grep -rEh \"^import .* from ['\\\\\"][^./]\" /d/stock_app_dev_v2/server/*.js /d/stock_app_dev_v2/server/**/*.js)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_JpOlFcMo9bn5@ep-holy-dawn-a1v2z6yo-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" NODE_ENV=production node scripts/backfill-history.js)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(ls .env*)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -5,7 +5,8 @@
       "Bash(ls /d/stock_app_dev_v2/*.md)",
       "Bash(cp -r /c/Users/aistudio/Documents/stock_app_dev/server /d/stock_app_dev_v2/)",
       "Bash(rm -rf /d/stock_app_dev_v2/server/node_modules)",
-      "Bash(cp -r /c/Users/aistudio/Documents/stock_app_dev/scripts /d/stock_app_dev_v2/)"
+      "Bash(cp -r /c/Users/aistudio/Documents/stock_app_dev/scripts /d/stock_app_dev_v2/)",
+      "Bash(git commit -m ' *)"
     ],
     "additionalDirectories": [
       "\\tmp"

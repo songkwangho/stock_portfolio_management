@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [nickname, setNickname] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetKey, setResetKey] = useState(0);
+  const [isAdding, setIsAdding] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
 
@@ -47,14 +48,31 @@ export default function SettingsPage() {
 
   const handleAddStock = async (stock: { code: string; name: string }) => {
     setMessage(null);
+    setIsAdding(true);
+
     try {
+      console.log('🔵 종목 추가 시작:', stock);
       const result = await stockApi.addStock(stock.code);
-      setMessage({ type: 'success', text: `종목 ${result.name} (${result.code})이 성공적으로 추가되었습니다.` });
-      setResetKey(k => k + 1);
+      console.log('🟢 종목 추가 성공:', result);
+
+      setMessage({
+        type: 'success',
+        text: `✅ ${result.name} (${result.code})이(가) 전체 종목 목록에 추가되었습니다!`,
+      });
+
+      // 성공 메시지를 먼저 보여준 뒤 0.5초 뒤 입력창 초기화 — 동시 소거로 인한 피드백 소실 방지
+      setTimeout(() => {
+        setResetKey(k => k + 1);
+      }, 500);
     } catch (error: unknown) {
-      console.error('Failed to add stock:', error);
+      console.error('🔴 종목 추가 실패:', error);
       const axiosError = error as { response?: { data?: { error?: string } } };
-      setMessage({ type: 'error', text: axiosError.response?.data?.error || '종목 추가에 실패했습니다.' });
+      setMessage({
+        type: 'error',
+        text: axiosError.response?.data?.error || '종목 추가에 실패했습니다.',
+      });
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -89,6 +107,13 @@ export default function SettingsPage() {
             resetKey={resetKey}
             className="mb-4"
           />
+
+          {isAdding && (
+            <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-sm text-blue-300 flex items-center space-x-2">
+              <RefreshCw size={14} className="animate-spin" />
+              <span>종목을 추가하는 중이에요...</span>
+            </div>
+          )}
 
           {message && (
             <div className={`p-4 rounded-2xl text-sm font-medium ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
