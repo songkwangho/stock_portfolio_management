@@ -74,11 +74,11 @@ export default function DisclaimerModal() {
         </button>
 
         <button
-          onClick={() => finishOnboarding('/stocks')}
+          onClick={() => finishOnboarding()}
           className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500 active:border-blue-500 text-left transition-colors"
         >
-          <p className="text-sm font-bold text-white mb-1">📚 주식 공부를 시작하고 싶어요</p>
-          <p className="text-xs text-slate-400 leading-relaxed">주요 97종목을 둘러보고, 용어 설명으로 기본기를 익혀요.</p>
+          <p className="text-sm font-bold text-white mb-1">📚 주식 기본부터 배우고 싶어요</p>
+          <p className="text-xs text-slate-400 leading-relaxed">대시보드에서 차근차근 기능을 둘러봐요.</p>
         </button>
 
         <button onClick={() => finishOnboarding()} className="w-full text-xs text-slate-500 hover:text-slate-300 py-2">

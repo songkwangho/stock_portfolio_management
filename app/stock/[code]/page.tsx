@@ -239,10 +239,10 @@ function StockDetailContent({ code }: { code: string }) {
               )}
             </div>
             <h2 className="text-4xl font-bold">{stockDetail?.name || stock.name}</h2>
-            <div className="flex items-center space-x-2 mt-1">
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
               <p className="text-slate-500 font-mono">{stock.code}</p>
               {stockDetail?.last_updated && (
-                <span className="text-xs text-slate-600">
+                <span className="text-xs text-slate-600 whitespace-nowrap">
                   {getDataFreshnessLabel(stockDetail.last_updated)}
                 </span>
               )}
@@ -727,7 +727,7 @@ function StockDetailContent({ code }: { code: string }) {
                   </div>
                 </div>
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs min-w-[600px]">
                     <thead className="sticky top-0 bg-slate-950">
                       <tr className="border-b border-slate-800">
                         <th className="text-left py-2 px-3 text-xs text-slate-500 font-bold">종목</th>

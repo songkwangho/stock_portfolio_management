@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { TrendingUp, Plus, Pencil, Trash2, Check, X, ChevronUp, PlusCircle, Eye, HelpCircle } from 'lucide-react';
+import { TrendingUp, Pencil, Trash2, Check, X, PlusCircle, Eye, HelpCircle } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
@@ -40,7 +40,6 @@ function PortfolioContent() {
     router.push(`/stock/${stock.code}?from=${isHolding ? 'holding' : 'watchlist'}`);
   };
 
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({ avgPrice: '', quantity: '' });
   const [newStock, setNewStock] = useState<{ code: string; name: string } | null>(null);
@@ -66,11 +65,8 @@ function PortfolioContent() {
     refetchHoldings();
   }, [refetchHoldings]);
 
-  // H1/H2: searchParams 기반 포커스 처리
+  // H1: 첫 종목 가이드 처리 (add-holding focus는 폼 상시 노출 변경으로 무의미)
   useEffect(() => {
-    if (focus === 'add-holding') {
-      setShowAddForm(true);
-    }
     // 조건 강화: holdings.length === 1 (정확히 첫 종목 추가 직후에만 노출)
     if (focus === 'first-stock-guide' && holdings.length === 1 && !localStorage.getItem('onboarding_first_stock_guided')) {
       const just = holdings[0];
@@ -151,26 +147,15 @@ function PortfolioContent() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-bold mb-2">내 종목 관리</h2>
-          <div className="flex items-center space-x-1 bg-slate-900/50 rounded-xl p-1 border border-slate-800">
-            <button onClick={() => setSubTab('holdings')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${subTab === 'holdings' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>보유종목</button>
-            <button onClick={() => setSubTab('watchlist')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 ${subTab === 'watchlist' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-              <Eye size={14} />
-              <span>관심종목</span>
-            </button>
-          </div>
+      <div>
+        <h2 className="text-2xl font-bold mb-2">내 종목 관리</h2>
+        <div className="flex items-center space-x-1 bg-slate-900/50 rounded-xl p-1 border border-slate-800 w-fit">
+          <button onClick={() => setSubTab('holdings')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${subTab === 'holdings' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>보유종목</button>
+          <button onClick={() => setSubTab('watchlist')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center space-x-1 ${subTab === 'watchlist' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+            <Eye size={14} />
+            <span>관심종목</span>
+          </button>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className={`px-4 py-3 min-h-[44px] rounded-xl text-xs font-bold transition-all flex items-center space-x-2 shrink-0 ${
-            showAddForm ? 'bg-slate-800 text-slate-400 border border-slate-700' : 'bg-blue-600 text-white active:bg-blue-500'
-          }`}
-        >
-          {showAddForm ? <ChevronUp size={14} /> : <Plus size={14} />}
-          <span>{showAddForm ? '접기' : '종목 추가'}</span>
-        </button>
       </div>
 
       <ErrorBanner error={portfolioError} kind="server" onRetry={refetchHoldings} />
@@ -201,12 +186,11 @@ function PortfolioContent() {
         </div>
       )}
 
-      {showAddForm && (
-        <div className="bg-slate-900/50 border border-blue-500/20 rounded-3xl p-6">
-          <h3 className="text-sm font-bold mb-4 flex items-center space-x-2">
-            <PlusCircle size={16} className="text-blue-400" />
-            <span>새 종목 추가</span>
-          </h3>
+      <div className="bg-slate-900/50 border border-blue-500/20 rounded-3xl p-6">
+        <h3 className="text-sm font-bold mb-4 flex items-center space-x-2">
+          <PlusCircle size={16} className="text-blue-400" />
+          <span>새 종목 추가</span>
+        </h3>
           <div className="space-y-3">
             <StockSearchInput
               placeholder="추가할 종목명을 검색하세요 (예: 삼성전자)"
@@ -244,7 +228,6 @@ function PortfolioContent() {
             )}
           </div>
         </div>
-      )}
 
       {firstStockGuide && (
         <div className="bg-gradient-to-br from-emerald-600/10 to-blue-600/10 border border-emerald-500/20 rounded-3xl p-6 relative">
@@ -441,16 +424,11 @@ function PortfolioContent() {
       </div>
 
       {holdings.length === 0 && (
-        <div className="text-center py-20 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
           <p className="text-3xl mb-4">📊</p>
           <p className="text-slate-300 font-bold text-lg mb-2">아직 보유 종목이 없어요</p>
-          <p className="text-slate-500 text-sm mb-6">가진 주식을 추가하면 수익률을 한눈에 볼 수 있어요</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button onClick={() => setShowAddForm(true)} className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-sm font-bold transition-colors inline-flex items-center space-x-2">
-              <Plus size={16} /><span>종목 추가하기</span>
-            </button>
-            <button onClick={() => router.push('/recommendations')} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-sm font-bold transition-colors">추천 종목 보기</button>
-          </div>
+          <p className="text-slate-500 text-sm mb-6">위 폼에서 가진 주식을 추가하면 수익률을 한눈에 볼 수 있어요</p>
+          <button onClick={() => router.push('/recommendations')} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-sm font-bold transition-colors">추천 종목 보기</button>
         </div>
       )}
       </>}
