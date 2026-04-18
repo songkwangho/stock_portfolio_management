@@ -1,5 +1,8 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { getDeviceId } from './deviceId';
+
+// 5xx 1회 자동 재시도용 플래그 (TS: AxiosRequestConfig에 _retry 필드 확장)
+type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
 
@@ -23,6 +26,20 @@ function ensureInterceptors() {
     (response) => response,
     async (error) => {
       const url = error.config?.url || '';
+      const status = error.response?.status as number | undefined;
+      const config = error.config as RetryConfig | undefined;
+
+      // 5xx 서버 오류 시 1회 자동 재시도 (2초 대기) — Render cold start·일시 장애 자가 복구
+      if (status && status >= 500 && config && !config._retry) {
+        config._retry = true;
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          return await axios.request(config);
+        } catch {
+          // 재시도 실패 시 아래 토스트 로직으로 진행
+        }
+      }
+
       // 보조 정보 폴링은 실패해도 사용자 흐름 방해 없음 → 토스트 억제
       const silent =
         url.includes('/health') ||
@@ -34,7 +51,6 @@ function ensureInterceptors() {
       if (!silent) {
         try {
           const { useToastStore } = await import('@/stores/useToastStore');
-          const status = error.response?.status as number | undefined;
           const friendly =
             status === 400 ? '입력 값을 다시 확인해 주세요.' :
             status === 401 ? '로그인이 필요해요.' :

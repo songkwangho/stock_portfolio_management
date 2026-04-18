@@ -130,9 +130,10 @@ function StockDetailContent({ code }: { code: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
-        <RefreshCw className="animate-spin mr-2" size={20} />
-        <span>데이터 분석 중...</span>
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <RefreshCw className="animate-spin mb-3 text-blue-400" size={24} />
+        <p className="text-sm text-slate-300 font-semibold mb-1">종목 정보를 불러오는 중이에요...</p>
+        <p className="text-xs text-slate-500">보통 3~5초 소요돼요</p>
       </div>
     );
   }

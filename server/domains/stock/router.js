@@ -69,13 +69,23 @@ router.get('/search', async (req, res) => {
     if (!q) return res.json([]);
     try {
         const like = `%${q}%`;
+        const startsWith = `${q}%`;
+        // ORDER BY: 1순위 이름이 q로 시작 (정확도 높음), 2순위 q를 포함, 그 외 이름순.
+        // "삼성" 입력 시 "삼성SDI"·"삼성전자"가 모두 노출되도록 부분 일치 정렬 강화.
         const { rows: results } = await query(`
             SELECT s.code, s.name, s.category, a.opinion AS market_opinion
             FROM stocks s
             LEFT JOIN stock_analysis a ON s.code = a.code
             WHERE s.name ILIKE $1 OR s.code ILIKE $1
+            ORDER BY
+                CASE
+                    WHEN s.name ILIKE $2 THEN 1
+                    WHEN s.name ILIKE $1 THEN 2
+                    ELSE 3
+                END,
+                s.name
             LIMIT 10
-        `, [like]);
+        `, [like, startsWith]);
         res.json(results);
     } catch (error) {
         console.error('Search Error:', error.message);

@@ -61,8 +61,8 @@ export default function HealthGate({ children, onReady }: Props) {
               <span className="text-sm">데이터를 불러오는 중이에요...</span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              처음 접속할 땐 준비 시간이 필요해요. (보통 30초 이내)<br />
-              커피 한 모금 하고 오셔도 괜찮아요 ☕
+              ⏱️ 처음 접속 시 <span className="font-bold text-slate-300">30~50초</span> 소요될 수 있어요.<br />
+              잠시만 기다려 주세요 ☕
             </p>
           </>
         ) : (
