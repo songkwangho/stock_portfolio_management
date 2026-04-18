@@ -301,6 +301,32 @@ PC (md: 이상):
 - [x] **[UX-T]** 에러 인터셉터 — HTTP 상태 코드별 한국어 친화 메시지 매핑 (400/401/404/429/5xx + 기본)
 - [x] **[UX-U]** silent 목록 확장 — `/market/indices`, `/volatility`, `/news` 추가 (보조 폴링 실패 토스트 억제)
 - [x] **[M-1]** Axios 글로벌 기본 타임아웃 30s — Render cold start + 스크래핑 지연 보호
+- [x] **[E2E-C1]** 첫 종목 가이드 카드 잔재 제거 — `holdings.length === 1` 조건 강화 + 0개 시 즉시 제거 (2026-04-18)
+- [x] **[E2E-C2]** HeaderBar 검색 오버레이 잔재 — `usePathname` 구독으로 라우트 변경 시 검색 입력·드롭다운 초기화
+- [x] **[E2E-C3]** 종목 상세 진입 시 스크롤 최상단 — `useEffect([code]) → window.scrollTo({top:0})`
+- [x] **[E2E-H1]** 온보딩 "공부 시작" 라우팅 — `/stocks`(97종목) → 대시보드(기본)로 변경, 초보자 UX 개선
+- [x] **[E2E-H2]** 포트폴리오 추가 폼 상시 노출 — 우상단 중복 버튼 제거, `showAddForm` state 삭제
+- [x] **[E2E-H3]** 모바일 반응형 — 섹터 비교 테이블 `min-w-[600px]` 가로 스크롤, 코드/날짜 `flex-wrap whitespace-nowrap`
+- [x] **[E2E-M1]** 검색 부분 일치 정렬 — `ORDER BY CASE ... ILIKE 'prefix%' THEN 1 ...` ('삼성' → 삼성전자·삼성SDI 모두 노출)
+- [x] **[E2E-M2]** 로딩 안내 친화화 — HealthGate "30~50초" 명시, `/stock/[code]` "보통 3~5초 소요" 안내
+- [x] **[E2E-M3]** Axios 5xx 자동 재시도 1회 — `_retry` 플래그, 2초 대기, `RetryConfig` 타입 확장
+- [x] **[Settings-UX]** `/settings` 종목 수동 추가 — `StockSearchInput`(DB 드롭다운) 제거 → 6자리 코드 입력 form (네이버 크롤링 업서트). 로딩 배너·성공/실패 메시지·🔵🟢🔴 콘솔 로그 추가
+  - **한계**: 네이버 금융 URL이 `?code=` 필수라 종목명 입력은 미지원 → **3.6차에서 KRX 디렉토리로 해소**
+
+**3.6차 — 종목 디렉토리 선행 (Sprint 1.6, Phase 6 일부 앞당김, ~2일)**
+
+`/settings` 수동 추가 UX가 종목 코드만 받는 한계 해소용. 네이버 크롤링 URL은 `?code=`가 필수라 종목명 직접 입력 불가. **전 상장 종목 명→코드 매핑 테이블을 선행 구축**해 프론트가 "삼성전자" 입력 시 `005930`로 변환해 `POST /stocks`에 전달.
+
+- [ ] **[DIR-1]** `stocks_directory` 테이블 신설 — (code PK, name, market [KOSPI/KOSDAQ/KONEX], listed_at, delisted_at, updated_at)
+- [ ] **[DIR-2]** KRX CSV 수집 파이프라인 — 상장법인목록 CSV (KRX 공식 공개 데이터) 일 1회 수집. 초기엔 수동 스크립트 `scripts/sync-directory.js`, Phase 6에서 스케줄러 편입
+- [ ] **[DIR-3]** `GET /api/stocks/directory/search?q=` 엔드포인트 — name ILIKE + 시작 일치 우선 정렬 (E2E-M1과 동일 패턴), 상장폐지 제외, 최대 10건
+- [ ] **[DIR-4]** `/settings` 입력창 자동완성 — 2자 이상 디바운스 250ms, 드롭다운 선택 시 code 자동 채움. 선택 없이도 6자리 숫자 직접 입력은 그대로 동작 (폴백)
+- [ ] **[DIR-5]** `POST /api/stocks` 확장 — body에 `code` 대신 `q`(name 또는 code) 허용. name이면 디렉토리 조회 후 code 해석, 실패 시 400 + 후보 제안
+- [ ] **[DIR-6]** 상장폐지 감지 — 디렉토리 갱신 시 `delisted_at` 채워진 종목은 `stocks` 테이블에서 경고 로그 (Cleanup-1 같은 수동 정리와 연결)
+
+**범위 제한**: 이번 선행은 **디렉토리 조회만** 포함. 가격·거래량·재무 등 시세 데이터는 여전히 네이버 크롤링 유지 (Phase 6 본 작업에서 KRX OpenAPI 전환).
+
+---
 
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
 - [ ] **[M1]** 차트 `components/charts/` 분리 + dynamic import 공유 청크화
@@ -335,7 +361,9 @@ PC (md: 이상):
 - 목표: **200명**
 
 ### Phase 6 — 데이터 소스 안정화
+- [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX CSV 파이프라인)
 - [ ] **가격·거래량·투자자 매매동향**: KRX OpenAPI 전환 — CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계
+- [ ] **디렉토리 자동 스케줄링**: 3.6차의 수동 `scripts/sync-directory.js`를 `setupScheduler`에 편입 (일 1회, 장마감 후)
 - [ ] **PER/PBR/목표가**: KRX 월별 공시라 실시간 불가 → **네이버 스크래핑 유지** (Phase 6 범위 축소)
 - [ ] 재무지표: FinanceDataReader(Python) — Node `child_process` 또는 별도 Python 마이크로서비스로 격리
 - **목표**: 스크래핑 의존도 축소 (완전 제거 불가)

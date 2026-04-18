@@ -212,7 +212,11 @@ const stock = await fetchStock(code); // Server에서
 
 ### /settings (CSR)
 
-- 종목 수동 추가 (StockSearchInput)
+- 종목 수동 추가 — 6자리 코드 입력 form (`stockCode` state + `handleAddStock` submit → `POST /api/stocks`)
+  - `StockSearchInput` 사용 안 함 (DB 기존 종목만 매칭하는 모순 해소, 2026-04-18)
+  - 로딩 상태: input 내 스피너 + "네이버 API에서 종목 데이터를 가져오는 중..." 배너
+  - 성공/실패 메시지 박스 + 🔵🟢🔴 콘솔 로그
+  - **3.6차 예정**: `stocks_directory` 자동완성 드롭다운 추가 → 종목명 입력 허용
 - 서버 상태 확인 (health API)
 - 닉네임 설정
 

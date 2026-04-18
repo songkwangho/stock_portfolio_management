@@ -80,6 +80,14 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
 
+### 3.6차 신설 예정 — stocks_directory (Phase 6 일부 선행)
+
+| 테이블 | PK | 주요 컬럼 | 비고 |
+|--------|-----|----------|------|
+| stocks_directory | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | KRX 상장법인목록 CSV 일 1회 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 종목, `stocks`는 앱 등록 종목만) |
+
+**용도**: `/settings` 수동 추가에서 종목명 → 코드 매핑. 네이버 금융 URL이 `?code=` 필수라 사용자 입력 종목명을 code로 해석하는 조회 레이어 필요. 가격·지표 데이터는 여전히 네이버 크롤링(`stocks` 테이블) 사용.
+
 ### ON CONFLICT 정책 (data.js 시드)
 
 - `stocks`: name만 upsert
@@ -99,10 +107,18 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | GET | `/api/stock/:code` | 종목 상세 |
 | POST | `/api/stock/:code/refresh` | 캐시 무효화 + 재수집 |
 | GET | `/api/stocks` | 전체 종목 (`market_opinion` JOIN) |
-| POST | `/api/stocks` | 종목 수동 등록 |
+| POST | `/api/stocks` | 종목 수동 등록 (body: `{ code }` → `getStockData(code)` 네이버 크롤링 + upsert) |
 | DELETE | `/api/stocks/:code` | 종목 삭제 (cascade) |
-| GET | `/api/search?q=` | 검색 (최대 10건) |
+| GET | `/api/search?q=` | 검색 (`stocks` 테이블, 시작 일치 우선 정렬, 최대 10건) |
 | GET | `/api/recommendations` | 추천 종목 |
+
+### 3.6차 신설 예정 — 디렉토리 조회
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/stocks/directory/search?q=` | `stocks_directory` 전 상장 종목 대상 name/code ILIKE 검색 (시작 일치 우선, `delisted_at IS NULL`, 최대 10건). `/api/search`와 달리 앱 등록 여부와 무관. |
+
+`POST /api/stocks` body는 하위 호환 유지한 채 `q`(name 또는 code) 필드 추가 지원 예정. name이면 디렉토리에서 code 해석 후 기존 흐름 진입.
 
 ### 포트폴리오 (portfolio — 5개, `requireDeviceId` 적용)
 
