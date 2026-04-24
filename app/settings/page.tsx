@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PlusCircle, ShieldCheck, Settings, RefreshCw, User } from 'lucide-react';
+import { PlusCircle, ShieldCheck, Settings, RefreshCw, User, X, Check } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 
 interface HealthStatus {
@@ -10,12 +10,21 @@ interface HealthStatus {
   lastSync: string | null;
 }
 
+interface DirectoryHit {
+  code: string;
+  name: string;
+  market: string;
+}
+
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'dev';
 
 export default function SettingsPage() {
   const [nickname, setNickname] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [stockCode, setStockCode] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedHit, setSelectedHit] = useState<DirectoryHit | null>(null);
+  const [directoryResults, setDirectoryResults] = useState<DirectoryHit[]>([]);
+  const [isSearchingDir, setIsSearchingDir] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -45,11 +54,62 @@ export default function SettingsPage() {
     checkHealth();
   }, []);
 
+  // 디렉토리 자동완성 — 2자 이상 입력 시 250ms 디바운스로 stocks_directory 검색.
+  // 6자리 숫자 코드만 입력한 경우엔 검색 결과 비움 (폴백으로 직접 코드 사용).
+  useEffect(() => {
+    if (selectedHit) return; // 이미 선택됨 — 드롭다운 숨김
+    const q = searchQuery.trim();
+    if (q.length < 2 || /^\d{1,6}$/.test(q)) {
+      setDirectoryResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingDir(true);
+      try {
+        const rows = await stockApi.searchDirectory(q);
+        setDirectoryResults(rows);
+      } catch {
+        setDirectoryResults([]);
+      } finally {
+        setIsSearchingDir(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedHit]);
+
+  const pickHit = (hit: DirectoryHit) => {
+    setSelectedHit(hit);
+    setSearchQuery(`${hit.name} (${hit.code})`);
+    setDirectoryResults([]);
+  };
+
+  const clearSelection = () => {
+    setSelectedHit(null);
+    setSearchQuery('');
+    setDirectoryResults([]);
+  };
+
+  // 제출 시 code 결정 로직:
+  //   1) 드롭다운에서 선택한 경우 → selectedHit.code
+  //   2) 선택 없이 6자리 숫자 직접 입력 → searchQuery (폴백, 기존 동작 유지)
+  const resolveCode = (): string => {
+    if (selectedHit) return selectedHit.code;
+    const raw = searchQuery.trim();
+    if (/^\d{6}$/.test(raw)) return raw;
+    return '';
+  };
+
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const code = stockCode.trim();
-    if (!code) return;
+    const code = resolveCode();
+    if (!code) {
+      setMessage({
+        type: 'error',
+        text: '종목을 드롭다운에서 선택하거나 6자리 종목 코드를 입력해 주세요.',
+      });
+      return;
+    }
 
     setMessage(null);
     setIsAdding(true);
@@ -67,7 +127,7 @@ export default function SettingsPage() {
         text: `✅ ${result.name} (${result.code})이(가) 전체 종목 목록에 추가되었습니다!`,
       });
 
-      setStockCode('');
+      clearSelection();
     } catch (error: unknown) {
       console.error('🔴 종목 추가 실패:', error);
       const axiosError = error as { response?: { data?: { error?: string } } };
@@ -101,23 +161,71 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            DB에 없는 새로운 종목을 추가합니다. 종목 코드를 입력하면 네이버 금융 API에서 데이터를 가져와 자동으로 등록합니다.
+            DB에 없는 새로운 종목을 추가합니다. 종목명(예: 삼성전자) 또는 6자리 코드(예: 005930)를 입력하면 네이버 금융 API에서 데이터를 가져와 자동으로 등록합니다.
           </p>
 
           <form onSubmit={handleAddStock} className="space-y-4">
-            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 focus-within:border-blue-500 transition-colors">
-              <input
-                type="text"
-                placeholder="종목 코드 입력 (예: 005930)"
-                value={stockCode}
-                onChange={(e) => setStockCode(e.target.value)}
-                disabled={isAdding}
-                inputMode="numeric"
-                maxLength={6}
-                className="bg-transparent border-none focus:outline-none text-sm w-full placeholder:text-slate-600 disabled:opacity-60"
-              />
-              {isAdding && <RefreshCw size={16} className="animate-spin text-blue-400 ml-2" />}
+            <div className="relative">
+              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 focus-within:border-blue-500 transition-colors">
+                <input
+                  type="text"
+                  placeholder="종목명 또는 코드 입력 (예: 삼성전자, 005930)"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (selectedHit) setSelectedHit(null);
+                  }}
+                  disabled={isAdding}
+                  maxLength={40}
+                  className="bg-transparent border-none focus:outline-none text-sm w-full placeholder:text-slate-600 disabled:opacity-60"
+                />
+                {isSearchingDir && <RefreshCw size={14} className="animate-spin text-slate-500 ml-2" />}
+                {isAdding && <RefreshCw size={16} className="animate-spin text-blue-400 ml-2" />}
+              </div>
+
+              {!selectedHit && directoryResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-20">
+                  {directoryResults.map((hit) => (
+                    <button
+                      key={hit.code}
+                      type="button"
+                      onClick={() => pickHit(hit)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 text-left"
+                    >
+                      <div>
+                        <p className="text-sm font-bold text-white">{hit.name}</p>
+                        <p className="text-xs text-slate-500 font-mono">{hit.code}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        hit.market === 'KOSPI' ? 'bg-blue-500/10 text-blue-400' :
+                        hit.market === 'KOSDAQ' ? 'bg-emerald-500/10 text-emerald-400' :
+                        'bg-slate-500/10 text-slate-400'
+                      }`}>{hit.market}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {selectedHit && (
+              <div className="flex items-center justify-between p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                <div className="flex items-center space-x-2 text-sm text-emerald-300">
+                  <Check size={14} />
+                  <span className="font-bold">{selectedHit.name}</span>
+                  <span className="text-slate-500 font-mono">({selectedHit.code})</span>
+                  <span className="text-slate-500">·</span>
+                  <span className="text-slate-400">{selectedHit.market}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-slate-500 hover:text-white p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"
+                  aria-label="선택 취소"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {isAdding && (
               <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-sm text-blue-300 flex items-center space-x-2">
@@ -138,7 +246,7 @@ export default function SettingsPage() {
 
             <button
               type="submit"
-              disabled={isAdding || !stockCode.trim()}
+              disabled={isAdding || (!selectedHit && !/^\d{6}$/.test(searchQuery.trim()))}
               className="w-full py-3 min-h-[44px] bg-blue-600 active:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl text-sm font-bold transition-colors"
             >
               {isAdding ? '추가 중...' : '종목 추가'}
@@ -146,7 +254,7 @@ export default function SettingsPage() {
           </form>
 
           <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-            💡 종목 코드는 네이버 금융에서 확인할 수 있습니다. (예: 삼성전자 005930)
+            💡 종목명은 KRX 상장법인목록 기준이에요. 드롭다운에서 찾아지지 않으면 네이버 금융에서 6자리 코드를 확인해 직접 입력해 주세요.
           </p>
         </div>
 
