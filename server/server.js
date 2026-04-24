@@ -32,8 +32,11 @@ const __dirname = path.dirname(__filename);
 // 3) registerInitialData: stocks/recommended_stocks 시드 (ON CONFLICT로 멱등)
 // 4) setupCleanup / setupScheduler: 주기 작업 시작
 // 5) app.listen
+console.log('📦 Schema init...');
 await initSchema(pool);
+console.log('🔄 Migrations...');
 await runMigrations(pool);
+console.log('🌱 Initial data...');
 await registerInitialData(pool);
 
 const app = express();
@@ -83,7 +86,9 @@ app.use('/api/', apiLimiter);
 app.use('/charts', express.static(path.join(__dirname, '..', 'public', 'charts')));
 
 // Cleanup old data + start scheduler (delayed sync on startup + daily 8AM)
+console.log('🧹 Cleanup setup...');
 setupCleanup(pool);
+console.log('⏰ Scheduler setup...');
 setupScheduler();
 
 // --- Mount Domain Routers ---
@@ -98,5 +103,6 @@ app.use('/api', analysisRouter); // owns /stock/:code/{indicators,volatility,fin
 app.use('/api', stockRouter);    // owns /stock/:code, /stocks, /search, /recommendations
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`🌐 CORS origin: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 });

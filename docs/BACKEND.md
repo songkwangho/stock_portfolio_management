@@ -80,7 +80,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | investor_history | code+date | institution, foreign_net, individual (모두 BIGINT) | FK 없음 |
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
-| **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market |
+| **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market. 서버 시작 시 데이터 0건이면 1회 자동 동기화. KRX 응답 4중 가드(HTTP 200 / 본문 1,000B+ / HTML 에러 페이지 차단 / 최소 행 수) |
 
 ### stocks_directory 동기화 파이프라인
 

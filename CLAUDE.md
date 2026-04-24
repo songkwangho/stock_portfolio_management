@@ -384,24 +384,29 @@ PC (md: 이상):
 - [ ] KIS OpenAPI 신청 **병행 시작** (Phase 7 착수 전 심사 완료 필요, 영업일 1~3일)
 - 목표: **200명**
 
-#### Phase 5 사전 결정 사항 (2026-04-24 확정)
+#### Phase 5 설계 확정 사항 (2026-04-24)
 
-**OAuth 개발 순서**: Google OAuth 먼저 개발(콘솔 승인 당일) → Kakao OAuth 심사 병행 신청(영업일 3~7일). 과거 일부 기록에 "Kakao 먼저"로 표기된 흔적이 있을 수 있으나 본 로드맵은 **Google 먼저**로 통일.
+**OAuth 개발 순서 확정**: Google OAuth 먼저(당일 승인) → Kakao OAuth 심사 병행.
+(주의: 이전 문서의 "Kakao 먼저" 표현과 불일치 있었음 → Google 먼저로 통일)
 
-**device_id → user_id 마이그레이션 흐름 (B안 구체화)**:
-1. OAuth 콜백 성공 시 클라이언트가 `X-Device-Id` 헤더에 기존 `device_id`를 실어 `POST /api/auth/link` 호출
-2. 서버: `holding_stocks`, `watchlist`, `alerts`의 `device_id` → 신규 `user_id`로 UPDATE (트랜잭션 1개)
-3. 클라이언트: localStorage의 `device_id` 제거, JWT `accessToken` 저장
-4. 마이그레이션 실패 시 "데이터 없음" 안내 + 수동 재등록 유도
+**device_id → user_id 마이그레이션 (B안 상세)**
+1. OAuth 콜백 성공 시 클라이언트가 기존 `device_id`를 `X-Device-Id` 헤더에 포함해 `POST /api/auth/link` 호출
+2. 서버: `holding_stocks` / `watchlist` / `alerts`의 `device_id` → 신규 `user_id`로 UPDATE (트랜잭션)
+3. 클라이언트: localStorage `device_id` 제거, JWT `accessToken` 저장
+4. 마이그레이션 실패 → "이전 데이터를 불러올 수 없어요" 안내 + 수동 재등록 유도
+5. 브라우저 캐시 클리어로 `device_id` 소실된 경우: 고아 데이터 그대로 방치 (cleanup은 별도 스크립트)
 
-**JWT 검증 위치**: Next.js middleware **불필요**. Express 백엔드에서만 `Authorization: Bearer` 검증. Edge Runtime을 피하므로 `jsonwebtoken` 그대로 사용 가능, `jose` 도입 없음.
+**JWT 검증 위치 확정**: Express 백엔드에서만. Next.js middleware 불사용.
+→ `jsonwebtoken` 사용 가능. `jose` 도입 불필요.
 
-**AI 리포트 스키마**: `stock_analysis.ai_report` + `ai_report_date` (3.7차 FIX-SCHEMA에서 이미 추가됨). 구독자 여부는 `user_subscriptions.status = 'active'` 조건으로 읽기 권한 제어.
+**AI 리포트 접근 제어**: `user_subscriptions.status = 'active'` 조건.
+스키마 선행 준비 완료 (`stock_analysis.ai_report` / `ai_report_date` 컬럼 기추가).
 
-**Toss Payments 사전 설계**:
-- 신규 테이블 `user_subscriptions` — `(user_id PK FK, status, expires_at, payment_id, created_at)`
-- 웹훅 멱등성: `payment_id UNIQUE` 제약으로 중복 차단
-- Phase 5 착수 시 이 DDL을 `schema.js`에 추가
+**Toss Payments 웹훅 설계**:
+- `user_subscriptions` 테이블: `(user_id FK, status, plan, expires_at, payment_id UNIQUE, created_at)`
+- 중복 수신: `payment_id UNIQUE` 제약으로 INSERT 실패 → 멱등 처리
+- 재전송: 최대 5회, 지수 backoff (Toss 기본 정책)
+- Phase 5 착수 시 `schema.js`에 DDL 추가
 
 ### Phase 6 — 데이터 소스 안정화
 - [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX 파싱 + 서버 시작 시 1회 자동 동기화)

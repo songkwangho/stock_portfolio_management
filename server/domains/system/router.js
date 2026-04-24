@@ -5,21 +5,27 @@ import { query } from '../../db/connection.js';
 const router = express.Router();
 
 // GET /api/health - liveness + connectivity probe
+// Render Health Check 용도로도 사용되므로 2~3초 이내 응답 유지가 중요.
+// DB는 가벼운 ping(SELECT 1), 네이버 연결성 확인은 2초 타임아웃.
 router.get('/health', async (req, res) => {
     const status = { api: false, database: false, lastSync: null };
-    try {
-        const { rows } = await query('SELECT COUNT(*)::int AS count FROM stocks');
-        status.database = rows[0].count >= 0;
 
+    // DB ping (가벼움)
+    try {
+        await query('SELECT 1');
+        status.database = true;
+    } catch { /* database stays false */ }
+
+    // 네이버 연결성 프로브 — 실패·지연 시 api=false만 되고 health는 계속 200 반환.
+    try {
         const testResp = await axios.get('https://finance.naver.com/item/main.naver?code=005930', {
-            timeout: 5000,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            timeout: 2000,
+            headers: { 'User-Agent': 'Mozilla/5.0' },
         });
         status.api = testResp.status === 200;
-    } catch {
-        // api stays false
-    }
+    } catch { /* api stays false */ }
 
+    // lastSync는 96행 fullscan이라도 ms 단위. 실패해도 무시.
     try {
         const { rows } = await query('SELECT MAX(last_updated) AS ts FROM stocks WHERE last_updated IS NOT NULL');
         status.lastSync = rows[0]?.ts || null;
