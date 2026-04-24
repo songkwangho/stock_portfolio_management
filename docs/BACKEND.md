@@ -68,7 +68,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## DB 스키마 (9개 테이블)
+## DB 스키마 (12개 테이블)
 
 | 테이블 | PK | 주요 컬럼 | 비고 |
 |--------|-----|----------|------|
@@ -81,6 +81,9 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
 | **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market. 서버 시작 시 데이터 0건이면 1회 자동 동기화. KRX 응답 4중 가드(HTTP 200 / 본문 1,000B+ / HTML 에러 페이지 차단 / 최소 행 수) |
+| **stock_themes** | (theme_id, code) | theme_name | 3.7차β 신설. 다대다 테마 매핑. code는 `stocks` FK (ON DELETE CASCADE). 10개 핵심 테마 + 대표 15종목 수동 + category 폴백 자동 시드. 인덱스: code, theme_id |
+| **users** | id (BIGSERIAL) | provider, provider_id, email, nickname, legacy_device_id, created_at | Phase 5 선행. 현재 미사용 (라우트 미연결). `UNIQUE(provider, provider_id)`. 인덱스: legacy_device_id |
+| **user_subscriptions** | id (BIGSERIAL) | user_id FK, status, plan, expires_at, payment_id UNIQUE, created_at | Phase 5 선행. Toss Payments 웹훅 멱등성은 payment_id UNIQUE로 확보 |
 
 ### stocks_directory 동기화 파이프라인
 
@@ -128,6 +131,9 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | DELETE | `/api/stocks/:code` | 종목 삭제 (cascade) |
 | GET | `/api/search?q=` | 검색 (`stocks` 테이블, 시작 일치 우선 정렬, 최대 10건) |
 | **GET** | **`/api/stocks/directory/search?q=`** | 3.6차 신설. `stocks_directory`(전 상장 종목) 대상 name/code ILIKE 검색. 시작 일치 우선 정렬, `delisted_at IS NULL`, 최대 10건. 앱 등록 여부와 무관 (`stocks` 테이블에 없어도 검색됨) |
+| **GET** | **`/api/themes`** | 3.7차β 신설. 테마 목록 + 종목 수 (`{theme_id, theme_name, stock_count}[]`) |
+| **GET** | **`/api/themes/:themeId/stocks`** | 3.7차β 신설. 특정 테마에 속한 종목 목록 |
+| **GET** | **`/api/stock/:code/themes`** | 3.7차β 신설. 종목이 속한 테마 태그 |
 | GET | `/api/recommendations` | 추천 종목 |
 
 **미이관 항목(DIR-5)**: `POST /api/stocks` body에 `q`(name 또는 code) 필드 허용 — Phase 6 본작업으로 이월. 현재는 프론트(`/settings`)가 디렉토리에서 선택된 `code`를 직접 보내므로 백엔드는 code 경로만 유지.
@@ -154,7 +160,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | GET | `/api/stock/:code/financials` | 분기 재무제표 |
 | GET | `/api/stock/:code/news` | 뉴스 10건 |
 | GET | `/api/stock/:code/chart/:tf` | 주봉/월봉 OHLCV |
-| GET | `/api/screener` | 조건 필터 |
+| GET | `/api/screener` | 조건 필터 (perMin/perMax/roeMin 등) OR `?preset=` 분기 (3.7차β: `breakout_52w`/`foreign_buy`/`fund_buy`/`neglected`) |
 | GET | `/api/sector/:cat/compare` | 섹터 비교 (averages + medians) |
 
 ### 알림/관심종목/시스템

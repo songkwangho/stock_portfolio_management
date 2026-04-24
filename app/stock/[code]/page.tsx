@@ -10,10 +10,11 @@ import {
   BarChart, Bar, Cell, ReferenceLine
 } from 'recharts';
 import { stockApi } from '@/lib/stockApi';
-import type { StockSummary, StockDetail, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry } from '@/types/stock';
+import type { StockSummary, StockDetail, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag } from '@/types/stock';
 import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
+import { getThemeMeta } from '@/lib/themesMeta';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useToastStore } from '@/stores/useToastStore';
 
@@ -77,6 +78,8 @@ function StockDetailContent({ code }: { code: string }) {
   const [showInvestor, setShowInvestor] = useState(false);
   const [showFinancials, setShowFinancials] = useState(false);
   const [showSector, setShowSector] = useState(false);
+  // 3.7차 — 소속 테마 태그 (지연 로딩)
+  const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
 
   // 종목 진입 시 스크롤 최상단으로 강제 — 이전 페이지 스크롤 위치 잔재 방지
   useEffect(() => {
@@ -102,9 +105,10 @@ function StockDetailContent({ code }: { code: string }) {
         setVolatility(vol.volatility);
         setIndicators(ind);
 
-        // Phase 2: 보조 데이터 지연 로딩 (뉴스 + 재무 + 섹터)
+        // Phase 2: 보조 데이터 지연 로딩 (뉴스 + 재무 + 섹터 + 테마)
         stockApi.getNews(stock.code).then(setNews).catch(() => {});
         stockApi.getFinancials(stock.code).then(setFinancials).catch(() => {});
+        stockApi.getStockThemes(stock.code).then(setStockThemes).catch(() => {});
         const cat = data?.category || stock.category;
         if (cat) {
           stockApi.getSectorComparison(cat).then(setSectorData).catch(() => {});
@@ -251,6 +255,20 @@ function StockDetailContent({ code }: { code: string }) {
                 </span>
               )}
             </div>
+            {stockThemes.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {stockThemes.map(t => (
+                  <button
+                    key={t.theme_id}
+                    onClick={() => router.push(`/themes?id=${t.theme_id}`)}
+                    className="text-[11px] font-bold px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors"
+                    title={`${t.theme_name} 테마 보기`}
+                  >
+                    {getThemeMeta(t.theme_id).emoji} {t.theme_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-500 mb-1">현재가</p>

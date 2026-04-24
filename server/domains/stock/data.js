@@ -137,6 +137,55 @@ const initialRecommendations = [
 ];
 
 // PostgreSQL 전환: server.js의 top-level await에서 호출되는 초기화 함수.
+// 3.7차 — 10개 핵심 테마 + 주요 종목 매핑 (수동 큐레이션).
+// 주달 같은 700개 테마는 유지보수 비용 폭증 → 초기엔 10개로 한정.
+// 매핑 없는 종목은 stocks.category에서 자동 유추 (CATEGORY_TO_THEMES 폴백).
+const THEMES = [
+    { id: 'battery',          name: '2차전지·전기차' },
+    { id: 'ai_semiconductor', name: 'AI·반도체' },
+    { id: 'defense',          name: '방산·우주항공' },
+    { id: 'bio',              name: '바이오·헬스케어' },
+    { id: 'high_dividend',    name: '고배당·배당주' },
+    { id: 'large_cap',        name: '대형주·우량주' },
+    { id: 'export',           name: '수출주·글로벌' },
+    { id: 'domestic',         name: '내수·소비재' },
+    { id: 'green',            name: '친환경·신재생에너지' },
+    { id: 'finance',          name: '금융·보험·증권' },
+];
+const THEME_NAME_BY_ID = Object.fromEntries(THEMES.map(t => [t.id, t.name]));
+
+// 수동 큐레이션 — 대표 종목 위주. 나머지는 category 기반 자동 매핑.
+const STOCK_THEME_MAP = [
+    { code: '005930', themes: ['ai_semiconductor', 'large_cap', 'export'] },   // 삼성전자
+    { code: '000660', themes: ['ai_semiconductor', 'large_cap', 'export'] },   // SK하이닉스
+    { code: '373220', themes: ['battery', 'export'] },                          // LG에너지솔루션
+    { code: '207940', themes: ['bio', 'large_cap'] },                           // 삼성바이오로직스
+    { code: '035420', themes: ['ai_semiconductor', 'domestic', 'large_cap'] },  // NAVER
+    { code: '005380', themes: ['export', 'large_cap'] },                        // 현대차
+    { code: '000270', themes: ['battery', 'export'] },                          // 기아
+    { code: '051910', themes: ['battery', 'export'] },                          // LG화학
+    { code: '006400', themes: ['battery', 'export'] },                          // 삼성SDI
+    { code: '028260', themes: ['large_cap', 'domestic'] },                      // 삼성물산
+    { code: '012330', themes: ['export', 'large_cap'] },                        // 현대모비스
+    { code: '035720', themes: ['ai_semiconductor', 'domestic'] },               // 카카오
+    { code: '096770', themes: ['export', 'large_cap', 'green'] },               // SK이노베이션
+    { code: '003550', themes: ['large_cap', 'domestic'] },                      // LG
+    { code: '034730', themes: ['large_cap', 'domestic'] },                      // SK
+];
+
+// category → theme_ids 자동 매핑 (큐레이션 없는 종목용 폴백).
+// 한 종목이 여러 테마에 속하도록 의도적으로 1:N 매핑.
+const CATEGORY_TO_THEMES = {
+    '기술/IT':             ['ai_semiconductor'],
+    '바이오/헬스케어':      ['bio'],
+    '자동차/모빌리티':      ['export', 'battery'],
+    '에너지/소재':          ['green', 'battery'],
+    '금융/지주':            ['finance', 'high_dividend'],
+    '소비재/서비스':        ['domestic'],
+    '엔터테인먼트/미디어':  ['domestic'],
+    '조선/기계/방산':       ['defense', 'export'],
+};
+
 // 모듈 import 만으로는 부작용이 발생하지 않으며, 명시적으로 registerInitialData(pool)을 호출해야 한다.
 //
 // ON CONFLICT 동작 의도:
@@ -145,6 +194,9 @@ const initialRecommendations = [
 //   - reason, score: 서버 재시작마다 코드 내 최신 값으로 덮어씌움 (운영자가 코드에서 관리).
 //   - fair_price: 최초 등록 후 고정 (DB 값 유지, 시세 변동과 무관).
 //   - source: 기존 값 우선 (algorithm으로 변경된 경우 보존).
+// - stock_themes:
+//   - (theme_id, code) PK 중복 시 DO NOTHING. 자동 매핑과 수동 큐레이션이 겹쳐도
+//     멱등적으로 동작. 큐레이션 우선, 이후 category 폴백에서 같은 테마 중복 시도 시 skip.
 export async function registerInitialData(pool) {
     // stocks 시드 — 한 번의 트랜잭션으로 묶어 idle connection 감소.
     {
@@ -191,4 +243,57 @@ export async function registerInitialData(pool) {
         }
     }
     console.log(`Seeded ${initialRecommendations.length} initial recommendations.`);
+
+    // stock_themes 시드 — 큐레이션 + category 폴백.
+    // stocks 테이블에 code가 없으면 FK로 거부되지만 majorStocks 시드 직후라 문제 없음.
+    {
+        const client = await pool.connect();
+        let inserted = 0;
+        try {
+            await client.query('BEGIN');
+
+            // 1단계: 수동 큐레이션
+            for (const { code, themes } of STOCK_THEME_MAP) {
+                for (const themeId of themes) {
+                    const name = THEME_NAME_BY_ID[themeId];
+                    if (!name) continue;
+                    const r = await client.query(
+                        `INSERT INTO stock_themes (theme_id, theme_name, code)
+                         VALUES ($1, $2, $3)
+                         ON CONFLICT (theme_id, code) DO NOTHING`,
+                        [themeId, name, code]
+                    );
+                    inserted += r.rowCount;
+                }
+            }
+
+            // 2단계: category 기반 폴백 — 아직 테마가 하나도 없는 종목만 채움.
+            // 수동 큐레이션과 같은 테마가 이미 있으면 ON CONFLICT로 skip.
+            const { rows: allStocks } = await client.query('SELECT code, category FROM stocks');
+            for (const { code, category } of allStocks) {
+                const themeIds = CATEGORY_TO_THEMES[category];
+                if (!themeIds) continue;
+                for (const themeId of themeIds) {
+                    const name = THEME_NAME_BY_ID[themeId];
+                    if (!name) continue;
+                    const r = await client.query(
+                        `INSERT INTO stock_themes (theme_id, theme_name, code)
+                         VALUES ($1, $2, $3)
+                         ON CONFLICT (theme_id, code) DO NOTHING`,
+                        [themeId, name, code]
+                    );
+                    inserted += r.rowCount;
+                }
+            }
+
+            await client.query('COMMIT');
+        } catch (e) {
+            await client.query('ROLLBACK');
+            console.error('stock_themes seed failed:', e.message);
+            // 테마 시드는 핵심 기능이 아니므로 실패해도 서버 시작 차단 안 함.
+        } finally {
+            client.release();
+        }
+        if (inserted > 0) console.log(`Seeded ${inserted} stock_themes rows.`);
+    }
 }

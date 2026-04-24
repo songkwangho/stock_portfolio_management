@@ -80,6 +80,11 @@ export const stockApi = {
   searchStocks: async (query: string) => (await axios.get(`${API_BASE_URL}/search`, { params: { q: query } })).data,
   searchDirectory: async (query: string): Promise<Array<{ code: string; name: string; market: string }>> =>
     (await axios.get(`${API_BASE_URL}/stocks/directory/search`, { params: { q: query } })).data,
+  getThemes: async () => (await axios.get(`${API_BASE_URL}/themes`)).data,
+  getThemeStocks: async (themeId: string) =>
+    (await axios.get(`${API_BASE_URL}/themes/${encodeURIComponent(themeId)}/stocks`)).data,
+  getStockThemes: async (code: string) =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/themes`)).data,
   getAllStocks: async () => (await axios.get(`${API_BASE_URL}/stocks`)).data,
   addStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stocks`, { code })).data,
   deleteStock: async (code: string) => (await axios.delete(`${API_BASE_URL}/stocks/${code}`)).data,

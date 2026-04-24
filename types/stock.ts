@@ -202,6 +202,41 @@ export interface FinancialData {
   financials: { label: string; values: (number | null)[] }[];
 }
 
+export interface Theme {
+  theme_id: string;
+  theme_name: string;
+  stock_count: number;
+}
+
+export interface ThemeStock {
+  code: string;
+  name: string;
+  category: string;
+  price: number | null;
+  change?: string;
+  change_rate?: string;
+  per: number | null;
+  pbr: number | null;
+  roe: number | null;
+  market_opinion?: MarketOpinion;
+}
+
+export interface StockThemeTag {
+  theme_id: string;
+  theme_name: string;
+}
+
+// 스크리너 프리셋 결과 — 기존 Stock 필드 + 프리셋별 추가 메트릭 (선택적).
+export interface ScreenerResult extends Stock {
+  breakout_pct?: number | null;
+  high_52w?: number | null;
+  foreign_sum?: number;
+  fund_sum?: number;
+  avg_vol_30d?: number;
+  recent_vol?: number;
+  vol_ratio?: number | null;
+}
+
 export interface SectorComparison {
   category: string;
   averages: { per: number; pbr: number; roe: number };

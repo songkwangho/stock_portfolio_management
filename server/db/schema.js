@@ -120,6 +120,46 @@ export async function initSchema(pool) {
         )
     `);
 
+    // 3.7차 — 다대다 테마 매핑. 초기 10개 테마 + 종목 큐레이션 (data.js).
+    // theme_id는 시스템 식별자(영문 소문자/언더스코어), theme_name은 UI 표시용.
+    // 동일 테마에 대해 theme_name을 여러 행에 중복 저장하지만 10개 × 평균 10종목
+    // 스케일이라 정규화 비용 대비 단순성 이득이 큼.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS stock_themes (
+            theme_id    TEXT NOT NULL,
+            theme_name  TEXT NOT NULL,
+            code        TEXT NOT NULL REFERENCES stocks(code) ON DELETE CASCADE,
+            PRIMARY KEY (theme_id, code)
+        )
+    `);
+
+    // Phase 5 선행 — 소셜 로그인 + 구독 DDL. 아직 라우트 미연결, 데이터 미사용.
+    // schema.js에 선행 배치해야 Phase 5 착수 시 ALTER TABLE 없이 바로 기능 구현 가능.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id               BIGSERIAL PRIMARY KEY,
+            provider         TEXT NOT NULL,
+            provider_id      TEXT NOT NULL,
+            email            TEXT,
+            nickname         TEXT,
+            legacy_device_id TEXT,
+            created_at       TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(provider, provider_id)
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_subscriptions (
+            id         BIGSERIAL PRIMARY KEY,
+            user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status     TEXT NOT NULL DEFAULT 'inactive',
+            plan       TEXT NOT NULL DEFAULT 'monthly',
+            expires_at TIMESTAMPTZ,
+            payment_id TEXT UNIQUE,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+
     // Indices
     await pool.query('CREATE INDEX IF NOT EXISTS idx_investor_history_code_date ON investor_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_history_code_date ON stock_history(code, date)');
@@ -127,6 +167,10 @@ export async function initSchema(pool) {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_alerts_device_read ON alerts(device_id, read, created_at)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stocks_directory_name ON stocks_directory(name)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stocks_directory_market ON stocks_directory(market)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_themes_code ON stock_themes(code)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_themes_theme_id ON stock_themes(theme_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_users_legacy_device_id ON users(legacy_device_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id)');
 
     console.log('PostgreSQL schema initialized.');
 }

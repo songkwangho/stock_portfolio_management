@@ -169,6 +169,72 @@ router.delete('/stocks/:code', async (req, res) => {
     }
 });
 
+// ============================================================================
+// 3.7차 — 테마 API
+// ============================================================================
+
+// GET /api/themes - 전체 테마 목록 + 각 테마의 종목 수 (stocks 테이블 존재 기준)
+router.get('/themes', async (req, res) => {
+    try {
+        const { rows } = await query(`
+            SELECT st.theme_id, st.theme_name, COUNT(st.code)::int AS stock_count
+            FROM stock_themes st
+            JOIN stocks s ON st.code = s.code
+            GROUP BY st.theme_id, st.theme_name
+            ORDER BY stock_count DESC, st.theme_name
+        `);
+        res.json(rows);
+    } catch (error) {
+        console.error('Themes Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch themes' });
+    }
+});
+
+// GET /api/themes/:themeId/stocks - 특정 테마에 속한 종목 목록
+router.get('/themes/:themeId/stocks', async (req, res) => {
+    const { themeId } = req.params;
+    try {
+        const { rows } = await query(`
+            SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
+                   s.per, s.pbr, s.roe,
+                   a.opinion AS market_opinion
+            FROM stock_themes st
+            JOIN stocks s ON st.code = s.code
+            LEFT JOIN stock_analysis a ON s.code = a.code
+            WHERE st.theme_id = $1
+            ORDER BY s.name
+        `, [themeId]);
+        const mapped = rows.map(r => ({
+            ...r,
+            per: r.per !== null ? Number(r.per) : null,
+            pbr: r.pbr !== null ? Number(r.pbr) : null,
+            roe: r.roe !== null ? Number(r.roe) : null,
+            price: r.price !== null ? Number(r.price) : null,
+        }));
+        res.json(mapped);
+    } catch (error) {
+        console.error('Theme Stocks Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch theme stocks' });
+    }
+});
+
+// GET /api/stock/:code/themes - 특정 종목이 속한 테마 목록
+router.get('/stock/:code/themes', async (req, res) => {
+    const { code } = req.params;
+    try {
+        const { rows } = await query(`
+            SELECT DISTINCT theme_id, theme_name
+            FROM stock_themes
+            WHERE code = $1
+            ORDER BY theme_name
+        `, [code]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Stock Themes Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch stock themes' });
+    }
+});
+
 // GET /api/recommendations - manual + analysis-based recommendations, excluding holdings
 router.get('/recommendations', async (req, res) => {
     try {

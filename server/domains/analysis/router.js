@@ -167,10 +167,143 @@ router.get('/stock/:code/chart/:timeframe', async (req, res) => {
     }
 });
 
-// GET /api/screener - filter stocks by conditions.
-// 동적 WHERE 절을 queryBuilder.buildWhereClause로 조립해 PG 플레이스홀더 번호($1, $2…)를 일관되게 유지한다.
+// GET /api/screener - filter stocks by conditions (legacy) OR by dynamic preset.
+//
+// preset 파라미터가 있으면 히스토리/수급 기반 프리셋 쿼리로 분기:
+//   - breakout_52w : 52주 신고가 돌파 (stock_history.high JOIN)
+//   - foreign_buy  : 외국인 최근 5거래일 순매수 상위 (investor_history 집계)
+//   - fund_buy     : 기관(연기금 포함) 최근 5거래일 순매수 상위
+//   - neglected    : 30일 평균 대비 최근 5일 거래량 < 30% (소외 역발상 지표)
+//
+// 기존 필터(perMin/pbrMax/roeMin 등)는 preset 미지정 시 그대로 동작 (하위 호환).
 router.get('/screener', async (req, res) => {
     try {
+        const { preset } = req.query;
+
+        if (preset === 'breakout_52w') {
+            // 52주 신고가 돌파: 최근 1년치 high 중 최대값 대비 현재가가 98%+ 도달.
+            // breakout_pct >= 0 이면 실제 돌파, -2~0 사이면 근접.
+            const { rows } = await query(`
+                SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
+                       s.per, s.pbr, s.roe, a.opinion AS market_opinion,
+                       h52.high_52w,
+                       ROUND(((s.price - h52.high_52w) / h52.high_52w::numeric * 100), 1) AS breakout_pct
+                FROM stocks s
+                LEFT JOIN stock_analysis a ON s.code = a.code
+                LEFT JOIN LATERAL (
+                    SELECT MAX(high) AS high_52w
+                    FROM stock_history
+                    WHERE code = s.code
+                      AND date >= TO_CHAR(NOW() - INTERVAL '365 days', 'YYYYMMDD')
+                      AND date <  TO_CHAR(NOW() - INTERVAL '1 day', 'YYYYMMDD')
+                ) h52 ON true
+                WHERE s.price IS NOT NULL AND s.price > 0
+                  AND h52.high_52w IS NOT NULL
+                  AND s.price >= h52.high_52w * 0.98
+                ORDER BY breakout_pct DESC NULLS LAST
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                high_52w: r.high_52w !== null ? Number(r.high_52w) : null,
+                breakout_pct: r.breakout_pct !== null ? Number(r.breakout_pct) : null,
+            })));
+        }
+
+        if (preset === 'foreign_buy') {
+            const { rows } = await query(`
+                SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
+                       s.per, s.pbr, s.roe, a.opinion AS market_opinion,
+                       inv.foreign_sum
+                FROM stocks s
+                LEFT JOIN stock_analysis a ON s.code = a.code
+                JOIN (
+                    SELECT code, SUM(foreign_net)::bigint AS foreign_sum
+                    FROM investor_history
+                    WHERE date >= TO_CHAR(NOW() - INTERVAL '7 days', 'YYYYMMDD')
+                    GROUP BY code
+                    HAVING SUM(foreign_net) > 0
+                ) inv ON s.code = inv.code
+                ORDER BY inv.foreign_sum DESC
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                foreign_sum: r.foreign_sum !== null ? Number(r.foreign_sum) : 0,
+            })));
+        }
+
+        if (preset === 'fund_buy') {
+            // investor_history.institution은 기관(연기금 + 금융투자 + 투신 등) 합산.
+            // 연기금 단독 컬럼이 없는 현 스키마 상 '기관 순매수'로 표기하고 UI 레이블도 '기관/연기금'으로.
+            const { rows } = await query(`
+                SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
+                       s.per, s.pbr, s.roe, a.opinion AS market_opinion,
+                       inv.fund_sum
+                FROM stocks s
+                LEFT JOIN stock_analysis a ON s.code = a.code
+                JOIN (
+                    SELECT code, SUM(institution)::bigint AS fund_sum
+                    FROM investor_history
+                    WHERE date >= TO_CHAR(NOW() - INTERVAL '7 days', 'YYYYMMDD')
+                    GROUP BY code
+                    HAVING SUM(institution) > 0
+                ) inv ON s.code = inv.code
+                ORDER BY inv.fund_sum DESC
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                fund_sum: r.fund_sum !== null ? Number(r.fund_sum) : 0,
+            })));
+        }
+
+        if (preset === 'neglected') {
+            // 30일 평균 거래량 대비 최근 5일 평균 거래량이 30% 이하인 종목.
+            // FILTER 절로 같은 from-to에 대해 두 집계를 한 번에 계산.
+            const { rows } = await query(`
+                SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
+                       s.per, s.pbr, s.roe, a.opinion AS market_opinion,
+                       vol_stats.avg_vol_30d, vol_stats.recent_vol,
+                       ROUND((vol_stats.recent_vol::numeric / NULLIF(vol_stats.avg_vol_30d, 0) * 100), 1) AS vol_ratio
+                FROM stocks s
+                LEFT JOIN stock_analysis a ON s.code = a.code
+                JOIN (
+                    SELECT code,
+                           AVG(volume) FILTER (WHERE date >= TO_CHAR(NOW() - INTERVAL '30 days', 'YYYYMMDD'))::bigint AS avg_vol_30d,
+                           AVG(volume) FILTER (WHERE date >= TO_CHAR(NOW() - INTERVAL '5 days', 'YYYYMMDD'))::bigint  AS recent_vol
+                    FROM stock_history
+                    WHERE date >= TO_CHAR(NOW() - INTERVAL '30 days', 'YYYYMMDD')
+                    GROUP BY code
+                ) vol_stats ON s.code = vol_stats.code
+                WHERE vol_stats.avg_vol_30d IS NOT NULL
+                  AND vol_stats.avg_vol_30d > 0
+                  AND vol_stats.recent_vol IS NOT NULL
+                  AND vol_stats.recent_vol < vol_stats.avg_vol_30d * 0.3
+                ORDER BY (vol_stats.recent_vol::numeric / NULLIF(vol_stats.avg_vol_30d, 0)) ASC
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                avg_vol_30d: r.avg_vol_30d !== null ? Number(r.avg_vol_30d) : 0,
+                recent_vol: r.recent_vol !== null ? Number(r.recent_vol) : 0,
+                vol_ratio: r.vol_ratio !== null ? Number(r.vol_ratio) : null,
+            })));
+        }
+
+        // 기존 필터 기반 스크리너 (preset 미지정 시)
         const { perMax, perMin, pbrMax, pbrMin, roeMin, priceMin, priceMax, category } = req.query;
 
         // PER 음수(적자 기업) 제외는 perMin/perMax가 있을 때만 강제.

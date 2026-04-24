@@ -13,6 +13,9 @@ export async function runMigrations(pool) {
         { table: 'stock_analysis',     columns: ['opinion', 'toss_url'] },
         { table: 'recommended_stocks', columns: ['source', 'created_at'] },
         { table: 'stocks_directory',   columns: ['code', 'name', 'market'] },
+        { table: 'stock_themes',       columns: ['theme_id', 'theme_name', 'code'] },
+        { table: 'users',              columns: ['provider', 'provider_id', 'email'] },
+        { table: 'user_subscriptions', columns: ['user_id', 'status', 'payment_id'] },
     ];
 
     for (const { table, columns } of expectations) {

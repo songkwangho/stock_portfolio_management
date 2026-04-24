@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, Star, Eye, Filter, Layers, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Star, Eye, Filter, Layers, Settings, Zap, Sparkles } from 'lucide-react';
 import NavButton from '@/components/ui/NavButton';
 
 const MENU = [
@@ -9,6 +9,7 @@ const MENU = [
   { path: '/portfolio', label: '내 포트폴리오', icon: TrendingUp },
   { path: '/recommendations', label: '유망 종목 추천', icon: Star },
   { path: '/watchlist', label: '관심종목', icon: Eye },
+  { path: '/themes', label: '테마 탐색', icon: Sparkles },
   { path: '/screener', label: '종목 스크리너', icon: Filter },
   { path: '/stocks', label: '주요 종목 현황', icon: Layers },
   { path: '/settings', label: '설정', icon: Settings },

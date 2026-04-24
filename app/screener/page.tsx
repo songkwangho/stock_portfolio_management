@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, Search, HelpCircle } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import type { Stock, StockSummary } from '@/types/stock';
+import type { StockSummary, ScreenerResult } from '@/types/stock';
 
 interface Preset {
   name: string;
@@ -13,40 +13,78 @@ interface Preset {
   emoji: string;
   filters: Record<string, string | number>;
   caveat?: string;
+  isNew?: boolean;
 }
 
 const PRESETS: Preset[] = [
   {
     name: '저평가 우량주',
-    description: '싸면서 잘 버는 기업',
+    description: 'PER↓ ROE↑ — 저평가 가능성',
     summary: 'PER < 15 + ROE > 10%',
     emoji: '💎',
     filters: { perMax: 15, roeMin: 10 },
     caveat: '⚠️ 금융·통신·자동차 업종이 많이 포함될 수 있어요. 이 업종은 원래 PER이 낮은 편이라 단순 저평가로 보기 어려워요.',
   },
   {
-    name: '안전한 자산주',
-    description: '자산 대비 저평가된 기업',
+    name: '자산 저평가주',
+    description: 'PBR↓ — 자산 대비 저평가',
     summary: 'PBR ≤ 1',
     emoji: '🛡️',
     filters: { pbrMax: 1 },
     caveat: '⚠️ 자산 대비 저평가지만 사업이 부진한 경우도 많아요. ROE를 함께 확인해보세요.',
   },
   {
-    name: '고수익 성장주',
-    description: '돈을 아주 잘 버는 기업',
+    name: '고ROE 성장주',
+    description: 'ROE↑ — 자기자본으로 돈 잘 버는 기업',
     summary: 'ROE ≥ 20%',
     emoji: '🚀',
     filters: { roeMin: 20 },
     caveat: '⚠️ 일시적 호황으로 ROE가 높을 수 있어요. 최근 분기 실적도 함께 봐주세요.',
   },
   {
-    name: '소액 투자',
+    name: '소액 투자 가능',
     description: '적은 금액으로 시작',
     summary: '주가 ≤ 10만원',
     emoji: '💰',
     filters: { priceMax: 100000 },
     caveat: '⚠️ 주가가 낮다고 좋은 종목은 아니에요. 시가총액과 사업 내용을 꼭 확인하세요.',
+  },
+  // 3.7차 — 히스토리/수급 기반 동적 프리셋
+  {
+    name: '52주 신고가 돌파',
+    description: '🚀 강한 상승 흐름',
+    summary: '최근 1년 고점 대비 +0~N%',
+    emoji: '📈',
+    filters: { preset: 'breakout_52w' },
+    caveat: '⚠️ 고점 돌파 후 단기 조정이 올 수 있어요. 거래량과 함께 확인하세요.',
+    isNew: true,
+  },
+  {
+    name: '외국인 순매수',
+    description: '🌏 해외 큰손 매수 중',
+    summary: '최근 5거래일 외국인 순매수 상위',
+    emoji: '🌏',
+    filters: { preset: 'foreign_buy' },
+    caveat: '⚠️ 외국인 매수가 항상 좋은 신호는 아니에요. 단기 흐름만으로 판단하지 마세요.',
+    isNew: true,
+  },
+  {
+    name: '기관·연기금 순매수',
+    description: '🏦 국내 기관 매수 중',
+    summary: '최근 5거래일 기관 순매수 상위',
+    emoji: '🏦',
+    filters: { preset: 'fund_buy' },
+    caveat: '⚠️ 기관 매수도 단기 트레이딩일 수 있어요. 장기 관점에서 함께 판단하세요.',
+    isNew: true,
+  },
+  {
+    name: '소외된 종목',
+    description: '💤 역발상 — 관심 줄어든 종목',
+    summary: '30일 평균 대비 거래량 < 30%',
+    emoji: '💤',
+    filters: { preset: 'neglected' },
+    caveat: '⚠️ 소외됐다고 무조건 좋은 종목이 아니에요. 하락 추세 중일 수도 있으니 지표를 함께 보세요.',
+    isNew: true,
   },
 ];
 
@@ -57,7 +95,7 @@ const CATEGORIES = [
 
 export default function ScreenerPage() {
   const router = useRouter();
-  const [results, setResults] = useState<Stock[]>([]);
+  const [results, setResults] = useState<ScreenerResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -93,6 +131,33 @@ export default function ScreenerPage() {
     handleSearch(preset.filters);
   };
 
+  // 활성 프리셋에 따라 종목별로 표시할 보조 지표 문구 생성.
+  // 정적 프리셋(저평가/자산/성장/소액)은 null 반환 → 기존 표시 유지.
+  const activePresetKey = PRESETS.find(p => p.name === activePreset)?.filters?.preset;
+  const renderPresetMetric = (stock: ScreenerResult): string | null => {
+    if (!activePresetKey) return null;
+    if (activePresetKey === 'breakout_52w') {
+      if (stock.breakout_pct === null || stock.breakout_pct === undefined) return null;
+      const pct = stock.breakout_pct;
+      return pct >= 0 ? `52주 고점 돌파 +${pct}%` : `52주 고점 ${pct}% 근접`;
+    }
+    if (activePresetKey === 'foreign_buy') {
+      const sum = stock.foreign_sum ?? 0;
+      const eok = Math.round(sum / 1_0000_0000); // 원 → 억
+      return eok > 0 ? `외국인 +${eok.toLocaleString()}억 순매수` : '외국인 순매수 중';
+    }
+    if (activePresetKey === 'fund_buy') {
+      const sum = stock.fund_sum ?? 0;
+      const eok = Math.round(sum / 1_0000_0000);
+      return eok > 0 ? `기관 +${eok.toLocaleString()}억 순매수` : '기관 순매수 중';
+    }
+    if (activePresetKey === 'neglected') {
+      if (stock.vol_ratio === null || stock.vol_ratio === undefined) return null;
+      return `30일 평균의 ${stock.vol_ratio}% 거래량`;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -110,12 +175,15 @@ export default function ScreenerPage() {
           <button
             key={preset.name}
             onClick={() => handlePreset(preset)}
-            className={`p-5 rounded-2xl border text-left transition-all hover:scale-[1.02] ${
+            className={`relative p-5 rounded-2xl border text-left transition-all hover:scale-[1.02] ${
               activePreset === preset.name
                 ? 'bg-blue-600/10 border-blue-500/40 ring-1 ring-blue-500/20'
                 : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
             }`}
           >
+            {preset.isNew && (
+              <span className="absolute top-2 right-2 text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span>
+            )}
             <span className="text-2xl mb-2 block">{preset.emoji}</span>
             <h4 className="text-sm font-bold mb-1">{preset.name}</h4>
             <p className="text-xs text-blue-400 font-mono mb-1">{preset.summary}</p>
@@ -206,11 +274,25 @@ export default function ScreenerPage() {
         </div>
       )}
 
-      {!loading && searched && results.length === 0 && (
-        <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
-          <p className="text-slate-500">조건에 맞는 종목이 없어요. 조건을 조금 넓혀보세요.</p>
-        </div>
-      )}
+      {!loading && searched && results.length === 0 && (() => {
+        // 수급 프리셋은 investor_history가 비어 있으면 항상 0건 — 별도 안내.
+        const preset = PRESETS.find(p => p.name === activePreset);
+        const isSupplyDemand = preset?.filters?.preset === 'foreign_buy' || preset?.filters?.preset === 'fund_buy';
+        if (isSupplyDemand) {
+          return (
+            <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+              <p className="text-3xl mb-3">⏳</p>
+              <p className="text-sm text-slate-400 font-semibold">수급 데이터를 수집 중이에요</p>
+              <p className="text-xs text-slate-500 mt-1">매일 08:00 업데이트 후 표시돼요.</p>
+            </div>
+          );
+        }
+        return (
+          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+            <p className="text-slate-500">조건에 맞는 종목이 없어요. 조건을 조금 넓혀보세요.</p>
+          </div>
+        );
+      })()}
 
       {!loading && results.length > 0 && (
         <div className="space-y-4">
@@ -249,6 +331,11 @@ export default function ScreenerPage() {
                   </span>
                 </div>
                 <p className="text-lg font-black mb-2">₩{stock.price?.toLocaleString()}</p>
+                {renderPresetMetric(stock) && (
+                  <p className="text-xs text-blue-400 font-bold mb-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-2 py-1 inline-block">
+                    {renderPresetMetric(stock)}
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <p className="text-slate-600">PER <span className="text-slate-700">(낮을수록↓)</span></p>
@@ -296,6 +383,11 @@ export default function ScreenerPage() {
                       <td className="px-5 py-4">
                         <p className="font-bold text-white">{stock.name}</p>
                         <p className="text-xs text-slate-500 font-mono">{stock.code} · {stock.category}</p>
+                        {renderPresetMetric(stock) && (
+                          <p className="text-[11px] text-blue-400 font-bold mt-1 inline-block bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">
+                            {renderPresetMetric(stock)}
+                          </p>
+                        )}
                       </td>
                       <td className="text-right px-4 py-4 font-bold">₩{stock.price?.toLocaleString()}</td>
                       <td className="text-right px-4 py-4">
