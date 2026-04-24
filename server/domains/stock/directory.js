@@ -13,6 +13,14 @@ const KRX_URLS = {
     KOSDAQ: 'https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=kosdaqMkt',
 };
 
+// KRX이 HTML 에러 페이지(HTTP 200 + <tr> 0~수십 개)를 돌려줄 때 조용히 "0건 upsert 성공"으로
+// 착각하지 않도록 최소 종목 수 임계값을 둔다. 실측 기준 KOSPI 950+ / KOSDAQ 1600+.
+// 너무 빡빡하면 KRX가 정상 데이터만 소폭 줄어든 날도 차단하므로 여유 있게 낮춤.
+const MIN_EXPECTED_ROWS = {
+    KOSPI: 500,
+    KOSDAQ: 800,
+};
+
 // HTML 테이블 1행을 { code, name, listedAt } 으로 파싱.
 // <tr> 내 <td> 순서대로 회사명, 종목코드, ..., 상장일, ... 이므로 간단 정규식으로 추출한다.
 function parseRow(trHtml) {
@@ -45,7 +53,15 @@ async function fetchMarket(market) {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         timeout: 30000,
     });
+    if (response.status !== 200) {
+        throw new Error(`KRX ${market} responded with HTTP ${response.status}`);
+    }
     const html = new TextDecoder('euc-kr').decode(response.data);
+
+    // 빈 응답 또는 마크업 자체가 이상한 경우 — 장애 페이지 가능성 높음.
+    if (!html || html.length < 1000) {
+        throw new Error(`KRX ${market} response too short (${html?.length ?? 0} bytes)`);
+    }
 
     // tbody 내부 행만 매칭 — header/footer 오염 방지.
     const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
@@ -57,6 +73,17 @@ async function fetchMarket(market) {
         const row = parseRow(tr);
         if (row) parsed.push({ ...row, market });
     }
+
+    // 파싱된 종목 수가 최소 임계값 미달이면 KRX 응답 이상으로 간주하고 upsert 스킵.
+    // (0건 조용히 성공 처리로 디렉토리가 공백으로 유지되는 문제 방지)
+    const minExpected = MIN_EXPECTED_ROWS[market];
+    if (parsed.length < minExpected) {
+        throw new Error(
+            `KRX ${market} parsed ${parsed.length} rows, below threshold ${minExpected} ` +
+            `— likely HTML error page or format change. Skipping upsert.`
+        );
+    }
+
     return parsed;
 }
 

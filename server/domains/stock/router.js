@@ -35,6 +35,42 @@ router.post('/stock/:code/refresh', async (req, res) => {
     }
 });
 
+// GET /api/stocks/directory/search?q=
+// stocks_directory(전 상장 종목) 대상 name/code ILIKE 검색. 시작 일치 우선 정렬.
+// delisted_at IS NULL 조건으로 상장폐지 제외. 앱 등록 여부(stocks 테이블)와 무관.
+// /api/search와의 차이:
+//   - /search: stocks 테이블 (앱에 등록·시세 수집된 종목 ~100개)
+//   - /directory/search: stocks_directory (전 상장 종목 ~2,600개, 시세 데이터 없음)
+//
+// 라우트 순서 주의: /stocks GET 및 POST보다 반드시 위에 선언해야 한다.
+// Express 5는 정적 경로 매칭이 우선이라 현재 구조에선 순서 무관하지만, 향후 누군가가
+// `router.get('/stocks/:something')` 같은 와일드카드 경로를 추가해도 디렉토리 경로가
+// 섀도잉당하지 않도록 방어적으로 선언 순서를 고정해둔다.
+router.get('/stocks/directory/search', async (req, res) => {
+    const { q } = req.query;
+    if (!q || q.length < 2) return res.json([]);
+    try {
+        const like = `%${q}%`;
+        const startsWith = `${q}%`;
+        const { rows } = await query(`
+            SELECT code, name, market
+            FROM stocks_directory
+            WHERE (name ILIKE $1 OR code ILIKE $1)
+              AND delisted_at IS NULL
+            ORDER BY
+                CASE WHEN name ILIKE $2 THEN 1
+                     WHEN name ILIKE $1 THEN 2
+                     ELSE 3 END,
+                name
+            LIMIT 10
+        `, [like, startsWith]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Directory Search Error:', error.message);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
 // GET /api/stocks - list all stocks; prices kept fresh by background sync
 router.get('/stocks', async (req, res) => {
     try {
@@ -89,37 +125,6 @@ router.get('/search', async (req, res) => {
         res.json(results);
     } catch (error) {
         console.error('Search Error:', error.message);
-        res.status(500).json({ error: 'Search failed' });
-    }
-});
-
-// GET /api/stocks/directory/search?q=
-// stocks_directory(전 상장 종목) 대상 name/code ILIKE 검색. 시작 일치 우선 정렬.
-// delisted_at IS NULL 조건으로 상장폐지 제외. 앱 등록 여부(stocks 테이블)와 무관.
-// /api/search와의 차이:
-//   - /search: stocks 테이블 (앱에 등록·시세 수집된 종목 ~100개)
-//   - /directory/search: stocks_directory (전 상장 종목 ~2,600개, 시세 데이터 없음)
-router.get('/stocks/directory/search', async (req, res) => {
-    const { q } = req.query;
-    if (!q || q.length < 2) return res.json([]);
-    try {
-        const like = `%${q}%`;
-        const startsWith = `${q}%`;
-        const { rows } = await query(`
-            SELECT code, name, market
-            FROM stocks_directory
-            WHERE (name ILIKE $1 OR code ILIKE $1)
-              AND delisted_at IS NULL
-            ORDER BY
-                CASE WHEN name ILIKE $2 THEN 1
-                     WHEN name ILIKE $1 THEN 2
-                     ELSE 3 END,
-                name
-            LIMIT 10
-        `, [like, startsWith]);
-        res.json(rows);
-    } catch (error) {
-        console.error('Directory Search Error:', error.message);
         res.status(500).json({ error: 'Search failed' });
     }
 });
