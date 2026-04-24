@@ -10,7 +10,9 @@
 //
 // 참고: 테마 매핑은 이 스크립트가 건드리지 않는다. data.js의 STOCK_THEME_MAP +
 // CATEGORY_TO_THEMES 폴백이 다음 서버 재시작 시 새 종목을 자동 매핑한다.
-import 'dotenv/config';
+//
+// DATABASE_URL은 CLI에서 주입한다 (dotenv 의존성 없음):
+//   DATABASE_URL=postgres://... node scripts/expand-stocks.js
 import { getStockData } from '../server/domains/stock/service.js';
 import pool from '../server/db/connection.js';
 

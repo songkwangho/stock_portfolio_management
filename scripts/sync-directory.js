@@ -4,7 +4,8 @@
 //
 // 일 1회 스케줄링은 Phase 6 본작업에서 setupScheduler에 편입 예정.
 // 현 시점에선 운영자가 필요 시 수동으로 돌리거나, 서버 재시작 시 (디렉토리 비어있을 때만) 자동 동기화.
-import 'dotenv/config';
+//
+// DATABASE_URL은 CLI에서 주입한다 (dotenv 의존성 없음).
 import { syncDirectory } from '../server/domains/stock/directory.js';
 import pool from '../server/db/connection.js';
 
