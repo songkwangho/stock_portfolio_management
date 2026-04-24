@@ -12,6 +12,7 @@ export async function runMigrations(pool) {
         { table: 'watchlist',          columns: ['device_id'] },
         { table: 'stock_analysis',     columns: ['opinion', 'toss_url'] },
         { table: 'recommended_stocks', columns: ['source', 'created_at'] },
+        { table: 'stocks_directory',   columns: ['code', 'name', 'market'] },
     ];
 
     for (const { table, columns } of expectations) {
@@ -40,6 +41,10 @@ export async function runMigrations(pool) {
         console.warn('[migrate] avg_price type check failed:', e.message);
     }
 
+    // 3.6차/Phase 5 선행 — stock_analysis.ai_report / ai_report_date 컬럼 보강 (기존 DB 호환).
+    await addColumnIfNotExists(pool, 'stock_analysis', 'ai_report', 'TEXT');
+    await addColumnIfNotExists(pool, 'stock_analysis', 'ai_report_date', 'DATE');
+
     console.log('PostgreSQL migration checks complete.');
 }
 
@@ -51,4 +56,16 @@ async function columnExists(pool, table, column) {
         [table, column]
     );
     return rows.length > 0;
+}
+
+// 컬럼 미존재 시에만 ALTER TABLE ADD COLUMN — 신규 DB는 schema.js에서 생성되므로 no-op.
+async function addColumnIfNotExists(pool, table, column, type) {
+    const exists = await columnExists(pool, table, column);
+    if (exists) return;
+    try {
+        console.log(`[migrate] Adding column ${table}.${column} ${type}`);
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    } catch (e) {
+        console.warn(`[migrate] Failed to add ${table}.${column}:`, e.message);
+    }
 }

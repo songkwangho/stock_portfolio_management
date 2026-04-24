@@ -58,14 +58,17 @@ export async function initSchema(pool) {
         )
     `);
 
+    // ai_report / ai_report_date: Phase 5 Claude Haiku AI 리포트 선행 컬럼 (현재는 NULL 유지).
     await pool.query(`
         CREATE TABLE IF NOT EXISTS stock_analysis (
-            code       TEXT PRIMARY KEY REFERENCES stocks (code) ON DELETE CASCADE,
-            analysis   TEXT,
-            advice     TEXT,
-            opinion    TEXT,
-            toss_url   TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW()
+            code           TEXT PRIMARY KEY REFERENCES stocks (code) ON DELETE CASCADE,
+            analysis       TEXT,
+            advice         TEXT,
+            opinion        TEXT,
+            toss_url       TEXT,
+            ai_report      TEXT,
+            ai_report_date DATE,
+            created_at     TIMESTAMPTZ DEFAULT NOW()
         )
     `);
 
@@ -104,11 +107,26 @@ export async function initSchema(pool) {
         )
     `);
 
+    // 3.6차 — 전 상장 종목 명↔코드 매핑. stocks 테이블과 FK 없음.
+    // (디렉토리는 전 종목, stocks는 앱 등록 종목만. KRX CSV로 일 1회 동기화.)
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS stocks_directory (
+            code        TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            market      TEXT NOT NULL CHECK (market IN ('KOSPI', 'KOSDAQ', 'KONEX')),
+            listed_at   DATE,
+            delisted_at DATE,
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+
     // Indices
     await pool.query('CREATE INDEX IF NOT EXISTS idx_investor_history_code_date ON investor_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_history_code_date ON stock_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stocks_category ON stocks(category)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_alerts_device_read ON alerts(device_id, read, created_at)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_stocks_directory_name ON stocks_directory(name)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_stocks_directory_market ON stocks_directory(market)');
 
     console.log('PostgreSQL schema initialized.');
 }
