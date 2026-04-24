@@ -299,7 +299,7 @@ PC (md: 이상):
 **3.5차 — 잔여 보완 (Sprint 1.5, 배포 후 우선순위 가능)**
 - [ ] **[H-NEW2/P10]** `app/portfolio/page.tsx` 로컬 toast → `useToastStore` 통일
 - [x] **[H-NEW3]** `/stock/[code]` `stockApi.deleteStock` 직접 호출 → store 경유로 변경 (로컬 상태 동기화 보장) — `usePortfolioStore.deleteStock` 액션 신설
-- [ ] **[Fix-6]** 시장지수 중복 fetch 해소 — HeaderBar + dashboard 각자 호출 → `useMarketStore` 신설 또는 Zustand 구독 패턴
+- [x] **[Fix-6]** 시장지수 중복 fetch 해소 — `useMarketStore` 신설. 300s TTL + inflight Promise로 중복 요청 차단. HeaderBar·대시보드 공용 구독
 - [ ] **[Fix-7/M2]** Recharts 커스텀 `CandlestickBar` wick 미동작 → Sprint 3에서 lightweight-charts 전환 우선 검토
 - [ ] **[UX-NEW3]** `profitHelpCode` 팝업 외부 클릭 닫기 (mousedown 리스너)
 - [ ] **[UX-NEW5]** `RecommendedStockCard` reason 2줄 초과 시 "더 보기" 토글
@@ -376,14 +376,32 @@ PC (md: 이상):
 - [ ] Google OAuth 먼저 → Kakao OAuth 심사 병행 신청 (영업일 3~7일)
 - [ ] device_id → user_id B안 병합 + 데이터 이전 확인 UI
 - [ ] **device_id 소실 케이스 방침** — 브라우저 캐시 클리어 시 고아 데이터 발생. "데이터 없음" 안내 + 서버측 cleanup 스크립트 필요
-- [ ] JWT (1h + 14일 refresh) + Next.js middleware 보호 라우트 (Phase 3~4 동안 비활성, 구조만 선행 분리)
-  - **Edge 호환 JWT 라이브러리 사전 결정 필수** — Express `jsonwebtoken`은 Edge Runtime 미지원. middleware는 `jose` 사용
+- [ ] JWT (1h + 14일 refresh) — Express 백엔드에서만 검증, `jsonwebtoken` 사용 (Phase 5 사전 결정 §OAuth 참조)
 - [ ] **Kakao Redirect URI 사전 등록** — 개발/스테이징/프로덕션 URI 전부 Kakao Developers에 등록 (Vercel Preview URL은 배포마다 변경되므로 Production URL만 OAuth 허용)
 - [ ] 구독 DB 스키마 (상태·만료·환불 이력) → Toss Payments → Claude Haiku AI 리포트 (순차)
   - **사전 준비 완료**: `stock_analysis.ai_report` / `ai_report_date` 컬럼은 3.7차에서 선행 추가 (FIX-SCHEMA)
 - [ ] **Toss Payments 웹훅 멱등성** — `payment_id` 기준 중복 차단, 최대 5회 재전송(지수 backoff) 대응
 - [ ] KIS OpenAPI 신청 **병행 시작** (Phase 7 착수 전 심사 완료 필요, 영업일 1~3일)
 - 목표: **200명**
+
+#### Phase 5 사전 결정 사항 (2026-04-24 확정)
+
+**OAuth 개발 순서**: Google OAuth 먼저 개발(콘솔 승인 당일) → Kakao OAuth 심사 병행 신청(영업일 3~7일). 과거 일부 기록에 "Kakao 먼저"로 표기된 흔적이 있을 수 있으나 본 로드맵은 **Google 먼저**로 통일.
+
+**device_id → user_id 마이그레이션 흐름 (B안 구체화)**:
+1. OAuth 콜백 성공 시 클라이언트가 `X-Device-Id` 헤더에 기존 `device_id`를 실어 `POST /api/auth/link` 호출
+2. 서버: `holding_stocks`, `watchlist`, `alerts`의 `device_id` → 신규 `user_id`로 UPDATE (트랜잭션 1개)
+3. 클라이언트: localStorage의 `device_id` 제거, JWT `accessToken` 저장
+4. 마이그레이션 실패 시 "데이터 없음" 안내 + 수동 재등록 유도
+
+**JWT 검증 위치**: Next.js middleware **불필요**. Express 백엔드에서만 `Authorization: Bearer` 검증. Edge Runtime을 피하므로 `jsonwebtoken` 그대로 사용 가능, `jose` 도입 없음.
+
+**AI 리포트 스키마**: `stock_analysis.ai_report` + `ai_report_date` (3.7차 FIX-SCHEMA에서 이미 추가됨). 구독자 여부는 `user_subscriptions.status = 'active'` 조건으로 읽기 권한 제어.
+
+**Toss Payments 사전 설계**:
+- 신규 테이블 `user_subscriptions` — `(user_id PK FK, status, expires_at, payment_id, created_at)`
+- 웹훅 멱등성: `payment_id UNIQUE` 제약으로 중복 차단
+- Phase 5 착수 시 이 DDL을 `schema.js`에 추가
 
 ### Phase 6 — 데이터 소스 안정화
 - [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX 파싱 + 서버 시작 시 1회 자동 동기화)

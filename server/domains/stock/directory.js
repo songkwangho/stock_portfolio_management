@@ -63,6 +63,14 @@ async function fetchMarket(market) {
         throw new Error(`KRX ${market} response too short (${html?.length ?? 0} bytes)`);
     }
 
+    // KRX이 XLS-wrapped HTML이 아닌 순수 HTML 에러 페이지(<!DOCTYPE html>, <html>)를
+    // 돌려주는 케이스 감지. 정상 응답은 <table>로 시작하는 Excel-wrapping 구조라
+    // <!DOCTYPE·<html·<head로 시작하는 경우 오류 페이지로 판정.
+    const head = html.trimStart().slice(0, 200).toLowerCase();
+    if (head.startsWith('<!doctype html') || head.startsWith('<html') || head.startsWith('<head')) {
+        throw new Error(`KRX ${market} returned an HTML error page (likely rate-limited or maintenance)`);
+    }
+
     // tbody 내부 행만 매칭 — header/footer 오염 방지.
     const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
     const scope = tbodyMatch ? tbodyMatch[1] : html;
