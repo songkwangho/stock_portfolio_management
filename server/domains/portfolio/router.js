@@ -1,6 +1,6 @@
 import express from 'express';
 import pool, { query } from '../../db/connection.js';
-import { requireDeviceId } from '../../helpers/deviceId.js';
+import { requireDeviceIdMiddleware } from '../../helpers/deviceId.js';
 import { calculateHoldingOpinion } from '../analysis/scoring.js';
 import { computeSMA } from '../../helpers/sma.js';
 import { buildSetClause } from '../../helpers/queryBuilder.js';
@@ -8,11 +8,11 @@ import { recalcWeights } from './service.js';
 import { getStockData } from '../stock/service.js';
 
 const router = express.Router();
+router.use(requireDeviceIdMiddleware);
 
 // GET /api/holdings - list holdings with runtime holding_opinion
 router.get('/', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     try {
         const { rows: holdings } = await query(`
             SELECT s.*, h.avg_price, h.weight, h.quantity, a.opinion AS market_opinion
@@ -52,8 +52,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/holdings/history - daily aggregated portfolio value
 router.get('/history', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     try {
         const { rows: result } = await query(`
             SELECT
@@ -92,8 +91,7 @@ router.get('/history', async (req, res) => {
 
 // POST /api/holdings - upsert holding (creates master stock if needed)
 router.post('/', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     const { code, name, avgPrice, quantity } = req.body;
     try {
         await getStockData(code, name);
@@ -141,8 +139,7 @@ router.post('/', async (req, res) => {
 
 // PUT /api/holdings/:code - partial update (avgPrice / quantity)
 router.put('/:code', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     const { code } = req.params;
     const { avgPrice, quantity } = req.body;
     try {
@@ -197,8 +194,7 @@ router.put('/:code', async (req, res) => {
 
 // DELETE /api/holdings/:code
 router.delete('/:code', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     const { code } = req.params;
     try {
         await query('DELETE FROM holding_stocks WHERE device_id = $1 AND code = $2', [deviceId, code]);

@@ -1,14 +1,14 @@
 import express from 'express';
 import { query } from '../../db/connection.js';
-import { requireDeviceId } from '../../helpers/deviceId.js';
+import { requireDeviceIdMiddleware } from '../../helpers/deviceId.js';
 import { getStockData } from '../stock/service.js';
 
 const router = express.Router();
+router.use(requireDeviceIdMiddleware);
 
 // GET /api/watchlist - list watchlist items for device
 router.get('/', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     try {
         const { rows: items } = await query(`
             SELECT s.code, s.name, s.category, s.price, a.opinion AS market_opinion, w.added_at
@@ -27,8 +27,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/watchlist - add a code to watchlist
 router.post('/', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'Code is required' });
     try {
@@ -52,8 +51,7 @@ router.post('/', async (req, res) => {
 
 // DELETE /api/watchlist/:code
 router.delete('/:code', async (req, res) => {
-    const deviceId = requireDeviceId(req, res);
-    if (!deviceId) return;
+    const deviceId = req.deviceId;
     try {
         await query('DELETE FROM watchlist WHERE device_id = $1 AND code = $2', [deviceId, req.params.code]);
         res.json({ success: true });
