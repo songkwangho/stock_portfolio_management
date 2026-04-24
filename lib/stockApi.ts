@@ -78,6 +78,8 @@ export const stockApi = {
     (await axios.put(`${API_BASE_URL}/holdings/${stock.code}`, { avgPrice: stock.avgPrice, quantity: stock.quantity })).data,
   deleteHolding: async (code: string) => (await axios.delete(`${API_BASE_URL}/holdings/${code}`)).data,
   searchStocks: async (query: string) => (await axios.get(`${API_BASE_URL}/search`, { params: { q: query } })).data,
+  searchDirectory: async (query: string): Promise<Array<{ code: string; name: string; market: string }>> =>
+    (await axios.get(`${API_BASE_URL}/stocks/directory/search`, { params: { q: query } })).data,
   getAllStocks: async () => (await axios.get(`${API_BASE_URL}/stocks`)).data,
   addStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stocks`, { code })).data,
   deleteStock: async (code: string) => (await axios.delete(`${API_BASE_URL}/stocks/${code}`)).data,

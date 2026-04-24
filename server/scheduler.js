@@ -1,5 +1,6 @@
 // Scheduler: syncAllStocks delayed startup + daily 8AM + cleanup
 import { syncAllStocks, scheduleDaily8AM } from './domains/stock/service.js';
+import { syncDirectoryIfEmpty } from './domains/stock/directory.js';
 
 // Neon 무료 플랜 sleep 해제(1~3초)와 connectionTimeoutMillis(5초)가 겹치면 첫 sync가 조용히 실패할 수 있다.
 // 다음 동기화는 다음 날 08:00이라 하루치 데이터를 잃게 됨 → 5초 후 1차 시도, 실패 시 30초 후 1회 backoff (16차 버그-D).
@@ -25,6 +26,12 @@ export function setupScheduler() {
 
     // Schedule daily 8AM sync
     scheduleDaily8AM();
+
+    // 3.6차 — stocks_directory 비어 있으면 초기 1회 동기화. 실패해도 서버 시작 차단하지 않음.
+    // 일 1회 스케줄링은 Phase 6 본작업에서 추가 예정.
+    setTimeout(() => {
+        syncDirectoryIfEmpty().catch(e => console.error('[directory] initial sync error:', e.message));
+    }, 10000);
 }
 
 // Cleanup function for data older than 20 days.
