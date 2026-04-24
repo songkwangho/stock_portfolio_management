@@ -105,7 +105,8 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │
 └── scripts/
     ├── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
-    └── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
+    ├── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
+    └── expand-stocks.js          # 3.7차 감마 — 종목 96→~180 확대 (배치 3 × 3초)
 ```
 
 ---
@@ -161,6 +162,10 @@ DATABASE_URL=postgres://... node scripts/backfill-history.js
 
 # KRX 상장법인목록 → stocks_directory 수동 동기화 (name↔code 매핑)
 DATABASE_URL=postgres://... node scripts/sync-directory.js
+
+# 종목 확대 — TARGET_CODES에 정의된 ~86개 코드를 네이버 크롤링으로 stocks 테이블에 추가
+# (배치 3 × 3초 간격, 전체 ~10~15분)
+DATABASE_URL=postgres://... node scripts/expand-stocks.js
 ```
 
 ### 환경변수
@@ -362,6 +367,8 @@ PC (md: 이상):
 - [x] **[SCREENER-3]** 수급 프리셋 빈 결과 전용 안내 ("수급 데이터를 수집 중이에요 — 매일 08:00 업데이트")
 - [x] **[PHASE5-PRE]** `users` / `user_subscriptions` 테이블 DDL 선행 추가. 라우트 미연결·데이터 미사용 상태로 스키마만 고정. Phase 5 착수 시 ALTER 없이 구현 가능
 - [x] **[LIB]** `lib/themesMeta.ts` — emoji/color 메타를 `/themes`와 `/stock/[code]`가 공유
+- [ ] **[EXPAND-1]** 종목 96 → ~180개 확대 — `scripts/expand-stocks.js` 신설 (TARGET_CODES ~86개, 배치 3 × 3초 간격으로 네이버 크롤링 + upsert). **스크립트 실행은 운영자 수동 — `DATABASE_URL=... node scripts/expand-stocks.js`**
+- [x] **[EXPAND-2]** `STOCK_THEME_MAP` 수동 큐레이션 확장 — 15 → ~50종목. 2차전지/AI/방산/바이오/금융·고배당/엔터/조선·친환경 카테고리 전반에 걸쳐 대표 종목 추가. 나머지는 `CATEGORY_TO_THEMES` 폴백 유지
 
 **범위 제한**: 프리셋 분기 로직은 단순 if-return 패턴. Phase 4 백테스팅 시점에 preset → 점수화 모듈로 통합 예정.
 

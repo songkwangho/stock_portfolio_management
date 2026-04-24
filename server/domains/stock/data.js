@@ -155,7 +155,10 @@ const THEMES = [
 const THEME_NAME_BY_ID = Object.fromEntries(THEMES.map(t => [t.id, t.name]));
 
 // 수동 큐레이션 — 대표 종목 위주. 나머지는 category 기반 자동 매핑.
+// 3.7차β: 초기 15종목 → 3.7차 감마: 확대 시점에 ~50종목으로 확장.
+// 수동 매핑이 없는 종목은 CATEGORY_TO_THEMES 폴백으로 자동 매핑.
 const STOCK_THEME_MAP = [
+    // 대표 우량주·대형주
     { code: '005930', themes: ['ai_semiconductor', 'large_cap', 'export'] },   // 삼성전자
     { code: '000660', themes: ['ai_semiconductor', 'large_cap', 'export'] },   // SK하이닉스
     { code: '373220', themes: ['battery', 'export'] },                          // LG에너지솔루션
@@ -171,6 +174,61 @@ const STOCK_THEME_MAP = [
     { code: '096770', themes: ['export', 'large_cap', 'green'] },               // SK이노베이션
     { code: '003550', themes: ['large_cap', 'domestic'] },                      // LG
     { code: '034730', themes: ['large_cap', 'domestic'] },                      // SK
+    { code: '005490', themes: ['large_cap', 'export'] },                        // POSCO홀딩스
+
+    // 2차전지·전기차 추가
+    { code: '247540', themes: ['battery'] },                                    // 에코프로비엠
+    { code: '086520', themes: ['battery'] },                                    // 에코프로
+    { code: '003670', themes: ['battery', 'export'] },                          // 포스코퓨처엠
+    { code: '361610', themes: ['battery'] },                                    // SK아이이테크놀로지
+    { code: '066970', themes: ['battery'] },                                    // L&F(엘앤에프)
+
+    // AI·반도체·IT 추가
+    { code: '042700', themes: ['ai_semiconductor'] },                           // 한미반도체
+    { code: '357780', themes: ['ai_semiconductor'] },                           // 솔브레인
+    { code: '240810', themes: ['ai_semiconductor'] },                           // 원익IPS
+    { code: '011070', themes: ['ai_semiconductor', 'export'] },                 // LG이노텍
+    { code: '009150', themes: ['ai_semiconductor', 'export'] },                 // 삼성전기
+    { code: '018260', themes: ['ai_semiconductor'] },                           // 삼성에스디에스
+
+    // 방산·우주항공
+    { code: '012450', themes: ['defense', 'export'] },                          // 한화에어로스페이스
+    { code: '064350', themes: ['defense'] },                                    // 현대로템
+    { code: '272210', themes: ['defense'] },                                    // 한화시스템
+    { code: '000880', themes: ['defense', 'large_cap'] },                       // 한화
+    { code: '042660', themes: ['defense', 'export'] },                          // 한화오션
+
+    // 바이오·헬스케어
+    { code: '068270', themes: ['bio'] },                                        // 셀트리온
+    { code: '000100', themes: ['bio'] },                                        // 유한양행
+    { code: '128940', themes: ['bio'] },                                        // 한미약품
+    { code: '185750', themes: ['bio'] },                                        // 종근당
+    { code: '326030', themes: ['bio'] },                                        // SK바이오팜
+    { code: '302440', themes: ['bio'] },                                        // SK바이오사이언스
+    { code: '196170', themes: ['bio'] },                                        // 알테오젠
+    { code: '091990', themes: ['bio'] },                                        // 셀트리온헬스케어
+
+    // 금융·고배당 — finance + high_dividend 동시 매핑
+    { code: '105560', themes: ['finance', 'high_dividend'] },                   // KB금융
+    { code: '055550', themes: ['finance', 'high_dividend'] },                   // 신한지주
+    { code: '086790', themes: ['finance', 'high_dividend'] },                   // 하나금융지주
+    { code: '316140', themes: ['finance', 'high_dividend'] },                   // 우리금융지주
+    { code: '000810', themes: ['finance', 'high_dividend'] },                   // 삼성화재
+    { code: '032830', themes: ['finance', 'high_dividend'] },                   // 삼성생명
+    { code: '024110', themes: ['finance', 'high_dividend'] },                   // 기업은행
+
+    // 엔터·미디어
+    { code: '352820', themes: ['domestic'] },                                   // 하이브
+    { code: '041510', themes: ['domestic'] },                                   // SM엔터
+    { code: '035900', themes: ['domestic'] },                                   // JYP엔터
+    { code: '122870', themes: ['domestic'] },                                   // 와이지엔터
+
+    // 조선·친환경·에너지
+    { code: '009540', themes: ['large_cap', 'export'] },                        // HD한국조선해양
+    { code: '329180', themes: ['export', 'large_cap'] },                        // HD현대중공업
+    { code: '015760', themes: ['green', 'high_dividend'] },                     // 한국전력
+    { code: '036460', themes: ['green', 'high_dividend'] },                     // 한국가스공사
+    { code: '267250', themes: ['green', 'export'] },                            // 현대중공업지주
 ];
 
 // category → theme_ids 자동 매핑 (큐레이션 없는 종목용 폴백).

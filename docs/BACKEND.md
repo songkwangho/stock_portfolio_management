@@ -289,6 +289,18 @@ app.listen(PORT);
 
 ## 데이터 현황
 
-- 등록 종목: 97개 (8개 섹터)
+- 등록 종목: 97개 (초기 시드) → `scripts/expand-stocks.js` 실행 시 ~180개 (8개 섹터)
 - 수동 추천: 20개 (source='manual', fair_price 최초 등록 후 고정)
 - 알고리즘 추천: market_opinion='긍정적' 종목 자동 필터링 (매일 갱신)
+
+---
+
+## 운영자 스크립트
+
+| 스크립트 | 용도 |
+|---------|------|
+| `scripts/backfill-history.js` | 등록 종목의 3년치 일봉 히스토리 적재 (배치 3, ~6시간) |
+| `scripts/sync-directory.js` | KRX 상장법인목록 → `stocks_directory` 수동 동기화 |
+| `scripts/expand-stocks.js` | 3.7차 감마 — TARGET_CODES(~86) 중 미등록 코드만 네이버 크롤링으로 `stocks`에 추가 (배치 3 × 3초 간격). 테마 매핑은 다음 서버 재시작 시 `CATEGORY_TO_THEMES` 폴백으로 자동 처리 |
+
+실행 공통: `DATABASE_URL=postgres://... node scripts/<name>.js`
