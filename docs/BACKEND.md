@@ -48,7 +48,8 @@ server/
 │   ├── stock/
 │   │   ├── service.js    # getStockData + syncAllStocks + scheduleDaily8AM
 │   │   ├── data.js       # registerInitialData (97종목 + 20개 추천)
-│   │   └── router.js     # 7 endpoints
+│   │   ├── directory.js  # 3.6차 — KRX stocks_directory 동기화 (syncDirectory/syncDirectoryIfEmpty)
+│   │   └── router.js     # 8 endpoints (directory/search 포함)
 │   └── system/
 │       └── router.js     # health, market/indices
 └── scheduler.js          # setupScheduler + setupCleanup
@@ -67,26 +68,35 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## DB 스키마 (8개 테이블)
+## DB 스키마 (9개 테이블)
 
 | 테이블 | PK | 주요 컬럼 | 비고 |
 |--------|-----|----------|------|
 | stocks | code | name, category, price, change, change_rate, per, pbr, roe, target_price, eps_current, eps_previous | change/change_rate는 최근 2거래일 종가로 계산 |
 | holding_stocks | device_id+code | avg_price (NUMERIC 14,2), weight, quantity | avg_price 소수점 보존 |
 | stock_history | code+date | price, open, high, low, volume (BIGINT) | FK 없음 (대량 데이터 cascade 회피) |
-| stock_analysis | code | analysis, advice, opinion (MarketOpinion), toss_url | ON DELETE CASCADE |
+| stock_analysis | code | analysis, advice, opinion (MarketOpinion), toss_url, **ai_report, ai_report_date** | ai_report* 는 Phase 5 Claude Haiku용 선행 컬럼 (3.7차). ON DELETE CASCADE |
 | recommended_stocks | code | reason, fair_price, score, source (manual/algorithm) | ON DELETE CASCADE |
 | investor_history | code+date | institution, foreign_net, individual (모두 BIGINT) | FK 없음 |
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
+| **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market |
 
-### 3.6차 신설 예정 — stocks_directory (Phase 6 일부 선행)
+### stocks_directory 동기화 파이프라인
 
-| 테이블 | PK | 주요 컬럼 | 비고 |
-|--------|-----|----------|------|
-| stocks_directory | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | KRX 상장법인목록 CSV 일 1회 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 종목, `stocks`는 앱 등록 종목만) |
+- **소스**: `https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType={stockMkt|kosdaqMkt}`
+  - 확장자는 `.xls`지만 실제 응답은 EUC-KR HTML `<table>`
+  - 컬럼 순서: 회사명, 종목코드, 업종, 주요제품, 상장일, 결산월, ...
+  - `TextDecoder('euc-kr')` + 정규식 `<tr>/<td>` 파싱 (`naver.js`와 동일 패턴, iconv-lite 불필요)
+- **구현**: `server/domains/stock/directory.js`
+  - `syncDirectory()` — KOSPI + KOSDAQ 연속 fetch, UPSERT (code PK 기준 name/market/listed_at 덮어쓰기)
+  - `syncDirectoryIfEmpty()` — COUNT 체크해서 0건일 때만 실행
+- **트리거**:
+  - 서버 시작 후 10초 지연으로 1회 (`setupScheduler` 내, 비어 있을 때만) — 3.6차
+  - 수동: `DATABASE_URL=... node scripts/sync-directory.js` — 3.6차
+  - 일 1회 cron 편입은 Phase 6 본작업으로 이월
 
-**용도**: `/settings` 수동 추가에서 종목명 → 코드 매핑. 네이버 금융 URL이 `?code=` 필수라 사용자 입력 종목명을 code로 해석하는 조회 레이어 필요. 가격·지표 데이터는 여전히 네이버 크롤링(`stocks` 테이블) 사용.
+**용도**: `/settings` 수동 추가에서 종목명 → 코드 매핑. 네이버 금융 URL이 `?code=` 필수라 사용자 입력 종목명을 code로 해석하는 조회 레이어. 가격·지표 데이터는 여전히 네이버 크롤링(`stocks` 테이블).
 
 ### ON CONFLICT 정책 (data.js 시드)
 
@@ -96,11 +106,18 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
   - fair_price: 최초 등록 후 고정
   - source: COALESCE로 기존 값 우선
 
+### ON CONFLICT 정책 (directory.js 동기화)
+
+- `stocks_directory`:
+  - name, market: KRX 최신 값으로 덮어씀
+  - listed_at: `COALESCE(EXCLUDED.listed_at, stocks_directory.listed_at)` — KRX에서 상장일이 비어 오는 종목 보존
+  - updated_at: 매 동기화마다 `NOW()`로 갱신
+
 ---
 
-## API 엔드포인트 (28개)
+## API 엔드포인트 (29개)
 
-### 종목 (stock — 7개)
+### 종목 (stock — 8개)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -110,17 +127,12 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | POST | `/api/stocks` | 종목 수동 등록 (body: `{ code }` → `getStockData(code)` 네이버 크롤링 + upsert) |
 | DELETE | `/api/stocks/:code` | 종목 삭제 (cascade) |
 | GET | `/api/search?q=` | 검색 (`stocks` 테이블, 시작 일치 우선 정렬, 최대 10건) |
+| **GET** | **`/api/stocks/directory/search?q=`** | 3.6차 신설. `stocks_directory`(전 상장 종목) 대상 name/code ILIKE 검색. 시작 일치 우선 정렬, `delisted_at IS NULL`, 최대 10건. 앱 등록 여부와 무관 (`stocks` 테이블에 없어도 검색됨) |
 | GET | `/api/recommendations` | 추천 종목 |
 
-### 3.6차 신설 예정 — 디렉토리 조회
+**미이관 항목(DIR-5)**: `POST /api/stocks` body에 `q`(name 또는 code) 필드 허용 — Phase 6 본작업으로 이월. 현재는 프론트(`/settings`)가 디렉토리에서 선택된 `code`를 직접 보내므로 백엔드는 code 경로만 유지.
 
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| GET | `/api/stocks/directory/search?q=` | `stocks_directory` 전 상장 종목 대상 name/code ILIKE 검색 (시작 일치 우선, `delisted_at IS NULL`, 최대 10건). `/api/search`와 달리 앱 등록 여부와 무관. |
-
-`POST /api/stocks` body는 하위 호환 유지한 채 `q`(name 또는 code) 필드 추가 지원 예정. name이면 디렉토리에서 code 해석 후 기존 흐름 진입.
-
-### 포트폴리오 (portfolio — 5개, `requireDeviceId` 적용)
+### 포트폴리오 (portfolio — 5개, `router.use(requireDeviceIdMiddleware)` 적용)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -149,12 +161,19 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET/DELETE | `/api/alerts`, `/api/alerts/:id` | 알림 CRUD |
+| GET/DELETE | `/api/alerts`, `/api/alerts/:id` | 알림 CRUD (`requireDeviceIdMiddleware` 라우터 단위 적용) |
 | GET | `/api/alerts/unread-count` | 미읽은 수 |
 | POST | `/api/alerts/read` | 전체 읽음 |
-| GET/POST/DELETE | `/api/watchlist` | 관심종목 |
+| GET/POST/DELETE | `/api/watchlist` | 관심종목 (`requireDeviceIdMiddleware` 라우터 단위 적용) |
 | GET | `/api/market/indices` | KOSPI/KOSDAQ |
 | GET | `/api/health` | 서버 상태 (`{ api, database, lastSync }`) |
+
+### device_id 가드 패턴 (3.7차 REFACTOR)
+
+- `helpers/deviceId.js`:
+  - `getDeviceId(req)` — 헤더 조회 (null 가능). stock/router.js 추천처럼 **선택적** 컨텍스트에서 사용
+  - `requireDeviceIdMiddleware(req, res, next)` — 누락 시 400 응답 + `req.deviceId` 주입. portfolio/alert/watchlist 라우터는 `router.use(requireDeviceIdMiddleware)` 한 줄로 일괄 적용
+  - `requireDeviceId(req, res)` — 레거시, 하위 호환용으로만 유지
 
 ---
 
@@ -216,6 +235,7 @@ WHERE device_id = $1 AND code = $2
 | 작업 | 주기 |
 |------|------|
 | syncAllStocks() | 서버 시작 후 5초(실패 시 30초 backoff 1회) + 매일 08:00 |
+| syncDirectoryIfEmpty() | 서버 시작 후 10초 (3.6차, `stocks_directory` 비어 있을 때만 1회). Phase 6에서 일 1회 cron으로 승격 예정 |
 | cleanupOldData() | 서버 시작 + 24시간마다 |
 
 **cleanupOldData 범위**: `stock_analysis`, `recommended_stocks` 20일+ 삭제.

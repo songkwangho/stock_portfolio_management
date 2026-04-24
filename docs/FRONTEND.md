@@ -65,9 +65,12 @@ interface PortfolioActions {
   fetchHoldings(): Promise<void>;
   addHolding(stock: AddHoldingPayload): Promise<void>;
   updateHolding(stock: UpdateHoldingPayload): Promise<void>;
-  deleteHolding(code: string): Promise<void>;
+  deleteHolding(code: string): Promise<void>;     // /holdings/:code (본인 보유 해제)
+  deleteStock(code: string): Promise<void>;       // /stocks/:code (앱 전역에서 종목 제거, cascade). 3.7차 추가
 }
 ```
+
+> `deleteStock`는 `/stock/[code]` 삭제 버튼이 `stockApi.deleteStock` + `fetchHoldings`를 수동 엮지 않도록 일원화한 액션. 성공 시 내부적으로 `fetchHoldings`를 호출해 로컬 상태를 즉시 동기화.
 
 ### useAlertStore
 
@@ -129,14 +132,14 @@ interface ToastActions {
 **데이터**: `usePortfolioStore`, `useWatchlistStore`
 
 **핵심 UI**:
-- 상단 탭: 보유종목 / 관심종목
+- 상단 탭: 보유종목 / 관심종목 (E2E-H2, 2026-04-18: 우상단 종목 추가 버튼 제거)
 - 보유종목 탭:
-  - 종목 추가 폼 (StockSearchInput + 평단가 + 수량)
+  - **종목 추가 폼 상시 노출** (StockSearchInput + 평단가 + 수량)
   - 종목 카드: holding_opinion 뱃지 + 이유 텍스트 (줄 분리)
   - sma_available=false → "분석 중" 뱃지 우선
   - 집중도 >50% → yellow 테두리 + 분산 권유
-  - 수익률 6구간 메시지
-  - 첫 종목 가이드 카드 (1회, onboarding_first_stock_guided)
+  - 수익률 6구간 메시지 — **`holding_opinion === '매도'`일 땐 숨김** (3.7차 UX-INIT 6-3: [주의 필요] 뱃지·설명과 중복 경고 방지)
+  - 첫 종목 가이드 카드 (1회, onboarding_first_stock_guided, `holdings.length === 1` 조건)
 - 관심종목 탭: `WatchlistContent` 컴포넌트
 
 **holding_opinion 표시 라벨**:
@@ -179,14 +182,17 @@ const stock = await fetchStock(code); // Server에서
   - 라인: Recharts ComposedChart + SMA5(파란선) + SMA20(노란선)
   - 캔들: `CandleChart` (lightweight-charts, dynamic ssr:false)
 - 거래량 BarChart
-- 투자자 매매동향 BarChart
-- PER/PBR/ROE/목표가 카드 (섹터별 PER 힌트)
-- 기술지표 종합 (RSI/MACD/볼린저 + `*_available` 폴백)
+- PER/PBR/ROE/목표가 카드
+  - PER: 섹터별 힌트 + **섹터 게이지 바** (3.7차) — `sectorData.medians.per` 대비 위치(에메랄드=저렴/앰버=높음)
+- 기술지표 종합 (RSI/MACD/볼린저 + `*_available` 폴백) — **기본 펼침**
+- 최신 뉴스 (Phase 2 지연 로딩) — **기본 펼침**
 - ScoringBreakdownPanel (임계값 미검증 amber 배너 포함)
-- 섹터 비교 (백분위 + 테이블)
-- 재무제표 (단위: 억 원, 1조 이상 "X조 Y억")
-- 뉴스 (Phase 2 지연 로딩)
+- **아코디언 (3.7차, 기본 접힘)** — 초보자 정보 과부하 완화:
+  - 투자자별 매매동향 BarChart
+  - 분기별 실적 (단위: 억 원, 1조 이상 "X조 Y억")
+  - 같은 업종 비교 (백분위 + 테이블)
 - 추가/수정 폼 (포트폴리오 등록)
+- 삭제 버튼: 보유 여부에 따라 `deleteHolding` 또는 `deleteStock` (store 액션) 호출
 
 ### /stocks (ISR 24h)
 
@@ -210,19 +216,45 @@ const stock = await fetchStock(code); // Server에서
 
 `WatchlistContent` 컴포넌트 래퍼.
 
+### /alerts (CSR)
+
+**컴포넌트**: `app/alerts/page.tsx`
+**데이터**: `useAlertStore`
+
+**핵심 UI**:
+- 알림 카드 — 타입별 아이콘·색상·label·description (sell_signal/sma5_break/sma5_touch/target_near/undervalued)
+- source 뱃지: `'holding'` → [보유 중] / `'watchlist'` → [관심 종목]
+- **타입별 1줄 가이드 (3.7차 UX-ALERT, 2026-04-19)** — `ALERT_GUIDES` 맵으로 message 하단에 "💡 이런 경우 확인해보세요" 문구
+- 첫 진입 안내 카드 (`onboarding_alerts_explained` localStorage, 1회)
+- 빈 상태: 알림 트리거 조건(5일 평균선 이탈·목표가 근접·저평가) + 갱신 시각(매일 08:00) 명시
+- 알림 카드 "분석 보기" → `/stock/[code]?from=alerts`
+
 ### /settings (CSR)
 
-- 종목 수동 추가 — 6자리 코드 입력 form (`stockCode` state + `handleAddStock` submit → `POST /api/stocks`)
+- **종목 수동 추가** — 종목명 또는 6자리 코드 입력 form (`searchQuery` + `selectedHit` + `handleAddStock` submit → `POST /api/stocks`)
   - `StockSearchInput` 사용 안 함 (DB 기존 종목만 매칭하는 모순 해소, 2026-04-18)
+  - **자동완성 드롭다운 (3.6차 DIR-4, 2026-04-19)**:
+    - 2자 이상 입력 시 250ms 디바운스 → `stockApi.searchDirectory(q)` 호출
+    - 6자리 숫자만 입력된 경우 디렉토리 검색 skip (폴백 입력으로 간주)
+    - 드롭다운: name + code(mono) + market 뱃지 (KOSPI=blue, KOSDAQ=emerald, KONEX=slate)
+    - 선택 시 확정 칩 "✓ name (code) · market [×]" 노출, [×]로 초기화
+  - 제출 시 code 해석: `selectedHit.code || (searchQuery가 6자리 숫자면 그대로)`. 둘 다 아니면 에러 메시지 + 제출 버튼 비활성
   - 로딩 상태: input 내 스피너 + "네이버 API에서 종목 데이터를 가져오는 중..." 배너
   - 성공/실패 메시지 박스 + 🔵🟢🔴 콘솔 로그
-  - **3.6차 예정**: `stocks_directory` 자동완성 드롭다운 추가 → 종목명 입력 허용
 - 서버 상태 확인 (health API)
 - 닉네임 설정
 
 ---
 
 ## 컴포넌트
+
+### HeaderBar
+
+- 검색 입력 (디바운스 300ms → `stockApi.searchStocks`)
+- 알림 아이콘 (`unreadCount` 뱃지, 60초 폴링)
+- PC 전용 시장지수(KOSPI/KOSDAQ) — `useMarketStore`로 300초 폴링
+- `usePathname` 구독 → 라우트 변경 시 검색 입력·드롭다운 초기화 (E2E-C2)
+- **빈 검색 결과 안내 박스** — '전체 종목 보기 → / 종목코드로 추가 →' 버튼 + **대표 종목 3개(삼성전자/SK하이닉스/NAVER) 빠른 이동 버튼** (3.7차 UX-SEARCH)
 
 ### HealthGate
 
@@ -292,6 +324,7 @@ interface StatCardProps {
 | addStock(code) | POST /stocks |
 | deleteStock(code) | DELETE /stocks/{code} |
 | searchStocks(q) | GET /search?q= |
+| searchDirectory(q) | GET /stocks/directory/search?q= (3.6차: 전 상장 종목 매핑, `{code,name,market}[]` 반환) |
 | getHoldings() | GET /holdings |
 | addHolding(stock) | POST /holdings |
 | updateHolding(stock) | PUT /holdings/{code} |

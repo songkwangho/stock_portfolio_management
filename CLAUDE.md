@@ -90,16 +90,22 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 ├── server/                       # Express 백엔드 (원본에서 이식, node_modules 제외)
 │   ├── server.js                 # Render 진입점
 │   ├── index.js
-│   ├── db/                       # 스키마·마이그레이션
-│   ├── helpers/
+│   ├── db/                       # 스키마·마이그레이션 (stocks_directory, ai_report 포함)
+│   ├── helpers/                  # deviceId(requireDeviceIdMiddleware), cache, sma
 │   ├── scrapers/                 # 네이버 증권
-│   ├── domains/                  # 도메인별 서비스
-│   ├── scheduler.js
+│   ├── domains/
+│   │   └── stock/
+│   │       ├── service.js        # getStockData + syncAllStocks
+│   │       ├── data.js           # registerInitialData (97 + 20)
+│   │       ├── directory.js      # 3.6차 — KRX stocks_directory 동기화
+│   │       └── router.js
+│   ├── scheduler.js              # setupScheduler + syncDirectoryIfEmpty 10s 지연
 │   └── package.json              # 별도 의존성 — `cd server && npm install` 필요
 │   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
 │
 └── scripts/
-    └── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
+    ├── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
+    └── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
 ```
 
 ---
@@ -152,6 +158,9 @@ DATABASE_URL=postgres://... node server/server.js  # 포트 3001
 
 # 히스토리 backfill
 DATABASE_URL=postgres://... node scripts/backfill-history.js
+
+# KRX 상장법인목록 → stocks_directory 수동 동기화 (name↔code 매핑)
+DATABASE_URL=postgres://... node scripts/sync-directory.js
 ```
 
 ### 환경변수
@@ -289,7 +298,7 @@ PC (md: 이상):
 
 **3.5차 — 잔여 보완 (Sprint 1.5, 배포 후 우선순위 가능)**
 - [ ] **[H-NEW2/P10]** `app/portfolio/page.tsx` 로컬 toast → `useToastStore` 통일
-- [ ] **[H-NEW3]** `/stock/[code]` `stockApi.deleteStock` 직접 호출 → store 경유로 변경 (로컬 상태 동기화 보장)
+- [x] **[H-NEW3]** `/stock/[code]` `stockApi.deleteStock` 직접 호출 → store 경유로 변경 (로컬 상태 동기화 보장) — `usePortfolioStore.deleteStock` 액션 신설
 - [ ] **[Fix-6]** 시장지수 중복 fetch 해소 — HeaderBar + dashboard 각자 호출 → `useMarketStore` 신설 또는 Zustand 구독 패턴
 - [ ] **[Fix-7/M2]** Recharts 커스텀 `CandlestickBar` wick 미동작 → Sprint 3에서 lightweight-charts 전환 우선 검토
 - [ ] **[UX-NEW3]** `profitHelpCode` 팝업 외부 클릭 닫기 (mousedown 리스너)
@@ -313,18 +322,33 @@ PC (md: 이상):
 - [x] **[Settings-UX]** `/settings` 종목 수동 추가 — `StockSearchInput`(DB 드롭다운) 제거 → 6자리 코드 입력 form (네이버 크롤링 업서트). 로딩 배너·성공/실패 메시지·🔵🟢🔴 콘솔 로그 추가
   - **한계**: 네이버 금융 URL이 `?code=` 필수라 종목명 입력은 미지원 → **3.6차에서 KRX 디렉토리로 해소**
 
-**3.6차 — 종목 디렉토리 선행 (Sprint 1.6, Phase 6 일부 앞당김, ~2일)**
+**3.6차 — 종목 디렉토리 선행 (Sprint 1.6, Phase 6 일부 앞당김, 2026-04-19)**
 
 `/settings` 수동 추가 UX가 종목 코드만 받는 한계 해소용. 네이버 크롤링 URL은 `?code=`가 필수라 종목명 직접 입력 불가. **전 상장 종목 명→코드 매핑 테이블을 선행 구축**해 프론트가 "삼성전자" 입력 시 `005930`로 변환해 `POST /stocks`에 전달.
 
-- [ ] **[DIR-1]** `stocks_directory` 테이블 신설 — (code PK, name, market [KOSPI/KOSDAQ/KONEX], listed_at, delisted_at, updated_at)
-- [ ] **[DIR-2]** KRX CSV 수집 파이프라인 — 상장법인목록 CSV (KRX 공식 공개 데이터) 일 1회 수집. 초기엔 수동 스크립트 `scripts/sync-directory.js`, Phase 6에서 스케줄러 편입
-- [ ] **[DIR-3]** `GET /api/stocks/directory/search?q=` 엔드포인트 — name ILIKE + 시작 일치 우선 정렬 (E2E-M1과 동일 패턴), 상장폐지 제외, 최대 10건
-- [ ] **[DIR-4]** `/settings` 입력창 자동완성 — 2자 이상 디바운스 250ms, 드롭다운 선택 시 code 자동 채움. 선택 없이도 6자리 숫자 직접 입력은 그대로 동작 (폴백)
-- [ ] **[DIR-5]** `POST /api/stocks` 확장 — body에 `code` 대신 `q`(name 또는 code) 허용. name이면 디렉토리 조회 후 code 해석, 실패 시 400 + 후보 제안
+- [x] **[DIR-1]** `stocks_directory` 테이블 신설 — (code PK, name, market [KOSPI/KOSDAQ/KONEX], listed_at, delisted_at, updated_at) + `idx_stocks_directory_name/_market`
+- [x] **[DIR-2]** KRX CSV 수집 파이프라인 — `server/domains/stock/directory.js`에 `syncDirectory`/`syncDirectoryIfEmpty` export. `setupScheduler` 내 서버 시작 후 10초 지연으로 **디렉토리가 비어 있을 때만** 1회 동기화. 수동 실행은 `scripts/sync-directory.js`. 일 1회 자동 스케줄링은 Phase 6 본작업으로 이월
+- [x] **[DIR-3]** `GET /api/stocks/directory/search?q=` 엔드포인트 — name/code ILIKE + 시작 일치 우선 정렬 (E2E-M1과 동일 패턴), `delisted_at IS NULL`, 최대 10건. `lib/stockApi.ts`에 `searchDirectory()` 래퍼 추가
+- [x] **[DIR-4]** `/settings` 입력창 자동완성 — 2자 이상 디바운스 250ms로 `searchDirectory` 호출, 드롭다운에 name + code(mono) + market 뱃지(KOSPI/KOSDAQ 색상 구분) 표시. 선택 시 확정 칩(✓ name (code) · market [×]). 선택 없이 6자리 숫자 직접 입력은 폴백으로 그대로 동작
+- [ ] **[DIR-5]** `POST /api/stocks` 확장 — body에 `code` 대신 `q`(name 또는 code) 허용. name이면 디렉토리 조회 후 code 해석, 실패 시 400 + 후보 제안 (현재는 프론트가 `selectedHit.code`를 직접 넘겨 code로 정규화하므로 백엔드는 code 경로만 유지)
 - [ ] **[DIR-6]** 상장폐지 감지 — 디렉토리 갱신 시 `delisted_at` 채워진 종목은 `stocks` 테이블에서 경고 로그 (Cleanup-1 같은 수동 정리와 연결)
 
 **범위 제한**: 이번 선행은 **디렉토리 조회만** 포함. 가격·거래량·재무 등 시세 데이터는 여전히 네이버 크롤링 유지 (Phase 6 본 작업에서 KRX OpenAPI 전환).
+
+---
+
+**3.7차 — 초보자 UX + 백엔드 위생 (Sprint 1.7, 2026-04-19)**
+
+디렉토리 이식과 함께 묶어 처리한 동반 개선. 3.6차와 독립이지만 같은 배포 주기에 묶는다.
+
+- [x] **[UX-INIT 6-1]** `/stock/[code]` 아코디언 — 투자자별 매매동향·분기별 실적·같은 업종 비교 기본 접힘(초보자 과부하 완화). 기술지표 종합·최신 뉴스는 펼침 유지. 각 헤더에 `ChevronDown` 회전 토글
+- [x] **[UX-INIT 6-2]** PER 카드 섹터 게이지 바 — `sectorData.medians.per` 대비 위치 시각화(에메랄드/앰버) + "업종 평균보다 저렴/높음" 라벨
+- [x] **[UX-INIT 6-3]** 포트폴리오 수익률 행동 유도 텍스트 — `holding_opinion === '매도'`일 땐 숨김. [주의 필요] 뱃지·설명과 중복 경고 방지
+- [x] **[UX-SEARCH]** HeaderBar 빈 검색 결과 박스 — "이런 종목은 어때요?" 대표 종목 3개(삼성전자/SK하이닉스/NAVER) 빠른 이동 버튼
+- [x] **[UX-ALERT]** `/alerts` 알림 카드 하단 — 타입별 1줄 가이드 (sell_signal/sma5_break/sma5_touch/target_near/undervalued)
+- [x] **[FIX-SCHEMA]** `stock_analysis.ai_report` + `ai_report_date` 컬럼 선행 추가 (Phase 5 Claude Haiku AI 리포트 대비). `migrate.js`에 `addColumnIfNotExists` 헬퍼 추가로 기존 DB도 자동 보강
+- [x] **[REFACTOR]** `requireDeviceIdMiddleware` — portfolio/alert/watchlist 라우터 전체에 `router.use(...)` 일괄 적용. 각 핸들러는 `req.deviceId` 참조만. `requireDeviceId`(레거시)는 하위 호환 유지
+  - 예외: `server/domains/stock/router.js` 추천 엔드포인트는 deviceId가 있으면 홀딩 필터링, 없으면 전체 반환 — 필수가 아니므로 `getDeviceId` 직접 호출 유지
 
 ---
 
@@ -356,14 +380,15 @@ PC (md: 이상):
   - **Edge 호환 JWT 라이브러리 사전 결정 필수** — Express `jsonwebtoken`은 Edge Runtime 미지원. middleware는 `jose` 사용
 - [ ] **Kakao Redirect URI 사전 등록** — 개발/스테이징/프로덕션 URI 전부 Kakao Developers에 등록 (Vercel Preview URL은 배포마다 변경되므로 Production URL만 OAuth 허용)
 - [ ] 구독 DB 스키마 (상태·만료·환불 이력) → Toss Payments → Claude Haiku AI 리포트 (순차)
+  - **사전 준비 완료**: `stock_analysis.ai_report` / `ai_report_date` 컬럼은 3.7차에서 선행 추가 (FIX-SCHEMA)
 - [ ] **Toss Payments 웹훅 멱등성** — `payment_id` 기준 중복 차단, 최대 5회 재전송(지수 backoff) 대응
 - [ ] KIS OpenAPI 신청 **병행 시작** (Phase 7 착수 전 심사 완료 필요, 영업일 1~3일)
 - 목표: **200명**
 
 ### Phase 6 — 데이터 소스 안정화
-- [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX CSV 파이프라인)
+- [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX 파싱 + 서버 시작 시 1회 자동 동기화)
+- [ ] **디렉토리 자동 스케줄링 (일 1회)**: 3.6차에서는 '비어 있을 때만' 조건이라 장기적으로 갱신 불가. `setupScheduler`에 일 1회 cron(예: 장마감 후 16:00 KST) 편입 + DIR-5(POST /stocks `q` 확장) + DIR-6(상장폐지 감지) 마무리
 - [ ] **가격·거래량·투자자 매매동향**: KRX OpenAPI 전환 — CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계
-- [ ] **디렉토리 자동 스케줄링**: 3.6차의 수동 `scripts/sync-directory.js`를 `setupScheduler`에 편입 (일 1회, 장마감 후)
 - [ ] **PER/PBR/목표가**: KRX 월별 공시라 실시간 불가 → **네이버 스크래핑 유지** (Phase 6 범위 축소)
 - [ ] 재무지표: FinanceDataReader(Python) — Node `child_process` 또는 별도 Python 마이크로서비스로 격리
 - **목표**: 스크래핑 의존도 축소 (완전 제거 불가)
