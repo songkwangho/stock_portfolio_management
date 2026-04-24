@@ -137,6 +137,24 @@ export default function HeaderBar({ nickname }: Props) {
                   종목코드로 추가 →
                 </button>
               </div>
+              <div className="mt-3 pt-3 border-t border-slate-800/50">
+                <p className="text-[11px] text-slate-500 mb-2">이런 종목은 어때요?</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { code: '005930', name: '삼성전자' },
+                    { code: '000660', name: 'SK하이닉스' },
+                    { code: '035420', name: 'NAVER' },
+                  ].map(s => (
+                    <button
+                      key={s.code}
+                      onClick={() => { router.push(`/stock/${s.code}?from=search`); setSearchQuery(''); setSearchResults([]); }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors"
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

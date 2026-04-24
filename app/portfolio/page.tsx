@@ -291,6 +291,9 @@ function PortfolioContent() {
                   <p className={`text-xl font-black ${parseFloat(profitRate) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                     {parseFloat(profitRate) >= 0 ? '+' : ''}{profitRate}%
                   </p>
+                  {/* 6-3: holding_opinion='매도'일 땐 [주의 필요] 뱃지 + 설명이 이미 아래에 나오므로
+                      수익률 행동 유도 텍스트는 숨겨서 중복 경고를 피한다. */}
+                  {stock.holding_opinion !== '매도' && (
                   <p className={`text-xs mt-0.5 ${
                     parseFloat(profitRate) >= 10 ? 'text-emerald-400' :
                     parseFloat(profitRate) >= 0 ? 'text-blue-400' :
@@ -305,6 +308,7 @@ function PortfolioContent() {
                      parseFloat(profitRate) >= -7 ? '손실이 나고 있어요. 시장 상황을 지켜봐요' :
                      '손실이 커지고 있어요. 해당 종목의 분석을 다시 확인해보세요 🔴'}
                   </p>
+                  )}
                 </div>
               </div>
 

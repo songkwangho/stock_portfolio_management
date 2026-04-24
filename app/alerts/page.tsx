@@ -6,6 +6,15 @@ import { Trash2 } from 'lucide-react';
 import { useAlertStore } from '@/stores/useAlertStore';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
 
+// 타입별 "이런 경우 확인해보세요" 가이드 — 알림이 왜 왔는지 이해 + 다음 액션 안내
+const ALERT_GUIDES: Record<string, string> = {
+  sell_signal: '💡 종목 상세에서 이평선 위치와 지지 구간을 확인해보세요.',
+  sma5_break: '💡 단기 흐름이 꺾인 신호예요. 20일 평균선이 지지해주는지 확인해보세요.',
+  sma5_touch: '💡 5일 평균선 근처로 내려왔어요. 반등인지 추가 하락인지 거래량을 보세요.',
+  target_near: '💡 목표가에 가까워졌어요. 실제 거래는 증권사 앱에서 직접 해주세요.',
+  undervalued: '💡 지표상 저평가 구간이에요. 기업 뉴스도 함께 확인해보세요.',
+};
+
 const ALERT_TYPE_LABELS: Record<string, { label: string; icon: string; color: string; description: string }> = {
   sell_signal: {
     label: '가격 하락 경고', icon: '🔴', color: 'text-red-400 bg-red-500/10',
@@ -93,6 +102,11 @@ export default function AlertsPage() {
                 <p className="text-xs text-slate-300 leading-relaxed pl-7 mb-1">{typeInfo.description}</p>
               )}
               <p className="text-xs text-slate-500 leading-relaxed pl-7">{alert.message}</p>
+              {ALERT_GUIDES[alert.type] && (
+                <p className="text-[11px] text-slate-500 mt-2 pl-7 pr-2 leading-relaxed border-t border-slate-800/50 pt-2">
+                  {ALERT_GUIDES[alert.type]}
+                </p>
+              )}
               <p className="text-xs text-slate-600 mt-1 pl-7">{getDataFreshnessShort(alert.created_at)}</p>
               <div className="pl-7 mt-2">
                 <button onClick={() => router.push(`/stock/${alert.code}?from=alerts`)} className="text-xs font-bold px-4 py-2 min-h-[44px] bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-colors">
