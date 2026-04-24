@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight
+  ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight, ChevronDown
 } from 'lucide-react';
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -39,7 +39,7 @@ function StockDetailContent({ code }: { code: string }) {
   const onAdd = usePortfolioStore(s => s.addHolding);
   const onUpdate = usePortfolioStore(s => s.updateHolding);
   const onDeleteHolding = usePortfolioStore(s => s.deleteHolding);
-  const fetchHoldings = usePortfolioStore(s => s.fetchHoldings);
+  const onDeleteStock = usePortfolioStore(s => s.deleteStock);
   const holdings = usePortfolioStore(s => s.holdings);
   const addToast = useToastStore(s => s.addToast);
   const holdingMatch = holdings.find(h => h.code === code);
@@ -73,6 +73,10 @@ function StockDetailContent({ code }: { code: string }) {
   const [chartTimeframe, setChartTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
   const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
+  // 정보 과부하 완화 — 초보자에게 어려운 섹션은 기본 접힘 (6-1)
+  const [showInvestor, setShowInvestor] = useState(false);
+  const [showFinancials, setShowFinancials] = useState(false);
+  const [showSector, setShowSector] = useState(false);
 
   // 종목 진입 시 스크롤 최상단으로 강제 — 이전 페이지 스크롤 위치 잔재 방지
   useEffect(() => {
@@ -224,8 +228,7 @@ function StockDetailContent({ code }: { code: string }) {
                       if (holdingMatch) {
                         await onDeleteHolding(stock.code);
                       } else {
-                        await stockApi.deleteStock(stock.code);
-                        await fetchHoldings();
+                        await onDeleteStock(stock.code);
                       }
                       addToast(`${stock.name} 종목이 삭제되었습니다.`, 'success');
                       onBack();
@@ -452,6 +455,23 @@ function StockDetailContent({ code }: { code: string }) {
                     </p>
                   );
                 })()}
+                {/* 섹터 대비 PER 게이지 — 업종 중앙값 대비 현재가 위치 (6-2) */}
+                {sectorData && stockDetail?.per !== null && stockDetail?.per !== undefined && stockDetail.per > 0 && sectorData.medians.per && (
+                  <div className="mt-2 pt-2 border-t border-slate-800/50">
+                    <p className="text-[10px] text-slate-600 mb-1">업종 중앙값 {sectorData.medians.per}배 대비</p>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${stockDetail.per < sectorData.medians.per ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          style={{ width: `${Math.min(100, (stockDetail.per / (sectorData.medians.per * 2)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-[10px] font-bold ${stockDetail.per < sectorData.medians.per ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {stockDetail.per < sectorData.medians.per ? '업종 평균보다 저렴' : '업종 평균보다 높음'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
                 <div className="flex items-center justify-between mb-1">
@@ -595,39 +615,56 @@ function StockDetailContent({ code }: { code: string }) {
               </div>
             )}
 
-            {/* Investor Trading Trends */}
+            {/* Investor Trading Trends — 아코디언(기본 접힘, 초보자에게 어려운 내용) */}
             {stockDetail?.investorData && stockDetail.investorData.length > 0 && (
               <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold">투자자별 매매동향</h3>
-                  <button onClick={() => setHelpTerm('supplyDemand')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="수급 도움말">[?]</button>
-                </div>
-                <p className="text-xs text-slate-500 mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
-                <p className="text-xs text-slate-600 mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stockDetail.investorData.slice(-10).map((d) => ({
-                      ...d, name: d.date.slice(4, 6) + '/' + d.date.slice(6, 8),
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                      <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? '+' : ''}${Math.round(v / 1000)}k`} />
-                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
-                      <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                      <ReferenceLine y={0} stroke="#334155" />
-                      <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#facc15" />
-                      <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#ec4899" />
-                      <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6366f1" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <button onClick={() => setShowInvestor(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-lg font-semibold">투자자별 매매동향</h3>
+                    <span onClick={(e) => { e.stopPropagation(); setHelpTerm('supplyDemand'); }} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-slate-500">{showInvestor ? '접기' : '펼치기'}</span>
+                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showInvestor ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+                {showInvestor && (
+                  <div className="mt-4">
+                    <p className="text-xs text-slate-500 mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
+                    <p className="text-xs text-slate-600 mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={stockDetail.investorData.slice(-10).map((d) => ({
+                          ...d, name: d.date.slice(4, 6) + '/' + d.date.slice(6, 8),
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                          <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? '+' : ''}${Math.round(v / 1000)}k`} />
+                          <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
+                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+                          <ReferenceLine y={0} stroke="#334155" />
+                          <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#facc15" />
+                          <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#ec4899" />
+                          <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6366f1" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Financial Statements */}
+            {/* Financial Statements — 아코디언(기본 접힘) */}
             {financials && financials.financials.length > 0 && (
               <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <h3 className="text-lg font-semibold mb-2">분기별 실적</h3>
+                <button onClick={() => setShowFinancials(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
+                  <h3 className="text-lg font-semibold">분기별 실적</h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-slate-500">{showFinancials ? '접기' : '펼치기'}</span>
+                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showFinancials ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+                {showFinancials && <div className="mt-4">
                 <p className="text-xs text-slate-500 mb-1">최근 분기별 매출과 이익 추이예요. 꾸준히 늘어나면 좋은 신호!</p>
                 <p className="text-xs text-slate-600 mb-4">단위: 억 원 (네이버 증권 기준). 1조 = 10,000억</p>
                 <div className="overflow-x-auto">
@@ -671,10 +708,11 @@ function StockDetailContent({ code }: { code: string }) {
                     </tbody>
                   </table>
                 </div>
+                </div>}
               </div>
             )}
 
-            {/* Sector Comparison */}
+            {/* Sector Comparison — 아코디언(기본 접힘) */}
             {sectorData && sectorData.stocks.length > 1 && (() => {
               // 현재 종목의 업종 내 백분위 계산 — "나는 어디 위치인가" 맥락 제공
               const me = sectorData.stocks.find(s => s.code === stock.code);
@@ -699,7 +737,14 @@ function StockDetailContent({ code }: { code: string }) {
               };
               return (
               <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <h3 className="text-lg font-semibold mb-2">같은 업종 비교</h3>
+                <button onClick={() => setShowSector(v => !v)} className="w-full flex items-center justify-between min-h-[44px] mb-2">
+                  <h3 className="text-lg font-semibold">같은 업종 비교</h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-slate-500">{showSector ? '접기' : '펼치기'}</span>
+                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showSector ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+                {showSector && <>
                 <p className="text-xs text-slate-500 mb-3">
                   <span className="text-blue-400 font-bold">{sectorData.category}</span> 업종 중앙값과 비교해요.
                   PER이 중앙값보다 낮고 ROE가 높으면 좋아요!
@@ -775,6 +820,7 @@ function StockDetailContent({ code }: { code: string }) {
                     </tbody>
                   </table>
                 </div>
+                </>}
               </div>
               );
             })()}

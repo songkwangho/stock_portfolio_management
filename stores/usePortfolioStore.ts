@@ -13,6 +13,7 @@ interface PortfolioActions {
   addHolding: (stock: AddHoldingPayload) => Promise<void>;
   updateHolding: (stock: UpdateHoldingPayload) => Promise<void>;
   deleteHolding: (code: string) => Promise<void>;
+  deleteStock: (code: string) => Promise<void>;
 }
 
 export const usePortfolioStore = create<PortfolioState & PortfolioActions>((set, get) => ({
@@ -83,6 +84,20 @@ export const usePortfolioStore = create<PortfolioState & PortfolioActions>((set,
       await get().fetchHoldings();
     } catch (error) {
       console.error('Failed to delete holding:', error);
+      set({ isLoading: false, error: '종목 삭제에 실패했습니다.' });
+      throw error;
+    }
+  },
+
+  // DELETE /api/stocks/:code — 앱 전역 종목 레코드 삭제 (cascade: holdings, watchlist 등)
+  // fetchHoldings까지 포함해서 store 상태를 한 번에 동기화.
+  deleteStock: async (code) => {
+    set({ isLoading: true, error: null });
+    try {
+      await stockApi.deleteStock(code);
+      await get().fetchHoldings();
+    } catch (error) {
+      console.error('Failed to delete stock:', error);
       set({ isLoading: false, error: '종목 삭제에 실패했습니다.' });
       throw error;
     }
