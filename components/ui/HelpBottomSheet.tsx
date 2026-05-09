@@ -1,7 +1,7 @@
 'use client';
 import { X } from 'lucide-react';
 
-export type HelpTermKey = 'per' | 'pbr' | 'roe' | 'rsi' | 'macd' | 'bollinger' | 'supplyDemand' | 'sma';
+export type HelpTermKey = 'per' | 'pbr' | 'roe' | 'peg' | 'rsi' | 'macd' | 'bollinger' | 'supplyDemand' | 'sma';
 
 interface HelpContent {
   title: string;
@@ -43,6 +43,19 @@ const HELP_CONTENTS: Record<HelpTermKey, HelpContent> = {
     ],
     inApp: '이 앱에서는 ROE 15% 이상을 우량 기업 기준으로 표시해요. 스크리너의 "고수익 성장주" 프리셋도 ROE ≥ 20% 조건을 사용해요.',
     example: '예: ROE 15% = 자기자본 100원으로 15원을 번 셈',
+  },
+  peg: {
+    title: 'PEG (성장 보정 PER)이란?',
+    short: '1 미만이면 성장 대비 저평가',
+    body: [
+      'PER을 EPS 성장률(%)로 나눈 값이에요.',
+      '1 미만: 성장성에 비해 주가가 저렴하다는 신호 (저평가)',
+      '1~2: 적정 수준',
+      '2 초과: 성장 대비 비싼 편',
+      '성장률이 0이거나 음수면 계산이 의미 없어 ---로 표시돼요.',
+    ],
+    inApp: '이 앱에서는 종목 상세의 PEG 카드에서 EPS 성장률로 보정한 PER을 함께 보여줘요. 성장주는 PER이 높아 보여도 PEG는 낮을 수 있어요.',
+    example: '예: PER 30, EPS 성장률 +40% → PEG = 0.75 (저평가)',
   },
   rsi: {
     title: 'RSI (상대강도지수)란?',

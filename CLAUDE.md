@@ -374,6 +374,21 @@ PC (md: 이상):
 
 ---
 
+**3.8차 — vibe-investing 접목 (무료 단계, 2026-04-25)**
+
+기존 DB 데이터(stocks, stock_history, investor_history)만 활용해 분석 깊이를 한 단계 끌어올림. 추가 스크래핑 없음.
+
+- [x] **[FG-1]** `GET /api/market/fear-greed` — RSI proxy(40%) + 외국인 매수 비율(30%) + 52주 고점 근접 비율(30%) 가중. `investor_history` 비어 있으면 외국인 점수 50 폴백. 어떤 단계 실패해도 `score:50, label:'중립'` 반환
+- [x] **[FG-2]** 대시보드 시장 온도 게이지 카드 — 그라데이션(blue→slate→red) + 점수/라벨 + ? 도움말 토글
+- [x] **[SCREENER-4]** 그레이엄 저평가 프리셋 — `Graham Number = √(22.5 × EPS × BPS)`. `eps_current > 0 AND pbr > 0` 조건 필수, 적정가 > 현재가 종목만 상승 여력순 정렬
+- [x] **[SCREENER-5]** 3개월 모멘텀 프리셋 — `LATERAL JOIN`으로 90일 전 가장 가까운 종가 추출, 상승률 상위 20개
+- [x] **[PEG-1]** 종목 상세 PEG 카드 — `PER ÷ EPS 성장률`. 음수·0 성장률은 `---` 표시. PER/PBR/ROE/목표가 4열 → 5열 그리드로 확장 (`md:grid-cols-3 lg:grid-cols-5`)
+- [x] **[PEG-2]** `HelpBottomSheet`에 `peg` 항목 추가
+- [x] **[SHARPE-1]** `GET /api/holdings/sharpe` — 보유 종목별 20일 일간 수익률 stddev → 252거래일 환산. 무위험금리 3.5%. 가중치는 `holding_stocks.weight` (없으면 10). 5일 미만 히스토리는 제외
+- [x] **[SHARPE-2]** 대시보드 위험 대비 수익 카드 — 1 초과/0 초과/0 이하로 색상 구분(emerald/blue/red), 도움말 토글
+
+---
+
 **3.7차 — 초보자 UX + 백엔드 위생 (Sprint 1.7, 2026-04-19)**
 
 디렉토리 이식과 함께 묶어 처리한 동반 개선. 3.6차와 독립이지만 같은 배포 주기에 묶는다.

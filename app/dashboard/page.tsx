@@ -45,6 +45,12 @@ export default function DashboardPage() {
   const marketIndices = useMarketStore(s => s.indices);
   const fetchMarketIndices = useMarketStore(s => s.fetchIndices);
 
+  // 3.8차 — 시장 온도 (Fear & Greed) + 포트폴리오 샤프 지수
+  const [fearGreed, setFearGreed] = useState<{ score: number; label: string } | null>(null);
+  const [showFGHelp, setShowFGHelp] = useState(false);
+  const [sharpe, setSharpe] = useState<number | null>(null);
+  const [showSharpeHelp, setShowSharpeHelp] = useState(false);
+
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=holding`);
@@ -53,7 +59,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchHoldings();
     fetchMarketIndices();
+    // Fear & Greed는 보유 여부 무관하게 호출. 실패해도 silent.
+    stockApi.getFearGreed().then(d => setFearGreed({ score: d.score, label: d.label })).catch(() => {});
   }, [fetchHoldings, fetchMarketIndices]);
+
+  // 보유 종목 변동 시 샤프 재계산. 보유 0개일 땐 호출 자체 skip.
+  useEffect(() => {
+    if (holdings.length === 0) { setSharpe(null); return; }
+    stockApi.getPortfolioSharpe()
+      .then(d => setSharpe(d.sharpe))
+      .catch(() => setSharpe(null));
+  }, [holdings.length]);
 
   const fetchHistory = async () => {
     setHistoryError(null);
@@ -195,6 +211,83 @@ export default function DashboardPage() {
           })()}
         />
       </div>
+
+      {/* 3.8차 — 시장 온도(Fear & Greed) + 포트폴리오 샤프 지수 */}
+      {(fearGreed || sharpe !== null) && (
+        <div className={`grid grid-cols-1 ${sharpe !== null ? 'md:grid-cols-2' : ''} gap-4`}>
+          {fearGreed && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">시장 온도</p>
+                <button
+                  onClick={() => setShowFGHelp(v => !v)}
+                  className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center"
+                  aria-label="시장 온도 도움말"
+                >?</button>
+              </div>
+              <div className="relative h-3 bg-gradient-to-r from-blue-600 via-slate-500 to-red-500 rounded-full mb-2 overflow-hidden">
+                <div
+                  className="absolute top-0 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-slate-900 transition-all"
+                  style={{ left: `calc(${fearGreed.score}% - 6px)` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-600 mb-2">
+                <span>공포</span><span>중립</span><span>탐욕</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={`text-lg font-black ${
+                  fearGreed.score <= 40 ? 'text-blue-400' :
+                  fearGreed.score <= 60 ? 'text-slate-300' : 'text-red-400'
+                }`}>{fearGreed.score}</span>
+                <span className={`text-sm font-bold ${
+                  fearGreed.score <= 40 ? 'text-blue-400' :
+                  fearGreed.score <= 60 ? 'text-slate-400' : 'text-red-400'
+                }`}>{fearGreed.label}</span>
+              </div>
+              {showFGHelp && (
+                <div className="mt-3 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+                  <p className="font-bold text-slate-300 mb-1">시장 온도란?</p>
+                  <p>RSI 평균·외국인 매수 비율·52주 고점 근접 종목 수를 종합해 0~100으로 표현해요.</p>
+                  <p className="mt-1">공포(0~40): 많이 내려있을 수 있어요 · 탐욕(60~100): 고점 주의</p>
+                  <p className="mt-1 text-slate-600">※ 이 지수는 참고용이며 실제 시장 예측이 아니에요.</p>
+                </div>
+              )}
+            </div>
+          )}
+          {sharpe !== null && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">위험 대비 수익 (샤프 지수)</p>
+                <button
+                  onClick={() => setShowSharpeHelp(v => !v)}
+                  className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center"
+                  aria-label="샤프 지수 도움말"
+                >?</button>
+              </div>
+              <div className="flex items-end justify-between">
+                <p className={`text-3xl font-black ${
+                  sharpe > 1 ? 'text-emerald-400' :
+                  sharpe > 0 ? 'text-blue-400' : 'text-red-400'
+                }`}>{sharpe.toFixed(2)}</p>
+                <p className={`text-sm font-bold ${
+                  sharpe > 1 ? 'text-emerald-400' :
+                  sharpe > 0 ? 'text-blue-400' : 'text-red-400'
+                }`}>{sharpe > 1 ? '우수' : sharpe > 0 ? '양호' : '개선 필요'}</p>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                같은 수익이라도 변동이 적으면 높아요. 1 이상이면 우수한 편이에요.
+              </p>
+              {showSharpeHelp && (
+                <div className="mt-3 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+                  <p className="font-bold text-slate-300 mb-1">샤프 지수란?</p>
+                  <p>(연환산 수익률 - 무위험금리 3.5%) ÷ 변동성. 보유 종목별 20일 일간 수익률에서 계산해 비중으로 가중평균해요.</p>
+                  <p className="mt-1 text-slate-600">※ 5일 미만 히스토리는 계산에서 제외돼요.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <ErrorBanner error={historyError} kind="server" onRetry={fetchHistory} autoRetryMs={3000} />
 

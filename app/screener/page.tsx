@@ -86,6 +86,25 @@ const PRESETS: Preset[] = [
     caveat: '⚠️ 소외됐다고 무조건 좋은 종목이 아니에요. 하락 추세 중일 수도 있으니 지표를 함께 보세요.',
     isNew: true,
   },
+  // 3.8차 — vibe-investing 접목
+  {
+    name: '그레이엄 저평가',
+    description: '📚 내재가치 — 적정가 < 현재가',
+    summary: 'Graham Number > 현재가',
+    emoji: '📚',
+    filters: { preset: 'graham' },
+    caveat: '⚠️ 그레이엄 공식은 안정적인 이익을 내는 기업에 적합해요. 적자·바이오·성장주에는 맞지 않아요.',
+    isNew: true,
+  },
+  {
+    name: '3개월 강세',
+    description: '📈 모멘텀 — 최근 3개월 상승률 상위',
+    summary: '90일 전 대비 +N%',
+    emoji: '📈',
+    filters: { preset: 'momentum_3m' },
+    caveat: '⚠️ 많이 오른 종목은 단기 조정이 올 수 있어요. 거래량과 이평선을 함께 확인하세요.',
+    isNew: true,
+  },
 ];
 
 const CATEGORIES = [
@@ -154,6 +173,17 @@ export default function ScreenerPage() {
     if (activePresetKey === 'neglected') {
       if (stock.vol_ratio === null || stock.vol_ratio === undefined) return null;
       return `30일 평균의 ${stock.vol_ratio}% 거래량`;
+    }
+    if (activePresetKey === 'graham') {
+      if (stock.graham_upside === null || stock.graham_upside === undefined) return null;
+      const fair = stock.graham_number;
+      return fair
+        ? `적정가 ₩${fair.toLocaleString()} (+${stock.graham_upside}%)`
+        : `그레이엄 적정가 +${stock.graham_upside}%`;
+    }
+    if (activePresetKey === 'momentum_3m') {
+      if (stock.momentum_3m === null || stock.momentum_3m === undefined) return null;
+      return `3개월 +${stock.momentum_3m}%`;
     }
     return null;
   };

@@ -46,6 +46,8 @@ function ensureInterceptors() {
         url.includes('/search') ||
         url.includes('/unread-count') ||
         url.includes('/market/indices') ||
+        url.includes('/market/fear-greed') ||
+        url.includes('/holdings/sharpe') ||
         url.includes('/volatility') ||
         url.includes('/news');
       if (!silent) {
@@ -85,6 +87,10 @@ export const stockApi = {
     (await axios.get(`${API_BASE_URL}/themes/${encodeURIComponent(themeId)}/stocks`)).data,
   getStockThemes: async (code: string) =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/themes`)).data,
+  getFearGreed: async (): Promise<{ score: number; label: string; components: { rsi: number; foreign: number; high: number } | null }> =>
+    (await axios.get(`${API_BASE_URL}/market/fear-greed`)).data,
+  getPortfolioSharpe: async (): Promise<{ sharpe: number | null; stockCount: number }> =>
+    (await axios.get(`${API_BASE_URL}/holdings/sharpe`)).data,
   getAllStocks: async () => (await axios.get(`${API_BASE_URL}/stocks`)).data,
   addStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stocks`, { code })).data,
   deleteStock: async (code: string) => (await axios.delete(`${API_BASE_URL}/stocks/${code}`)).data,

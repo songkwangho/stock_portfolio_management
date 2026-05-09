@@ -87,6 +87,8 @@ export interface StockDetail {
   pbr?: number;
   roe?: number;
   targetPrice?: number;
+  eps_current?: number | null;   // 서버 service.js가 snake_case로 반환
+  eps_previous?: number | null;
   history: HistoryEntry[];
   investorData?: InvestorEntry[];
   analysis?: string;
@@ -235,6 +237,10 @@ export interface ScreenerResult extends Stock {
   avg_vol_30d?: number;
   recent_vol?: number;
   vol_ratio?: number | null;
+  graham_number?: number | null;
+  graham_upside?: number | null;
+  price_3m?: number | null;
+  momentum_3m?: number | null;
 }
 
 export interface SectorComparison {

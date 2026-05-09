@@ -147,6 +147,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | PUT | `/api/holdings/:code` | 부분 수정 |
 | DELETE | `/api/holdings/:code` | 삭제 |
 | GET | `/api/holdings/history` | 포트폴리오 가치 히스토리 (20일) |
+| **GET** | **`/api/holdings/sharpe`** | 3.8차 — 가중 평균 샤프 지수. 종목별 20일 일간 수익률 stddev → 252일 환산. 무위험금리 3.5%. 5일 미만 히스토리 제외 |
 
 > **`sma_available` 규칙**: false이면 `holding_opinion`은 항상 '보유'로 반환되지만 신뢰 불가.
 > 프론트는 `sma_available=false`일 때 반드시 "분석 중" 뱃지를 표시해야 한다.
@@ -160,7 +161,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | GET | `/api/stock/:code/financials` | 분기 재무제표 |
 | GET | `/api/stock/:code/news` | 뉴스 10건 |
 | GET | `/api/stock/:code/chart/:tf` | 주봉/월봉 OHLCV |
-| GET | `/api/screener` | 조건 필터 (perMin/perMax/roeMin 등) OR `?preset=` 분기 (3.7차β: `breakout_52w`/`foreign_buy`/`fund_buy`/`neglected`) |
+| GET | `/api/screener` | 조건 필터 (perMin/perMax/roeMin 등) OR `?preset=` 분기 (3.7차β: `breakout_52w`/`foreign_buy`/`fund_buy`/`neglected`, 3.8차: `graham`/`momentum_3m`) |
 | GET | `/api/sector/:cat/compare` | 섹터 비교 (averages + medians) |
 
 ### 알림/관심종목/시스템
@@ -172,6 +173,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | POST | `/api/alerts/read` | 전체 읽음 |
 | GET/POST/DELETE | `/api/watchlist` | 관심종목 (`requireDeviceIdMiddleware` 라우터 단위 적용) |
 | GET | `/api/market/indices` | KOSPI/KOSDAQ |
+| **GET** | **`/api/market/fear-greed`** | 3.8차 — 간이 시장 온도 (RSI proxy 40% + 외국인 매수 비율 30% + 52주 고점 근접 30%). 폴백 50/중립 |
 | GET | `/api/health` | 서버 상태 (`{ api, database, lastSync }`) |
 
 ### device_id 가드 패턴 (3.7차 REFACTOR)

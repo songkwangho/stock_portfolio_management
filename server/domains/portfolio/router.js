@@ -50,6 +50,54 @@ router.get('/', async (req, res) => {
     }
 });
 
+// GET /api/holdings/sharpe - 포트폴리오 가중 평균 샤프 지수.
+// 단순화 모델: 종목별 20일 일간 수익률 stddev로 변동성 산출 → 252거래일 환산.
+// 가중치는 holding_stocks.weight (없으면 동일 가중 10).
+// 보유 종목이 없거나 모든 종목의 히스토리가 < 5일이면 sharpe: null 반환.
+router.get('/sharpe', async (req, res) => {
+    const deviceId = req.deviceId;
+    const RISK_FREE_RATE = 3.5; // 한국 기준금리 근사 (연 %).
+    try {
+        const { rows: holdings } = await query(
+            'SELECT code, weight FROM holding_stocks WHERE device_id = $1',
+            [deviceId]
+        );
+        if (holdings.length === 0) return res.json({ sharpe: null, stockCount: 0 });
+
+        const results = [];
+        for (const h of holdings) {
+            const { rows: hist } = await query(
+                'SELECT price FROM stock_history WHERE code = $1 ORDER BY date DESC LIMIT 21',
+                [h.code]
+            );
+            if (hist.length < 5) continue;
+
+            const prices = hist.map(r => Number(r.price)).reverse();
+            const returns = prices.slice(1).map((p, i) => (p - prices[i]) / prices[i] * 100);
+            const avg = returns.reduce((a, b) => a + b, 0) / returns.length;
+            const variance = returns.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / returns.length;
+            const stdDev = Math.sqrt(variance);
+
+            const annualReturn = avg * 252;
+            const annualStd = stdDev * Math.sqrt(252);
+            const sharpe = annualStd > 0 ? (annualReturn - RISK_FREE_RATE) / annualStd : 0;
+
+            results.push({ code: h.code, sharpe, weight: h.weight !== null ? Number(h.weight) : 10 });
+        }
+
+        if (results.length === 0) return res.json({ sharpe: null, stockCount: 0 });
+
+        const totalWeight = results.reduce((a, b) => a + b.weight, 0) || 1;
+        const weighted = results.reduce((a, b) => a + b.sharpe * b.weight / totalWeight, 0);
+        const sharpe = Math.round(weighted * 100) / 100;
+
+        res.json({ sharpe, stockCount: results.length });
+    } catch (error) {
+        console.error('Sharpe Error:', error.message);
+        res.json({ sharpe: null, stockCount: 0 });
+    }
+});
+
 // GET /api/holdings/history - daily aggregated portfolio value
 router.get('/history', async (req, res) => {
     const deviceId = req.deviceId;

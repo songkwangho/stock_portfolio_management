@@ -432,7 +432,7 @@ function StockDetailContent({ code }: { code: string }) {
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
                 <div className="flex items-center justify-between mb-1">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PER (주가수익비율)</h4>
@@ -528,6 +528,41 @@ function StockDetailContent({ code }: { code: string }) {
                     : '증권사 애널리스트 평균 예상가'}
                 </p>
               </div>
+              {/* 3.8차 PEG 카드 — EPS 성장률로 보정한 PER */}
+              {(() => {
+                const epsCur = stockDetail?.eps_current;
+                const epsPrev = stockDetail?.eps_previous;
+                const per = stockDetail?.per;
+                const growth = (epsCur != null && epsPrev != null && epsPrev !== 0)
+                  ? ((epsCur - epsPrev) / Math.abs(epsPrev) * 100)
+                  : null;
+                const peg = (growth !== null && growth > 0 && per != null && per > 0)
+                  ? +(per / growth).toFixed(2)
+                  : null;
+                return (
+                  <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PEG (성장 보정)</h4>
+                      <button onClick={() => setHelpTerm('peg')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="PEG 도움말">[?]</button>
+                    </div>
+                    <p className="text-xl font-bold text-white">{peg !== null ? `${peg}배` : '---'}</p>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      {peg === null
+                        ? 'EPS 성장률 데이터 부족 또는 마이너스 성장'
+                        : peg < 1
+                        ? '성장 대비 저평가예요 (PEG < 1)'
+                        : peg < 2
+                        ? '적정 수준이에요 (PEG 1~2)'
+                        : '성장 대비 고평가예요 (PEG > 2)'}
+                    </p>
+                    {growth !== null && (
+                      <p className="text-[11px] text-slate-600 mt-1">
+                        EPS 성장률: {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 초보자 친화적 보조지표 패널 */}

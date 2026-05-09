@@ -267,6 +267,70 @@ router.get('/screener', async (req, res) => {
             })));
         }
 
+        if (preset === 'graham') {
+            // Graham Number = √(22.5 × EPS × BPS), BPS = price / pbr 역산.
+            // 적자 기업·PBR 0/null 종목은 WHERE 절에서 제외.
+            // 적정가 > 현재가일 때만 결과에 포함, 상승 여력 큰 순으로 정렬.
+            const { rows } = await query(`
+                WITH calc AS (
+                    SELECT s.*,
+                           a.opinion AS market_opinion,
+                           SQRT(22.5 * s.eps_current * (s.price / s.pbr)) AS graham_raw
+                    FROM stocks s
+                    LEFT JOIN stock_analysis a ON s.code = a.code
+                    WHERE s.eps_current IS NOT NULL AND s.eps_current > 0
+                      AND s.pbr IS NOT NULL AND s.pbr > 0
+                      AND s.price IS NOT NULL AND s.price > 0
+                )
+                SELECT *,
+                       ROUND(graham_raw::numeric, 0)                                            AS graham_number,
+                       ROUND(((graham_raw - price) / price * 100)::numeric, 1)                  AS graham_upside
+                FROM calc
+                WHERE graham_raw > price
+                ORDER BY graham_upside DESC
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                graham_number: r.graham_number !== null ? Number(r.graham_number) : null,
+                graham_upside: r.graham_upside !== null ? Number(r.graham_upside) : null,
+            })));
+        }
+
+        if (preset === 'momentum_3m') {
+            // 3개월 전 종가 대비 현재가 상승률 상위.
+            // LATERAL JOIN으로 종목별 90일 전 가장 가까운 일봉을 1개 가져옴.
+            const { rows } = await query(`
+                SELECT s.*, a.opinion AS market_opinion,
+                       h3m.price_3m,
+                       ROUND(((s.price - h3m.price_3m) / NULLIF(h3m.price_3m, 0) * 100)::numeric, 1) AS momentum_3m
+                FROM stocks s
+                LEFT JOIN stock_analysis a ON s.code = a.code
+                JOIN LATERAL (
+                    SELECT price AS price_3m
+                    FROM stock_history
+                    WHERE code = s.code
+                      AND date <= TO_CHAR(NOW() - INTERVAL '90 days', 'YYYYMMDD')
+                    ORDER BY date DESC
+                    LIMIT 1
+                ) h3m ON true
+                WHERE s.price > h3m.price_3m
+                ORDER BY momentum_3m DESC
+                LIMIT 20
+            `);
+            return res.json(rows.map(r => ({
+                ...r,
+                per: r.per !== null ? Number(r.per) : null,
+                pbr: r.pbr !== null ? Number(r.pbr) : null,
+                roe: r.roe !== null ? Number(r.roe) : null,
+                price_3m: r.price_3m !== null ? Number(r.price_3m) : null,
+                momentum_3m: r.momentum_3m !== null ? Number(r.momentum_3m) : null,
+            })));
+        }
+
         if (preset === 'neglected') {
             // 30일 평균 거래량 대비 최근 5일 평균 거래량이 30% 이하인 종목.
             // FILTER 절로 같은 from-to에 대해 두 집계를 한 번에 계산.
