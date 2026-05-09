@@ -15,6 +15,7 @@ import { stockApi } from '@/lib/stockApi';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
+import { useAlertStore } from '@/stores/useAlertStore';
 import type { StockSummary } from '@/types/stock';
 
 // 한국식 금액 단위 포매터 — Y축/툴팁 공용 (16차 5-2).
@@ -44,6 +45,8 @@ export default function DashboardPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const marketIndices = useMarketStore(s => s.indices);
   const fetchMarketIndices = useMarketStore(s => s.fetchIndices);
+  const unreadCount = useAlertStore(s => s.unreadCount);
+  const fetchUnreadCount = useAlertStore(s => s.fetchUnreadCount);
 
   // 3.8차 — 시장 온도 (Fear & Greed) + 포트폴리오 샤프 지수
   const [fearGreed, setFearGreed] = useState<{ score: number; label: string } | null>(null);
@@ -59,9 +62,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchHoldings();
     fetchMarketIndices();
+    fetchUnreadCount();
     // Fear & Greed는 보유 여부 무관하게 호출. 실패해도 silent.
     stockApi.getFearGreed().then(d => setFearGreed({ score: d.score, label: d.label })).catch(() => {});
-  }, [fetchHoldings, fetchMarketIndices]);
+  }, [fetchHoldings, fetchMarketIndices, fetchUnreadCount]);
 
   // 보유 종목 변동 시 샤프 재계산. 보유 0개일 땐 호출 자체 skip.
   useEffect(() => {
@@ -173,6 +177,79 @@ export default function DashboardPage() {
           </p>
         );
       })()}
+      {/* 3.9차 — 오늘 확인할 것: 매도/관망 종목 + 미읽 알림 */}
+      {(() => {
+        const cautionHoldings = holdings.filter(
+          h => h.holding_opinion === '매도' || h.holding_opinion === '관망'
+        );
+        if (cautionHoldings.length === 0 && unreadCount === 0 && holdings.length > 0) {
+          return (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center space-x-3">
+              <span className="text-2xl">✅</span>
+              <div>
+                <p className="text-sm font-bold text-emerald-400">보유 종목 모두 양호해요</p>
+                <p className="text-xs text-slate-500 mt-0.5">특별히 확인이 필요한 종목이 없어요. 계속 지켜보세요.</p>
+              </div>
+            </div>
+          );
+        }
+        if (cautionHoldings.length === 0 && unreadCount === 0) return null;
+        return (
+          <div className="bg-slate-900/50 border border-amber-500/20 rounded-2xl p-5">
+            <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3">
+              📋 오늘 확인할 것
+            </p>
+            <div className="space-y-2">
+              {cautionHoldings.map(h => (
+                <button
+                  key={h.code}
+                  onClick={() => router.push(`/stock/${h.code}?from=holding`)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-950/50 hover:bg-slate-800/50 rounded-xl border border-slate-800 transition-all text-left min-h-[44px]"
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 shrink-0">
+                      {h.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{h.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {h.holding_opinion === '매도' ? '하락 추세 — 분석 확인 필요' : '단기 흐름 약화 — 관망 구간'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-lg shrink-0 ml-2 ${
+                    h.holding_opinion === '매도'
+                      ? 'bg-red-500/10 text-red-400'
+                      : 'bg-yellow-500/10 text-yellow-400'
+                  }`}>
+                    {h.holding_opinion === '매도' ? '주의 필요' : '관망'}
+                  </span>
+                </button>
+              ))}
+              {unreadCount > 0 && (
+                <button
+                  onClick={() => router.push('/alerts')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-950/50 hover:bg-slate-800/50 rounded-xl border border-slate-800 transition-all text-left min-h-[44px]"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-sm">
+                      🔔
+                    </div>
+                    <p className="text-sm font-bold text-white">
+                      읽지 않은 알림 {unreadCount}개
+                    </p>
+                  </div>
+                  <span className="text-xs text-blue-400 font-bold shrink-0 ml-2">확인 →</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-600 mt-3 leading-relaxed">
+              ※ 위 정보는 알고리즘 분석이에요. 실제 투자 결정은 본인이 직접 해주세요.
+            </p>
+          </div>
+        );
+      })()}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <StatCard
           title="총 자산"
