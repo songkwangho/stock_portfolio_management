@@ -149,7 +149,9 @@ function StockDetailContent({ code }: { code: string }) {
     from === 'recommendation' ? '추천 종목' :
     from === 'watchlist' ? '관심 종목' :
     from === 'major' ? '주요 종목' :
-    from === 'alerts' ? '알림 종목' : '';
+    from === 'alerts' ? '알림 종목' :
+    from === 'theme' ? '테마 종목' :
+    from === 'search' ? '검색 결과' : '';
 
   const stock: StockSummary = holdingMatch
     ? { code, name: holdingMatch.name, category: '보유 종목', avgPrice: holdingMatch.avgPrice, quantity: holdingMatch.quantity, currentPrice: holdingMatch.currentPrice, value: holdingMatch.value, market_opinion: holdingMatch.market_opinion }
