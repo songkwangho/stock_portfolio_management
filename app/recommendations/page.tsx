@@ -71,6 +71,17 @@ export default function RecommendationsPage() {
         </button>
       </div>
 
+      {/* 3.9차 — 이 종목들이 왜 추천됐는지 결론형 안내 */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
+        <p className="text-sm font-bold text-white mb-1">📌 이 종목들은 왜 추천됐나요?</p>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          지표상 저평가됐거나 상승 신호가 나타난 종목이에요.
+          <span className="text-blue-400"> 관심 있는 종목을 클릭해서 상세 분석을 확인해보세요.</span>
+          <br />
+          마음에 드는 종목은 ♡로 관심 종목에 추가하거나 포트폴리오에 등록할 수 있어요.
+        </p>
+      </div>
+
       {/* 3.7차 — 테마 탐색 진입 배너 */}
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">

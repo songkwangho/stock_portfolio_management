@@ -2,8 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Heart } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import { getThemeMeta } from '@/lib/themesMeta';
+import { useWatchlistStore } from '@/stores/useWatchlistStore';
+import { useToastStore } from '@/stores/useToastStore';
 import type { Theme, ThemeStock } from '@/types/stock';
 
 export default function ThemesPage() {
@@ -28,6 +31,33 @@ function ThemesContent() {
   const [loading, setLoading] = useState(true);
   const [stocksLoading, setStocksLoading] = useState(false);
   const activeTheme = themes.find(t => t.theme_id === activeThemeId);
+
+  // 3.9차 — 원스텝 관심 추가
+  const addToWatchlist = useWatchlistStore(s => s.addToWatchlist);
+  const watchItems = useWatchlistStore(s => s.items);
+  const fetchWatchlist = useWatchlistStore(s => s.fetchWatchlist);
+  const addToast = useToastStore(s => s.addToast);
+  const watchedCodes = new Set(watchItems.map(w => w.code));
+
+  useEffect(() => { fetchWatchlist(); }, [fetchWatchlist]);
+
+  const onAddWatch = async (e: React.MouseEvent, stock: ThemeStock) => {
+    e.stopPropagation();
+    if (watchedCodes.has(stock.code)) {
+      addToast(`${stock.name}은(는) 이미 관심 종목에 있어요.`, 'info');
+      return;
+    }
+    try {
+      await addToWatchlist(stock.code);
+      addToast(
+        `${stock.name}을(를) 관심 종목에 추가했어요 ♡`,
+        'success',
+        { label: '알림 설정 →', onClick: () => router.push('/alerts') },
+      );
+    } catch {
+      addToast('관심 종목 추가에 실패했어요.', 'error');
+    }
+  };
 
   useEffect(() => {
     stockApi.getThemes()
@@ -120,35 +150,54 @@ function ThemesContent() {
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {themeStocks.map(stock => (
-                <button
-                  key={stock.code}
-                  onClick={() => router.push(`/stock/${stock.code}?from=theme`)}
-                  className="flex items-center justify-between p-4 bg-slate-950/50 hover:bg-slate-800/50 border border-slate-800 rounded-2xl transition-all text-left min-h-[44px]"
-                >
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-blue-400 text-sm shrink-0">
-                      {stock.name.charAt(0)}
+              {themeStocks.map(stock => {
+                const inWatch = watchedCodes.has(stock.code);
+                return (
+                  <div
+                    key={stock.code}
+                    onClick={() => router.push(`/stock/${stock.code}?from=theme`)}
+                    className="flex items-center justify-between p-4 bg-slate-950/50 hover:bg-slate-800/50 border border-slate-800 rounded-2xl transition-all min-h-[44px] cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/stock/${stock.code}?from=theme`); }}
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-blue-400 text-sm shrink-0">
+                        {stock.name.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{stock.name}</p>
+                        <p className="text-xs text-slate-500 font-mono">{stock.code} · {stock.category}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{stock.name}</p>
-                      <p className="text-xs text-slate-500 font-mono">{stock.code} · {stock.category}</p>
+                    <div className="flex items-center space-x-2 shrink-0 ml-2">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-white">
+                          {stock.price ? `₩${stock.price.toLocaleString()}` : '---'}
+                        </p>
+                        {stock.market_opinion && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            stock.market_opinion === '긍정적' ? 'bg-emerald-500/10 text-emerald-400' :
+                            stock.market_opinion === '부정적' ? 'bg-red-500/10 text-red-400' :
+                            'bg-slate-500/10 text-slate-400'
+                          }`}>{stock.market_opinion}</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => onAddWatch(e, stock)}
+                        className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                          inWatch
+                            ? 'text-pink-400 bg-pink-500/10'
+                            : 'text-slate-500 hover:text-pink-400 hover:bg-slate-800'
+                        }`}
+                        aria-label={inWatch ? '관심 종목에 있음' : '관심 종목 추가'}
+                      >
+                        <Heart size={16} fill={inWatch ? 'currentColor' : 'none'} />
+                      </button>
                     </div>
                   </div>
-                  <div className="text-right shrink-0 ml-2">
-                    <p className="text-sm font-bold text-white">
-                      {stock.price ? `₩${stock.price.toLocaleString()}` : '---'}
-                    </p>
-                    {stock.market_opinion && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        stock.market_opinion === '긍정적' ? 'bg-emerald-500/10 text-emerald-400' :
-                        stock.market_opinion === '부정적' ? 'bg-red-500/10 text-red-400' :
-                        'bg-slate-500/10 text-slate-400'
-                      }`}>{stock.market_opinion}</span>
-                    )}
-                  </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

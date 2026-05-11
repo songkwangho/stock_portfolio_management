@@ -18,6 +18,28 @@ const CATEGORY_ORDER = [
   '조선/기계/방산',
 ];
 
+// 3.9차 — 학습 모드 기초 가이드
+const LEARN_TIPS = [
+  {
+    title: '종목을 어떻게 고르나요?',
+    desc: '처음에는 자신이 알고 있는 회사부터 시작해보세요. 삼성전자, 현대차, NAVER처럼 평소에 듣던 이름의 회사를 검색해보세요.',
+    action: '삼성전자 보러가기 →',
+    href: '/stock/005930?from=major',
+  },
+  {
+    title: 'PER이 뭔가요?',
+    desc: '주가가 1년 이익의 몇 배인지 보여줘요. 15배면 "이 회사 이익의 15년치 가격"이라는 뜻이에요. 낮을수록 저렴할 수 있지만, 같은 업종끼리 비교해야 해요.',
+    action: '저평가 종목 보기 →',
+    href: '/screener',
+  },
+  {
+    title: '어떤 종목이 좋은 건가요?',
+    desc: '정답은 없어요. 실적이 좋고(ROE 높음), 적정 가격이고(PER 중간), 상승 추세이면(이평선 정배열) 좋은 신호들이에요.',
+    action: '추천 종목 보기 →',
+    href: '/recommendations',
+  },
+];
+
 export default function MajorStocksPage() {
   const router = useRouter();
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -25,6 +47,17 @@ export default function MajorStocksPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Stock | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // 3.9차 — 온보딩에서 '주식 기초부터 이해하기'를 선택한 경우 학습 배너 표시
+  const [isLearnMode, setIsLearnMode] = useState(false);
+  const [learnStep, setLearnStep] = useState(0);
+  useEffect(() => {
+    setIsLearnMode(typeof window !== 'undefined' && localStorage.getItem('onboarding_mode') === 'learn');
+  }, []);
+  const closeLearnMode = () => {
+    localStorage.removeItem('onboarding_mode');
+    setIsLearnMode(false);
+  };
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=major`);
@@ -84,6 +117,48 @@ export default function MajorStocksPage() {
         <p className="text-slate-500 text-sm">업종별 주요 종목의 실시간 시세와 추세를 한눈에 확인하세요.</p>
         <p className="text-slate-600 text-xs mt-2">※ ▲/▼ 등락률은 <span className="text-slate-400 font-bold">전일 종가 대비</span> 변동분이에요.</p>
       </div>
+
+      {/* 3.9차 — 학습 모드 기초 가이드 배너 */}
+      {isLearnMode && (
+        <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-blue-300">
+              📚 주식 기초 가이드 ({learnStep + 1}/{LEARN_TIPS.length})
+            </p>
+            <button
+              onClick={closeLearnMode}
+              className="text-xs text-slate-500 hover:text-white min-h-[44px] px-3"
+            >
+              닫기
+            </button>
+          </div>
+          <h3 className="text-base font-bold text-white mb-2">{LEARN_TIPS[learnStep].title}</h3>
+          <p className="text-sm text-slate-300 leading-relaxed mb-4">{LEARN_TIPS[learnStep].desc}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => router.push(LEARN_TIPS[learnStep].href)}
+              className="flex-1 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl"
+            >
+              {LEARN_TIPS[learnStep].action}
+            </button>
+            {learnStep < LEARN_TIPS.length - 1 ? (
+              <button
+                onClick={() => setLearnStep(s => s + 1)}
+                className="py-3 px-4 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl"
+              >
+                다음 팁 →
+              </button>
+            ) : (
+              <button
+                onClick={closeLearnMode}
+                className="py-3 px-4 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl"
+              >
+                완료
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <ErrorBanner error={error} kind="server" onRetry={fetchStocks} />
 

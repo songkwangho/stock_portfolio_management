@@ -7,8 +7,9 @@ interface HelpContent {
   title: string;
   short: string;
   body: string[];
-  inApp: string;   // "이 앱에서는?" — 이 앱의 어느 부분에서 이 개념이 쓰이는지
-  example?: string; // 예시 숫자
+  inApp: string;        // "이 앱에서는?" — 이 앱의 어느 부분에서 이 개념이 쓰이는지
+  example?: string;     // 예시 숫자
+  implication?: string; // 3.9차 — "그래서 어떻게 보면 되나요?" 한 줄 해석 (선택)
 }
 
 // 작성 기준 (8차 보완): ① 한 문장 정의 ② 높으면/낮으면 ③ 이 앱에서의 활용 ④ 예시 숫자
@@ -23,6 +24,7 @@ const HELP_CONTENTS: Record<HelpTermKey, HelpContent> = {
     ],
     inApp: '이 앱에서는 같은 업종 회사들의 PER 중앙값과 비교해서 "저렴한 편"인지 "비싼 편"인지 알려드려요. 종합점수의 밸류에이션 항목에 반영돼요.',
     example: '예: PER 10배 = 지금 주가로 10년치 이익을 산 셈',
+    implication: '같은 업종 평균보다 낮으면 상대적으로 저렴할 수 있어요. 업종마다 정상 범위가 달라서 단일 숫자만으로 판단하지 마세요.',
   },
   pbr: {
     title: 'PBR (주가순자산비율)이란?',
@@ -33,6 +35,7 @@ const HELP_CONTENTS: Record<HelpTermKey, HelpContent> = {
     ],
     inApp: '이 앱에서는 업종 중앙값 PBR과 비교해서 자산 대비 저평가 여부를 판단해요. 밸류에이션 점수에 반영돼요.',
     example: '예: PBR 0.8배 = 회사 자산보다 20% 싸게 거래',
+    implication: '1 미만이면 자산 대비 저평가일 수 있어요. 단, 사업이 부진해서 싼 경우도 있으니 ROE와 함께 확인해 보세요.',
   },
   roe: {
     title: 'ROE (자기자본이익률)이란?',
@@ -43,6 +46,7 @@ const HELP_CONTENTS: Record<HelpTermKey, HelpContent> = {
     ],
     inApp: '이 앱에서는 ROE 15% 이상을 우량 기업 기준으로 표시해요. 스크리너의 "고수익 성장주" 프리셋도 ROE ≥ 20% 조건을 사용해요.',
     example: '예: ROE 15% = 자기자본 100원으로 15원을 번 셈',
+    implication: '10% 이상이면 양호, 15% 이상이면 우량이에요. 일시적 호황이 섞일 수 있어 최근 몇 분기 ROE 추이를 함께 봐주세요.',
   },
   peg: {
     title: 'PEG (성장 보정 PER)이란?',
@@ -56,6 +60,7 @@ const HELP_CONTENTS: Record<HelpTermKey, HelpContent> = {
     ],
     inApp: '이 앱에서는 종목 상세의 PEG 카드에서 EPS 성장률로 보정한 PER을 함께 보여줘요. 성장주는 PER이 높아 보여도 PEG는 낮을 수 있어요.',
     example: '예: PER 30, EPS 성장률 +40% → PEG = 0.75 (저평가)',
+    implication: '성장 기업을 평가할 때 PER보다 유용해요. 성장률이 마이너스거나 0이면 의미 없으니 \'---\'로 표기돼요.',
   },
   rsi: {
     title: 'RSI (상대강도지수)란?',
@@ -146,6 +151,12 @@ const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
           <p className="text-xs font-bold text-blue-400">이 앱에서는?</p>
           <p className="text-sm text-blue-200/90 leading-relaxed">{content.inApp}</p>
         </div>
+        {content.implication && (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 space-y-1.5">
+            <p className="text-xs font-bold text-slate-300">그래서 어떻게 보면 되나요?</p>
+            <p className="text-sm text-slate-400 leading-relaxed">{content.implication}</p>
+          </div>
+        )}
         {content.example && (
           <p className="text-xs text-slate-600 italic">{content.example}</p>
         )}

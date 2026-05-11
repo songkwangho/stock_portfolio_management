@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Step = 'hidden' | 'disclaimer' | 'purpose' | 'done';
+// 3.9차 — Step 0(앱 가치 제안) → Step 1(면책) → Step 2(3갈래 온보딩)
+type Step = 'hidden' | 'intro' | 'disclaimer' | 'purpose' | 'done';
 
 export default function DisclaimerModal() {
   const router = useRouter();
@@ -12,8 +13,8 @@ export default function DisclaimerModal() {
   useEffect(() => {
     const disclaimerDone = !!localStorage.getItem('disclaimer_accepted');
     const onboardingDone = !!localStorage.getItem('onboarding_done');
-    if (!disclaimerDone) setStep('disclaimer');
-    else if (!onboardingDone) setStep('purpose');
+    if (!disclaimerDone) setStep('intro');           // 신규 사용자: 앱 소개부터
+    else if (!onboardingDone) setStep('purpose');    // 면책만 본 기존 사용자: 온보딩으로
     else setStep('done');
   }, []);
 
@@ -22,14 +23,55 @@ export default function DisclaimerModal() {
     setStep('purpose');
   };
 
-  const finishOnboarding = (target?: string) => {
+  const finishOnboarding = (target?: string, mode?: 'learn') => {
     localStorage.setItem('onboarding_done', '1');
+    if (mode) localStorage.setItem('onboarding_mode', mode);
+    else localStorage.removeItem('onboarding_mode');
     setStep('done');
     if (target) router.push(target);
   };
 
   if (step === 'hidden' || step === 'done') return null;
 
+  // ============ Step 0: 앱 가치 제안 ============
+  if (step === 'intro') {
+    const features = [
+      { emoji: '🔍', title: '137개 종목 분석', desc: '실적·기술지표·수급을 종합해서 알기 쉽게 정리해드려요' },
+      { emoji: '📋', title: '내 종목 상태 확인', desc: '보유 중인 종목이 지금 어떤 상태인지 바로 확인할 수 있어요' },
+      { emoji: '🎯', title: '테마별 탐색', desc: '2차전지, AI·반도체, 방산 등 관심 테마의 종목을 모아볼 수 있어요' },
+      { emoji: '🔔', title: '가격 변화 알림', desc: '주요 변화가 생기면 알림으로 알려드려요' },
+    ];
+    return (
+      <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
+          <div className="text-center">
+            <div className="text-5xl mb-4">📊</div>
+            <h2 className="text-xl font-black text-white mb-3">한국 주식, 쉽게 분석해드려요</h2>
+            <div className="space-y-3 text-left mb-6">
+              {features.map(item => (
+                <div key={item.title} className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
+                  <span className="text-xl shrink-0">{item.emoji}</span>
+                  <div>
+                    <p className="text-sm font-bold text-white">{item.title}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setStep('disclaimer')}
+              className="w-full py-4 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl text-sm transition-colors"
+            >
+              시작해볼게요 →
+            </button>
+            <p className="text-xs text-slate-600 mt-3">로그인 없이 바로 사용할 수 있어요</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============ Step 1: 면책 ============
   if (step === 'disclaimer') {
     return (
       <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
@@ -49,7 +91,28 @@ export default function DisclaimerModal() {
     );
   }
 
-  // purpose 단계: 어떻게 사용하실 건가요? 3갈래
+  // ============ Step 2: 3갈래 온보딩 ============
+  const options = [
+    {
+      emoji: '💼',
+      label: '지금 갖고 있는 주식\n관리하기',
+      sub: '수익률·보유 상태를 한눈에 확인해요',
+      onClick: () => finishOnboarding('/portfolio?focus=add-holding'),
+    },
+    {
+      emoji: '🔍',
+      label: '어떤 종목 살지\n알아보기',
+      sub: '추천·테마·스크리너로 종목을 탐색해요',
+      onClick: () => finishOnboarding('/recommendations'),
+    },
+    {
+      emoji: '📚',
+      label: '주식 기초부터\n이해하기',
+      sub: 'PER·PBR·이평선이 뭔지 알아가요',
+      onClick: () => finishOnboarding('/stocks', 'learn'),
+    },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full space-y-4">
@@ -57,31 +120,23 @@ export default function DisclaimerModal() {
         <h2 className="text-lg font-bold text-white">어떻게 사용하실 건가요?</h2>
         <p className="text-sm text-slate-400 leading-relaxed">가장 가까운 상황을 골라주세요. 나중에 다른 기능도 전부 쓰실 수 있어요.</p>
 
-        <button
-          onClick={() => finishOnboarding('/portfolio?focus=add-holding')}
-          className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500 active:border-blue-500 text-left transition-colors"
-        >
-          <p className="text-sm font-bold text-white mb-1">📊 이미 산 주식을 관리하고 싶어요</p>
-          <p className="text-xs text-slate-400 leading-relaxed">보유 종목을 등록하면 수익률 추적과 매매 의견을 받을 수 있어요.</p>
-        </button>
+        {options.map(opt => (
+          <button
+            key={opt.label}
+            onClick={opt.onClick}
+            className="w-full p-4 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-blue-500 rounded-2xl text-left transition-all min-h-[44px]"
+          >
+            <div className="flex items-center space-x-3">
+              <span className="text-2xl shrink-0">{opt.emoji}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white whitespace-pre-line leading-tight">{opt.label}</p>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{opt.sub}</p>
+              </div>
+            </div>
+          </button>
+        ))}
 
-        <button
-          onClick={() => finishOnboarding('/recommendations')}
-          className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500 active:border-blue-500 text-left transition-colors"
-        >
-          <p className="text-sm font-bold text-white mb-1">🔍 어떤 주식을 사면 좋을지 알고 싶어요</p>
-          <p className="text-xs text-slate-400 leading-relaxed">알고리즘 점수 기반 추천 종목을 먼저 살펴봐요.</p>
-        </button>
-
-        <button
-          onClick={() => finishOnboarding()}
-          className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500 active:border-blue-500 text-left transition-colors"
-        >
-          <p className="text-sm font-bold text-white mb-1">📚 주식 기본부터 배우고 싶어요</p>
-          <p className="text-xs text-slate-400 leading-relaxed">대시보드에서 차근차근 기능을 둘러봐요.</p>
-        </button>
-
-        <button onClick={() => finishOnboarding()} className="w-full text-xs text-slate-500 hover:text-slate-300 py-2">
+        <button onClick={() => finishOnboarding()} className="w-full text-xs text-slate-500 hover:text-slate-300 py-2 min-h-[44px]">
           건너뛰고 대시보드로
         </button>
       </div>

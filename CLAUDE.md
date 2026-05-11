@@ -389,6 +389,26 @@ PC (md: 이상):
 
 ---
 
+**3.9차 — 의사결정 중심 UX 완성 (2026-05-11)**
+
+탐색→분석→결정→학습 전체 흐름 완성. 결론·다음 행동·맥락형 학습을 모든 핵심 페이지에 배치.
+
+**1묶음 (A~C) — 결론·행동 최상단 배치**
+- [x] **[UX-A]** 종목 상세 결론 카드 (`generateStockSummary` / `generateActionGuide` 순수 함수). 헤더 직하·차트 위 배치. market_opinion·holding_opinion에 따라 emerald/red/slate 톤. 한 줄 요약 → 의견 뱃지 → 3단계 행동 가이드 → 면책
+- [x] **[UX-B]** 포트폴리오 매도/관망 종목 카드에 인라인 행동 가이드 스텝. 첫 스텝은 종목 상세 진입 버튼으로 연결
+- [x] **[UX-C]** 대시보드 "오늘 확인할 것" 카드 — 매도/관망 보유 종목 + 미읽 알림 집계. 0건+보유있음 시 "✅ 모두 양호" emerald 카드
+
+**2묶음 (D~G) — 탐색·온보딩·학습 흐름 완성**
+- [x] **[UX-D]** `RecommendedStockCard` 결론형 재작성 — `왜 지금?`(blue) / `가격 차이`(emerald) 라벨드 섹션. `상세 분석 보기` + `관심 ♡` 버튼 2개. `useWatchlistStore.addToWatchlist` + `useToastStore` 연결. 관심 추가 토스트에 `알림 설정 →` 액션 포함
+- [x] **[UX-D2]** `/recommendations` 상단 "📌 이 종목들은 왜 추천됐나요?" 안내 배너 추가
+- [x] **[UX-E]** `DisclaimerModal` Step 0(앱 가치 제안) 신설 — 137종목 분석 / 내 종목 상태 / 테마 탐색 / 가격 변화 알림 4가지 카드. `disclaimer_accepted` 없을 때만 Step 0부터 시작. 기존 사용자는 Step 1/2 그대로
+- [x] **[UX-E2]** 온보딩 3갈래 레이블 명확화 + 부제 추가. `주식 기초부터 이해하기` 선택 시 `/stocks` 이동 + `localStorage.onboarding_mode = 'learn'` 플래그
+- [x] **[UX-F]** `/themes` 종목 카드 우측 ♡ 버튼 — `e.stopPropagation()`으로 카드 클릭과 분리, `inWatch` 상태에 따라 색/채움 변화. 추가 토스트에 알림 설정 액션 포함. `<button>` 중첩 회피 위해 외곽을 `<div role="button">`로 변경
+- [x] **[UX-G1]** `/stocks` 학습 모드 배너 — `onboarding_mode === 'learn'`일 때 3단계 기초 가이드(LEARN_TIPS). "다음 팁 →" / "완료" 버튼으로 순환, 닫기 시 플래그 제거
+- [x] **[UX-G2]** `HelpBottomSheet` 각 용어에 `implication`(선택 필드) 추가 — "그래서 어떻게 보면 되나요?" 슬레이트 박스. PER/PBR/ROE/PEG 4종에 시사점 1줄 작성. 기존 `body`/`inApp`/`example` 구조 보존
+
+---
+
 **3.7차 — 초보자 UX + 백엔드 위생 (Sprint 1.7, 2026-04-19)**
 
 디렉토리 이식과 함께 묶어 처리한 동반 개선. 3.6차와 독립이지만 같은 배포 주기에 묶는다.
