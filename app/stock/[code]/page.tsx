@@ -515,6 +515,19 @@ function StockDetailContent({ code }: { code: string }) {
           </div>
         )}
 
+        {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
+            PC는 우측 사이드바에 폼이 즉시 보이므로 lg 이상에서 숨김. */}
+        {!isHolding && stockDetail?.market_opinion === '긍정적' && (
+          <div className="lg:hidden mb-4">
+            <button
+              onClick={() => document.getElementById('portfolio-add-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="w-full py-3 min-h-[44px] bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 text-sm font-bold rounded-2xl transition-colors"
+            >
+              + 포트폴리오에 추가하기 ↓
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
 
@@ -1174,7 +1187,7 @@ function StockDetailContent({ code }: { code: string }) {
               )}
 
               {!isHolding && (
-                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-6 mb-6">
+                <div id="portfolio-add-form" className="bg-slate-950/50 border border-slate-800 rounded-2xl p-6 mb-6 scroll-mt-20">
                   <h4 className="text-sm font-bold mb-4 flex items-center space-x-2">
                     <Plus size={16} className="text-blue-400" />
                     <span>내 포트폴리오에 추가</span>

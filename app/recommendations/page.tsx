@@ -82,17 +82,17 @@ export default function RecommendationsPage() {
         </p>
       </div>
 
-      {/* 3.7차 — 테마 탐색 진입 배너 */}
-      <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
+      {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구) */}
+      <div className="bg-blue-500/5 border border-blue-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 mr-3">
           <p className="text-sm font-bold text-blue-300">🎯 테마로 종목 찾기</p>
           <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-            2차전지, AI·반도체, 방산 등 관심 테마의 종목을 모아서 볼 수 있어요.
+            2차전지·AI·방산 등 관심 테마 종목 모아보기
           </p>
         </div>
         <button
           onClick={() => router.push('/themes')}
-          className="px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors whitespace-nowrap shrink-0"
+          className="shrink-0 px-4 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
         >
           테마 보기 →
         </button>

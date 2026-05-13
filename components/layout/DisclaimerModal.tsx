@@ -43,28 +43,34 @@ export default function DisclaimerModal() {
     ];
     return (
       <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
-          <div className="text-center">
-            <div className="text-5xl mb-4">📊</div>
-            <h2 className="text-xl font-black text-white mb-3">한국 주식, 쉽게 분석해드려요</h2>
-            <div className="space-y-3 text-left mb-6">
-              {features.map(item => (
-                <div key={item.title} className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
-                  <span className="text-xl shrink-0">{item.emoji}</span>
-                  <div>
-                    <p className="text-sm font-bold text-white">{item.title}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
+        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full flex flex-col max-h-[90vh]">
+          {/* 스크롤 영역 — 모바일 작은 화면에서도 4개 카드 전부 볼 수 있도록 */}
+          <div className="overflow-y-auto -mx-2 px-2">
+            <div className="text-center">
+              <div className="text-5xl mb-4">📊</div>
+              <h2 className="text-xl font-black text-white mb-3">한국 주식, 쉽게 분석해드려요</h2>
+              <div className="space-y-3 text-left mb-2">
+                {features.map(item => (
+                  <div key={item.title} className="flex items-start space-x-3 p-3 bg-slate-800/50 rounded-xl">
+                    <span className="text-xl shrink-0">{item.emoji}</span>
+                    <div>
+                      <p className="text-sm font-bold text-white">{item.title}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{item.desc}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          </div>
+          {/* 버튼 영역 — 스크롤 밖에 고정 */}
+          <div className="mt-4 pt-4 border-t border-slate-800 shrink-0">
             <button
               onClick={() => setStep('disclaimer')}
               className="w-full py-4 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl text-sm transition-colors"
             >
               시작해볼게요 →
             </button>
-            <p className="text-xs text-slate-600 mt-3">로그인 없이 바로 사용할 수 있어요</p>
+            <p className="text-xs text-slate-600 mt-3 text-center">로그인 없이 바로 사용할 수 있어요</p>
           </div>
         </div>
       </div>

@@ -139,27 +139,34 @@ export default function DashboardPage() {
           <p className="text-slate-400 text-sm mb-6 leading-relaxed text-center max-w-md mx-auto">
             목적에 맞게 골라주세요. 나중에 다른 기능도 전부 쓰실 수 있어요.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               onClick={() => router.push('/portfolio?focus=add-holding')}
-              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors min-h-[44px]"
             >
               <p className="text-sm font-bold text-white mb-1">📊 내 주식 관리</p>
               <p className="text-xs text-slate-400 leading-relaxed">보유 종목을 등록해 수익률·의견을 받아요.</p>
             </button>
             <button
               onClick={() => router.push('/recommendations')}
-              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors min-h-[44px]"
             >
               <p className="text-sm font-bold text-white mb-1">🔍 살 종목 찾기</p>
               <p className="text-xs text-slate-400 leading-relaxed">알고리즘 점수 기반 추천 종목을 살펴봐요.</p>
             </button>
             <button
+              onClick={() => router.push('/themes')}
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors min-h-[44px]"
+            >
+              <p className="text-sm font-bold text-white mb-1">🎯 테마별 종목 탐색</p>
+              <p className="text-xs text-slate-400 leading-relaxed">2차전지·AI·방산 등 관심 테마 모아보기.</p>
+            </button>
+            <button
               onClick={() => router.push('/stocks')}
-              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors"
+              className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-blue-500 text-left transition-colors min-h-[44px]"
             >
               <p className="text-sm font-bold text-white mb-1">📚 주식 공부</p>
-              <p className="text-xs text-slate-400 leading-relaxed">주요 97종목과 용어로 기본기를 익혀요.</p>
+              <p className="text-xs text-slate-400 leading-relaxed">주요 종목과 용어로 기본기를 익혀요.</p>
             </button>
           </div>
         </div>
@@ -304,7 +311,7 @@ export default function DashboardPage() {
               </div>
               <div className="relative h-3 bg-gradient-to-r from-blue-600 via-slate-500 to-red-500 rounded-full mb-2 overflow-hidden">
                 <div
-                  className="absolute top-0 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-slate-900 transition-all"
+                  className="absolute top-0 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-slate-900 transition-all duration-500"
                   style={{ left: `calc(${fearGreed.score}% - 6px)` }}
                 />
               </div>

@@ -362,7 +362,7 @@ function PortfolioContent() {
                                 <span className="text-slate-600 text-xs shrink-0 mt-0.5">1.</span>
                                 <button
                                   onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
-                                  className="text-xs text-blue-400 hover:underline text-left leading-relaxed"
+                                  className="text-xs text-blue-400 hover:underline text-left leading-relaxed min-h-[44px] flex items-center"
                                 >
                                   종목 상세에서 최근 이평선·거래량 변화 확인하기 →
                                 </button>
@@ -386,7 +386,7 @@ function PortfolioContent() {
                                 <span className="text-slate-600 text-xs shrink-0 mt-0.5">1.</span>
                                 <button
                                   onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
-                                  className="text-xs text-blue-400 hover:underline text-left leading-relaxed"
+                                  className="text-xs text-blue-400 hover:underline text-left leading-relaxed min-h-[44px] flex items-center"
                                 >
                                   20일 평균선(노란선)이 지지하는지 차트에서 확인해보세요 →
                                 </button>

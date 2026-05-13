@@ -192,7 +192,15 @@ export default function ScreenerPage() {
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div>
         <h2 className="text-2xl font-bold mb-2">종목 스크리너</h2>
-        <p className="text-slate-500 text-sm">원하는 조건에 맞는 종목을 쉽게 찾아보세요. 아래 추천 필터를 눌러보세요!</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-slate-500 text-sm">원하는 조건에 맞는 종목을 쉽게 찾아보세요. 아래 추천 필터를 눌러보세요!</p>
+          <button
+            onClick={() => router.push('/themes')}
+            className="shrink-0 text-xs text-blue-400 hover:text-blue-300 font-bold px-3 py-2 min-h-[44px] flex items-center whitespace-nowrap"
+          >
+            🎯 테마로 보기 →
+          </button>
+        </div>
       </div>
 
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 text-xs text-blue-300 leading-relaxed flex items-start space-x-2">

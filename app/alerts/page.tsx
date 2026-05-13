@@ -103,7 +103,7 @@ export default function AlertsPage() {
               )}
               <p className="text-xs text-slate-500 leading-relaxed pl-7">{alert.message}</p>
               {ALERT_GUIDES[alert.type] && (
-                <p className="text-[11px] text-slate-500 mt-2 pl-7 pr-2 leading-relaxed border-t border-slate-800/50 pt-2">
+                <p className="text-[11px] text-slate-500 mt-2 pl-7 pr-2 leading-relaxed border-t border-slate-800/50 pt-2 break-keep">
                   {ALERT_GUIDES[alert.type]}
                 </p>
               )}

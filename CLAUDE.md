@@ -407,6 +407,14 @@ PC (md: 이상):
 - [x] **[UX-G1]** `/stocks` 학습 모드 배너 — `onboarding_mode === 'learn'`일 때 3단계 기초 가이드(LEARN_TIPS). "다음 팁 →" / "완료" 버튼으로 순환, 닫기 시 플래그 제거
 - [x] **[UX-G2]** `HelpBottomSheet` 각 용어에 `implication`(선택 필드) 추가 — "그래서 어떻게 보면 되나요?" 슬레이트 박스. PER/PBR/ROE/PEG 4종에 시사점 1줄 작성. 기존 `body`/`inApp`/`example` 구조 보존
 
+**3묶음 (모바일 보완, 2026-05-13)**
+- [x] **[MOB-1]** `/themes` 진입 경로 강화 — 추천 페이지 배너 테두리 진하게 + 압축 문구, 대시보드 빈 상태 CTA 3→4 카드(테마별 종목 탐색 추가), 스크리너 페이지 상단에 "🎯 테마로 보기 →" 링크
+- [x] **[MOB-2]** 종목 상세 모바일 빠른 진입 — `#portfolio-add-form` id + `scroll-mt-20`, 결론 카드 직하에 lg:hidden "+ 포트폴리오에 추가하기 ↓" 버튼 (긍정적 미보유 종목 한정)
+- [x] **[MOB-3]** 포트폴리오 행동 가이드 버튼 — `min-h-[44px] flex items-center`로 터치 영역 보장
+- [x] **[MOB-4]** DisclaimerModal Step 0 — `max-h-[90vh] flex-col`로 모달 자체 높이 제한, 컨텐츠 영역 `overflow-y-auto`, 버튼 영역은 스크롤 밖에 고정 (작은 화면에서도 4개 기능 카드 + "시작해볼게요" 버튼 모두 접근 가능)
+- [x] **[MOB-5]** Fear & Greed 게이지 포인터 `transition-all duration-500` — 점수 변경 시 부드러운 이동
+- [x] **[MOB-6]** `/alerts` 가이드 텍스트 `break-keep` — 한국어 단어 단위 줄바꿈
+
 ---
 
 **3.7차 — 초보자 UX + 백엔드 위생 (Sprint 1.7, 2026-04-19)**
