@@ -43,16 +43,21 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS whitelist (dev + production origins).
-// `FRONTEND_URL`은 콤마 분리로 여러 origin 지정 가능.
-// `FRONTEND_URL_PATTERN`은 정규식(한 개). Vercel Preview URL처럼 hash가 바뀌는 도메인에 사용.
-//   예: `^https://stock-portfolio-management(-[a-z0-9]+)*-crossofjc-9688s-projects\.vercel\.app$`
+//
+// 허용 우선순위:
+// 1) FRONTEND_URL 환경변수 (콤마 분리, 운영자가 명시 지정한 production URL — 가장 신뢰)
+// 2) 하드코딩된 Vercel Preview 패턴 — 매 배포마다 hash가 바뀌므로 정규식으로 매칭
+// 3) FRONTEND_URL_PATTERN 환경변수 — 레포 이름·org가 바뀐 경우의 비상 override
+// 4) 로컬 dev 포트
+//
+// 모든 패턴은 `^...$` 앵커 + 호스트 제한으로 임의 path injection 방지.
 const ALLOWED_ORIGINS = [
-    'http://localhost:5173',  // Vite dev server
-    'http://localhost:4173',  // Vite preview
-    'http://localhost:3000',  // alternative dev
-    'capacitor://localhost',  // Capacitor iOS
-    'http://localhost',       // Capacitor Android
+    'http://localhost:3000',  // Next.js dev
     ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(s => s.trim()).filter(Boolean) : []),
+];
+const DEFAULT_ORIGIN_PATTERNS = [
+    // Vercel Preview: <repo>-<hash>-<scope>.vercel.app 형태. project 이름은 stock-portfolio-management.
+    /^https:\/\/stock-portfolio-management-[a-z0-9-]+\.vercel\.app$/,
 ];
 let ORIGIN_PATTERN = null;
 if (process.env.FRONTEND_URL_PATTERN) {
@@ -61,14 +66,16 @@ if (process.env.FRONTEND_URL_PATTERN) {
 }
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
+        // Allow requests with no origin (curl, server-to-server, mobile apps).
         if (!origin) return callback(null, true);
         if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        if (DEFAULT_ORIGIN_PATTERNS.some(p => p.test(origin))) return callback(null, true);
         if (ORIGIN_PATTERN && ORIGIN_PATTERN.test(origin)) return callback(null, true);
         // CORS 거부는 에러 throw 대신 false로 반환 — 500 대신 정상 401-ish 흐름.
         console.warn(`CORS blocked origin: ${origin}`);
         return callback(null, false);
     },
+    credentials: true,
 }));
 app.use(express.json());
 
