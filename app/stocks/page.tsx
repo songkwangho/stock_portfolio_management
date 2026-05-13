@@ -115,6 +115,11 @@ export default function MajorStocksPage() {
       <div>
         <h2 className="text-2xl font-bold mb-2">주요 종목 현황</h2>
         <p className="text-slate-500 text-sm">업종별 주요 종목의 실시간 시세와 추세를 한눈에 확인하세요.</p>
+        {stocks.length > 0 && (
+          <p className="text-slate-400 text-sm font-bold mt-2">
+            {stocks.length}개 종목 · {new Set(stocks.map(s => s.category)).size}개 섹터
+          </p>
+        )}
         <p className="text-slate-600 text-xs mt-2">※ ▲/▼ 등락률은 <span className="text-slate-400 font-bold">전일 종가 대비</span> 변동분이에요.</p>
       </div>
 

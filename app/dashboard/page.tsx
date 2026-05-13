@@ -572,7 +572,7 @@ export default function DashboardPage() {
       >
         <div>
           <p className="text-sm font-bold">전체 종목 보기</p>
-          <p className="text-xs text-slate-500 mt-0.5">삼성전자, 현대차 등 97개 주요 종목을 살펴보세요</p>
+          <p className="text-xs text-slate-500 mt-0.5">삼성전자, 현대차 등 업종별 주요 종목을 살펴보세요</p>
         </div>
         <span className="text-blue-400">→</span>
       </button>

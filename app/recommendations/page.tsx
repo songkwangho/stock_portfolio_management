@@ -175,7 +175,7 @@ export default function RecommendationsPage() {
             body = `약 ${hoursUntil}시간 후 결과가 나와요.`;
         } else if (hour < 10) {
             headline = '지금 데이터를 분석 중이에요';
-            body = '97종목 분석이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
+            body = '전체 종목 분석이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
         }
         return (
           <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl px-6">
@@ -194,7 +194,7 @@ export default function RecommendationsPage() {
           <Layers size={20} className="text-blue-400" />
           <div className="text-left">
             <p className="text-sm font-bold">전체 종목 보기</p>
-            <p className="text-xs text-slate-500">8개 섹터별 97종목 한눈에</p>
+            <p className="text-xs text-slate-500">업종별 주요 종목 한눈에</p>
           </div>
         </div>
         <span className="text-blue-400">→</span>

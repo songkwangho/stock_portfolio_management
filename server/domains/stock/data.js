@@ -303,15 +303,31 @@ export async function registerInitialData(pool) {
     console.log(`Seeded ${initialRecommendations.length} initial recommendations.`);
 
     // stock_themes 시드 — 큐레이션 + category 폴백.
-    // stocks 테이블에 code가 없으면 FK로 거부되지만 majorStocks 시드 직후라 문제 없음.
+    //
+    // FK 안전성: STOCK_THEME_MAP에 있는 code가 stocks 테이블에 없으면 FK 위반으로
+    // 단일 INSERT가 실패할 뿐 아니라 트랜잭션 전체가 abort된다 ("current transaction
+    // is aborted, commands ignored until end of transaction"). 그러면 이후 INSERT가
+    // 전부 무시되어 결과적으로 일부만 시드되거나 0건이 된다.
+    // → STOCK_THEME_MAP은 majorStocks와 별개로 유지되는 큐레이션이라 종목 디렉토리
+    //    축소·통합 시 stale 코드가 남을 수 있다. 미리 stocks의 실재 코드 Set으로
+    //    필터링해 FK 위반을 사전에 차단한다.
     {
         const client = await pool.connect();
         let inserted = 0;
+        let skipped = 0;
         try {
+            // 사전 단계: 실재하는 코드 Set 확보 (BEGIN 밖에서 조회해도 무방).
+            const { rows: existingStocks } = await client.query('SELECT code, category FROM stocks');
+            const existingCodes = new Set(existingStocks.map(r => r.code));
+
             await client.query('BEGIN');
 
-            // 1단계: 수동 큐레이션
+            // 1단계: 수동 큐레이션 — stocks에 없는 코드는 skip 로그 후 건너뜀.
             for (const { code, themes } of STOCK_THEME_MAP) {
+                if (!existingCodes.has(code)) {
+                    skipped++;
+                    continue;
+                }
                 for (const themeId of themes) {
                     const name = THEME_NAME_BY_ID[themeId];
                     if (!name) continue;
@@ -325,10 +341,8 @@ export async function registerInitialData(pool) {
                 }
             }
 
-            // 2단계: category 기반 폴백 — 아직 테마가 하나도 없는 종목만 채움.
-            // 수동 큐레이션과 같은 테마가 이미 있으면 ON CONFLICT로 skip.
-            const { rows: allStocks } = await client.query('SELECT code, category FROM stocks');
-            for (const { code, category } of allStocks) {
+            // 2단계: category 기반 폴백 — 큐레이션과 겹치면 ON CONFLICT로 skip.
+            for (const { code, category } of existingStocks) {
                 const themeIds = CATEGORY_TO_THEMES[category];
                 if (!themeIds) continue;
                 for (const themeId of themeIds) {
@@ -352,6 +366,13 @@ export async function registerInitialData(pool) {
         } finally {
             client.release();
         }
+        if (skipped > 0) console.log(`[theme seed] skipped ${skipped} curated codes not present in stocks table.`);
         if (inserted > 0) console.log(`Seeded ${inserted} stock_themes rows.`);
+
+        // 최종 카운트 — 운영 디버깅용. 시드 결과 가시화.
+        try {
+            const { rows: count } = await pool.query('SELECT COUNT(*)::int AS n FROM stock_themes');
+            console.log(`stock_themes total rows: ${count[0].n}`);
+        } catch { /* 카운트 조회 실패는 무시 */ }
     }
 }
