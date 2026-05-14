@@ -36,7 +36,7 @@ export default function DisclaimerModal() {
   // ============ Step 0: 앱 가치 제안 ============
   if (step === 'intro') {
     const features = [
-      { emoji: '🔍', title: '137개 종목 분석', desc: '실적·기술지표·수급을 종합해서 알기 쉽게 정리해드려요' },
+      { emoji: '🔍', title: '178개 종목 분석', desc: '실적·기술지표·수급을 종합해서 알기 쉽게 정리해드려요' },
       { emoji: '📋', title: '내 종목 상태 확인', desc: '보유 중인 종목이 지금 어떤 상태인지 바로 확인할 수 있어요' },
       { emoji: '🎯', title: '테마별 탐색', desc: '2차전지, AI·반도체, 방산 등 관심 테마의 종목을 모아볼 수 있어요' },
       { emoji: '🔔', title: '가격 변화 알림', desc: '주요 변화가 생기면 알림으로 알려드려요' },

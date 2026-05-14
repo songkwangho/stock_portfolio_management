@@ -7,3 +7,10 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+
+# Claude Code 로컬 설정 — 머신마다 다르고 push 부적합
+.claude/settings.json
+
+# scripts 실행 부산물 — backfill/expand 진행 상태 등
+scripts/.backfill-state.json
+
