@@ -130,7 +130,7 @@ const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
   return (
     <div className="fixed inset-0 bg-black/60 z-[200] flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-t-3xl md:rounded-3xl p-6 max-w-md w-full space-y-4 animate-in slide-in-from-bottom-4 duration-200"
+        className="bg-slate-900 border border-slate-700 rounded-t-2xl md:rounded-2xl p-6 max-w-md w-full space-y-4 animate-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">

@@ -69,7 +69,7 @@ export default function AlertsPage() {
         </div>
       )}
       {alerts.length === 0 ? (
-        <div className="text-center py-16 px-6 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-16 px-6 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
           <p className="text-3xl mb-4">🔔</p>
           <p className="text-slate-300 font-bold">아직 알림이 없어요</p>
           <p className="text-slate-500 text-sm mt-3 leading-relaxed max-w-md mx-auto">
@@ -88,10 +88,10 @@ export default function AlertsPage() {
                   <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${typeInfo.color}`}>{typeInfo.label}</span>
                   <span className="text-xs text-slate-500 font-bold">{alert.name}</span>
                   {alert.source === 'holding' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">보유 중</span>
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">보유 중</span>
                   )}
                   {alert.source === 'watchlist' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">관심 종목</span>
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">관심 종목</span>
                   )}
                 </div>
                 <button onClick={() => deleteAlert(alert.id)} className="text-red-400/60 active:text-red-400 p-1" aria-label="알림 삭제">
@@ -103,7 +103,7 @@ export default function AlertsPage() {
               )}
               <p className="text-xs text-slate-500 leading-relaxed pl-7">{alert.message}</p>
               {ALERT_GUIDES[alert.type] && (
-                <p className="text-[11px] text-slate-500 mt-2 pl-7 pr-2 leading-relaxed border-t border-slate-800/50 pt-2 break-keep">
+                <p className="text-xs text-slate-500 mt-2 pl-7 pr-2 leading-relaxed border-t border-slate-800/50 pt-2 break-keep">
                   {ALERT_GUIDES[alert.type]}
                 </p>
               )}

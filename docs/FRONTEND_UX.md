@@ -48,8 +48,23 @@
 
 ## UI 디자인 시스템
 
+### SSOT (2026-05-13 — DESIGN.md 채택, 3.10차)
+
+디자인 토큰의 단일 진실 공급원은 프로젝트 루트 [docs/DESIGN.md](../docs/DESIGN.md).
+Tailwind v4 `@theme` 블록은 [app/design-tokens.css](../app/design-tokens.css)에 정의되어 있고
+[app/globals.css](../app/globals.css)에서 import된다.
+
+- **카드 위계**: [components/ui/Card.tsx](../components/ui/Card.tsx) — `primary` / `secondary` / `tertiary` variant. 배경 명도로 위계 표현 (그림자 금지)
+- **색상**: 의미색 4개(positive/negative/accent/caution) + slate 그레이스케일
+- **타이포**: 최소 12px(body-sm), `text-[10px]`/`text-[11px]` 임의값 금지
+- **폰트**: Pretendard (CDN 로드, 실패 시 시스템 폰트 fallback)
+- **라운딩**: `rounded-lg`(8px, 뱃지) / `rounded-xl`(12px, 카드) / `rounded-2xl`(16px, 강조·모달). `rounded-3xl` 사용 금지
+
+**토큰 수정 절차**: DESIGN.md 편집 → `app/design-tokens.css`의 `@theme` 블록 동기화.
+DESIGN.md → CSS 자동 변환 CLI(`@google/design.md`)는 아직 프로젝트에 도입되지 않았으므로 수동.
+
 ### 접근성 원칙 (필수)
-1. 최소 폰트: `text-xs`(12px) 이상
+1. 최소 폰트: `text-xs`(12px) 이상 — 3.10차부터 강제
 2. 터치 타겟: 모든 인터랙티브 요소 최소 44×44px
 3. hover 의존 금지 — 모바일에서도 항상 접근 가능
 4. 용어 설명 기본 노출 — [?] 버튼 뒤에만 숨기지 않음
@@ -97,26 +112,35 @@ target_near  → 🎯 목표가 근접 알림
 undervalued  → 💎 저평가 분석 결과
 ```
 
-### 컬러 팔레트 (다크 테마)
+### 컬러 팔레트 (다크 테마, 3.10차 DESIGN.md 토큰)
 
-| 용도 | 클래스 |
-|------|--------|
-| 배경 (깊은) | `bg-slate-950` |
-| 배경 (카드) | `bg-slate-900/50` |
-| 테두리 | `border-slate-800` |
-| 주요 액센트 | `blue-600`, `blue-500`, `blue-400` |
-| 상승/긍정 | `emerald-500`, `emerald-400` |
-| 하락/부정 | `red-500`, `red-400` |
-| 텍스트 계층 | `slate-50` > `slate-300` > `slate-400` > `slate-600` |
+| 용도 | 토큰 클래스 | 값 (slate 참조) |
+|------|-------------|------------------|
+| 배경 (deep) | `bg-deep` | `#020617` (slate-950) |
+| 배경 (카드) | `bg-card` | `#0f172a` (slate-900) |
+| 배경 (강조 카드) | `bg-card-raised` | `#1e293b` (slate-800) |
+| 배경 (함몰) | `bg-inset` | `#020617` (slate-950) |
+| 테두리 (기본) | `border-border-subtle` | slate-800 |
+| 테두리 (강조) | `border-border-muted` | slate-700 |
+| 인터랙션 (blue — 버튼/링크 전용) | `bg-accent`, `text-accent`, `hover:bg-accent-hover` | blue-600 / blue-500 |
+| 상승/긍정 | `text-positive`, `bg-positive` | emerald-500 |
+| 하락/부정 | `text-negative`, `bg-negative` | red-500 |
+| 관망/미검증 | `text-caution`, `bg-caution` | amber-500 |
+| 텍스트 계층 | `text-text-primary` > `text-text-body` > `text-text-muted` > `text-text-faint` | slate-50 > slate-300 > slate-400 > slate-500 |
 
-### 공통 패턴
+### 공통 패턴 (3.10차 갱신)
 
 ```
-카드:     bg-slate-900/50 border border-slate-800 rounded-3xl p-6
-버튼:     bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-sm font-bold px-4 py-3
-인풋:     bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-blue-500
-뱃지:     text-xs font-bold px-2.5 py-1 rounded-lg bg-{color}-500/10 text-{color}-400
+카드 (일반):  <Card variant="secondary" padding="base">     — bg-card + rounded-xl(12px) + p-4
+카드 (결론):  <Card variant="primary" padding="emphasis" accentBar="positive">
+              — bg-card-raised + rounded-xl + p-6 + border-l-4
+카드 (함몰):  <Card variant="tertiary" padding="tight">     — bg-inset + rounded-lg(8px) + p-3
+버튼:         bg-accent hover:bg-accent-hover text-white rounded-xl min-h-[44px] px-4 py-3 text-sm font-bold
+인풋:         bg-inset border-border-subtle rounded-xl px-4 py-3 text-sm focus:border-accent
+뱃지:         text-xs font-bold px-2.5 py-1 rounded-lg bg-{semantic}-500/10 text-{semantic}-500
 ```
+
+DEPRECATED (사용 금지): `rounded-3xl`, `text-[10px]`, `text-[11px]`. 3.10차에서 전량 제거됨.
 
 ---
 

@@ -154,7 +154,7 @@ export default function SettingsPage() {
       </p>
 
       <div className="space-y-6">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
           <div className="flex items-center space-x-3 mb-6">
             <PlusCircle className="text-blue-400" size={24} />
             <h3 className="text-lg font-semibold">종목 수동 추가</h3>
@@ -196,7 +196,7 @@ export default function SettingsPage() {
                         <p className="text-sm font-bold text-white">{hit.name}</p>
                         <p className="text-xs text-slate-500 font-mono">{hit.code}</p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                         hit.market === 'KOSPI' ? 'bg-blue-500/10 text-blue-400' :
                         hit.market === 'KOSDAQ' ? 'bg-emerald-500/10 text-emerald-400' :
                         'bg-slate-500/10 text-slate-400'
@@ -258,7 +258,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <ShieldCheck className="text-emerald-400" size={24} />
@@ -316,7 +316,7 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
           <div className="flex items-center space-x-3 mb-6">
             <User className="text-blue-400" size={24} />
             <h3 className="text-lg font-semibold">내 프로필</h3>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="p-6 border border-slate-800 rounded-3xl flex items-center justify-between text-slate-500">
+        <div className="p-6 border border-slate-800 rounded-xl flex items-center justify-between text-slate-500">
           <div className="flex items-center space-x-3">
             <Settings size={20} />
             <span className="text-sm">현재 버전: v{APP_VERSION}</span>

@@ -220,7 +220,7 @@ export default function ScreenerPage() {
             }`}
           >
             {preset.isNew && (
-              <span className="absolute top-2 right-2 text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span>
+              <span className="absolute top-2 right-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">NEW</span>
             )}
             <span className="text-2xl mb-2 block">{preset.emoji}</span>
             <h4 className="text-sm font-bold mb-1">{preset.name}</h4>
@@ -230,7 +230,7 @@ export default function ScreenerPage() {
         ))}
       </div>
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center space-x-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors px-4 py-3"
@@ -318,7 +318,7 @@ export default function ScreenerPage() {
         const isSupplyDemand = preset?.filters?.preset === 'foreign_buy' || preset?.filters?.preset === 'fund_buy';
         if (isSupplyDemand) {
           return (
-            <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+            <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
               <p className="text-3xl mb-3">⏳</p>
               <p className="text-sm text-slate-400 font-semibold">수급 데이터를 수집 중이에요</p>
               <p className="text-xs text-slate-500 mt-1">매일 08:00 업데이트 후 표시돼요.</p>
@@ -326,7 +326,7 @@ export default function ScreenerPage() {
           );
         }
         return (
-          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
             <p className="text-slate-500">조건에 맞는 종목이 없어요. 조건을 조금 넓혀보세요.</p>
           </div>
         );
@@ -398,7 +398,7 @@ export default function ScreenerPage() {
             ))}
           </div>
 
-          <div className="hidden md:block bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden">
+          <div className="hidden md:block bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -422,7 +422,7 @@ export default function ScreenerPage() {
                         <p className="font-bold text-white">{stock.name}</p>
                         <p className="text-xs text-slate-500 font-mono">{stock.code} · {stock.category}</p>
                         {renderPresetMetric(stock) && (
-                          <p className="text-[11px] text-blue-400 font-bold mt-1 inline-block bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">
+                          <p className="text-xs text-blue-400 font-bold mt-1 inline-block bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">
                             {renderPresetMetric(stock)}
                           </p>
                         )}

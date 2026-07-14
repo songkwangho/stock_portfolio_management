@@ -91,7 +91,7 @@ function ThemesContent() {
           ))}
         </div>
       ) : themes.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
           <p className="text-3xl mb-3">🗂️</p>
           <p className="text-sm text-slate-400">테마 데이터를 준비 중이에요.</p>
           <p className="text-xs text-slate-500 mt-1">서버 재시작 후 자동으로 채워져요.</p>
@@ -125,7 +125,7 @@ function ThemesContent() {
       )}
 
       {activeThemeId && (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
           <div className="flex items-center space-x-3 mb-2">
             <h3 className="text-lg font-bold">
               {getThemeMeta(activeThemeId).emoji} {activeTheme?.theme_name || '테마'} 관련 종목
@@ -176,7 +176,7 @@ function ThemesContent() {
                           {stock.price ? `₩${stock.price.toLocaleString()}` : '---'}
                         </p>
                         {stock.market_opinion && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
                             stock.market_opinion === '긍정적' ? 'bg-emerald-500/10 text-emerald-400' :
                             stock.market_opinion === '부정적' ? 'bg-red-500/10 text-red-400' :
                             'bg-slate-500/10 text-slate-400'

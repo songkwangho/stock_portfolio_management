@@ -40,7 +40,7 @@ const ErrorBanner = ({ error, kind = 'unknown', onRetry, autoRetryMs }: ErrorBan
         <p className="text-sm font-bold text-red-300">⚠️ {headline}</p>
         <p className="text-xs text-slate-400 mt-1 leading-relaxed">{error}</p>
         {autoRetryMs && onRetry && (
-          <p className="text-[10px] text-slate-500 mt-1">잠시 후 자동으로 다시 시도해요...</p>
+          <p className="text-xs text-slate-500 mt-1">잠시 후 자동으로 다시 시도해요...</p>
         )}
       </div>
       {onRetry && (

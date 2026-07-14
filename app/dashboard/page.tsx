@@ -134,7 +134,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {holdings.length === 0 && (
-        <div className="bg-gradient-to-br from-blue-600/10 to-emerald-600/10 border border-blue-500/20 rounded-3xl p-6 md:p-8">
+        <div className="bg-gradient-to-br from-blue-600/10 to-emerald-600/10 border border-blue-500/20 rounded-2xl p-6 md:p-8">
           <h2 className="text-xl font-bold mb-2 text-center">무엇부터 시작해 볼까요?</h2>
           <p className="text-slate-400 text-sm mb-6 leading-relaxed text-center max-w-md mx-auto">
             목적에 맞게 골라주세요. 나중에 다른 기능도 전부 쓰실 수 있어요.
@@ -250,7 +250,7 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-slate-600 mt-3 leading-relaxed">
+            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
               ※ 위 정보는 알고리즘 분석이에요. 실제 투자 결정은 본인이 직접 해주세요.
             </p>
           </div>
@@ -315,7 +315,7 @@ export default function DashboardPage() {
                   style={{ left: `calc(${fearGreed.score}% - 6px)` }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-slate-600 mb-2">
+              <div className="flex justify-between text-xs text-slate-600 mb-2">
                 <span>공포</span><span>중립</span><span>탐욕</span>
               </div>
               <div className="flex items-center justify-between">
@@ -358,7 +358,7 @@ export default function DashboardPage() {
                   sharpe > 0 ? 'text-blue-400' : 'text-red-400'
                 }`}>{sharpe > 1 ? '우수' : sharpe > 0 ? '양호' : '개선 필요'}</p>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 같은 수익이라도 변동이 적으면 높아요. 1 이상이면 우수한 편이에요.
               </p>
               {showSharpeHelp && (
@@ -377,7 +377,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">포트폴리오 수익률 추이</h3>
               <span className="text-xs text-slate-500">최근 {portfolioHistory.length}거래일 기준</span>
@@ -444,7 +444,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">내 보유 종목</h3>
               <button
@@ -473,9 +473,9 @@ export default function DashboardPage() {
                           <p className="text-sm font-bold">{stock.name}</p>
                           <p className="text-xs text-slate-500 bg-slate-900 px-1.5 rounded">{stock.value}%</p>
                           {stock.sma_available === false ? (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">분석 중</span>
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">분석 중</span>
                           ) : stock.holding_opinion && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
                               stock.holding_opinion === '매도' ? 'bg-red-500/10 text-red-400' :
                               stock.holding_opinion === '관망' ? 'bg-yellow-500/10 text-yellow-400' :
                               stock.holding_opinion === '추가매수' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -523,7 +523,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
           <h3 className="text-lg font-semibold mb-6">자산 배분 현황</h3>
           {holdings.length === 1 ? (
             <div className="space-y-4">

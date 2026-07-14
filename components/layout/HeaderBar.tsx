@@ -138,7 +138,7 @@ export default function HeaderBar({ nickname }: Props) {
                 </button>
               </div>
               <div className="mt-3 pt-3 border-t border-slate-800/50">
-                <p className="text-[11px] text-slate-500 mb-2">이런 종목은 어때요?</p>
+                <p className="text-xs text-slate-500 mb-2">이런 종목은 어때요?</p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { code: '005930', name: '삼성전자' },

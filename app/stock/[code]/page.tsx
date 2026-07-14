@@ -13,6 +13,7 @@ import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, StockDetail, Holding, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag } from '@/types/stock';
 import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
+import Card from '@/components/ui/Card';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { getThemeMeta } from '@/lib/themesMeta';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -303,6 +304,28 @@ function StockDetailContent({ code }: { code: string }) {
   const priceMin = Math.min(...allPrices) * 0.98;
   const priceMax = Math.max(...allPrices) * 1.02;
 
+  // 3.10차 (DS-5) — "한눈에 보기" 9지표 파생 값.
+  // 52주 범위는 chartData 슬라이스 이전 원본(stockDetail.history)을 써야 함 — 차트 탭에 따라 잘리지 않도록.
+  const historyForRange = stockDetail?.history || [];
+  const high52w = historyForRange.length > 0
+    ? Math.max(...historyForRange.map(h => h.high || h.price))
+    : null;
+  const low52w = historyForRange.length > 0
+    ? Math.min(...historyForRange.filter(h => (h.low || h.price) > 0).map(h => h.low || h.price))
+    : null;
+  const prevClose = chartData.length >= 2 ? chartData[chartData.length - 2].price : null;
+  const latestVolume = chartData.length > 0 ? chartData[chartData.length - 1].volume : null;
+  const perDisplay =
+    stockDetail?.per == null ? '---'
+    : stockDetail.per < 0 ? '적자'
+    : stockDetail.per === 0 ? '이익 없음'
+    : `${stockDetail.per}배`;
+  const formatVol = (v: number): string => {
+    if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
+    if (v >= 10_000) return `${Math.round(v / 10_000)}만`;
+    return v.toLocaleString();
+  };
+
   const helpTexts: Record<string, string> = {
     rsi: 'RSI는 주가가 최근 얼마나 올랐는지/내렸는지를 0~100 사이 숫자로 보여줘요. 70 이상이면 "너무 많이 올랐다", 30 이하면 "너무 많이 내렸다"는 뜻이에요.',
     macd: 'MACD는 최근 주가 흐름의 방향을 보여줘요. 막대가 위로 올라가면 상승 힘이 강하고, 아래로 내려가면 하락 힘이 강하다는 신호예요.',
@@ -318,7 +341,7 @@ function StockDetailContent({ code }: { code: string }) {
         <span>돌아가기</span>
       </button>
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
@@ -360,7 +383,7 @@ function StockDetailContent({ code }: { code: string }) {
                   <button
                     key={t.theme_id}
                     onClick={() => router.push(`/themes?id=${t.theme_id}`)}
-                    className="text-[11px] font-bold px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors"
+                    className="text-xs font-bold px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors"
                     title={`${t.theme_name} 테마 보기`}
                   >
                     {getThemeMeta(t.theme_id).emoji} {t.theme_name}
@@ -454,15 +477,18 @@ function StockDetailContent({ code }: { code: string }) {
           </div>
         </div>
 
-        {/* 3.9차 — 결론 카드. 차트보다 먼저 노출해 "이 종목 한 줄 요약 + 다음 행동" 안내. */}
+        {/* 3.9차 — 결론 카드. 차트보다 먼저 노출해 "이 종목 한 줄 요약 + 다음 행동" 안내.
+            3.10차 (DS-6) — Card primary + 컬러바로 위계 최상단 표시. 배경 tint 대신 accent bar로 절제. */}
         {stockDetail && (
-          <div className={`rounded-2xl p-5 border mb-6 ${
-            stockDetail.market_opinion === '긍정적'
-              ? 'bg-emerald-500/5 border-emerald-500/20'
-              : stockDetail.market_opinion === '부정적'
-              ? 'bg-red-500/5 border-red-500/20'
-              : 'bg-slate-800/50 border-slate-700/50'
-          }`}>
+          <Card
+            variant="primary"
+            padding="emphasis"
+            accentBar={
+              stockDetail.market_opinion === '긍정적' ? 'positive' :
+              stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
+            }
+            className="mb-6"
+          >
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
               📋 이 종목 한 줄 요약
             </p>
@@ -508,11 +534,63 @@ function StockDetailContent({ code }: { code: string }) {
                 ))}
               </div>
             </div>
-            <p className="text-[11px] text-slate-600 mt-3 leading-relaxed">
+            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
               ※ 위 내용은 알고리즘 분석 결과예요. 실제 투자 결정은 본인이 직접 하시고,
               거래는 증권사 앱에서 진행해 주세요.
             </p>
-          </div>
+          </Card>
+        )}
+
+        {/* 3.10차 (DS-5) — "한눈에 보기" 9지표 그리드. 결론 카드 다음, 차트 이전.
+            초보자가 스크롤 없이 종목의 요약 상태(가격·거래·범위·밸류·목표가)를 파악. */}
+        {stockDetail && (
+          <Card variant="secondary" padding="base" className="mb-6">
+            <h3 className="text-sm font-bold text-text-body mb-3">📊 한눈에 보기</h3>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+              {[
+                { label: '현재가',    value: stockDetail?.price ? `₩${stockDetail.price.toLocaleString()}` : '---' },
+                { label: '전일종가',  value: prevClose ? `₩${prevClose.toLocaleString()}` : '---' },
+                { label: '거래량',    value: latestVolume ? formatVol(latestVolume) : '---' },
+                { label: '52주 최고', value: high52w ? `₩${high52w.toLocaleString()}` : '---' },
+                { label: '52주 최저', value: low52w ? `₩${low52w.toLocaleString()}` : '---' },
+                { label: 'PER',       value: perDisplay },
+                { label: 'PBR',       value: stockDetail?.pbr ? `${stockDetail.pbr}배` : '---' },
+                { label: 'ROE',       value: stockDetail?.roe ? `${stockDetail.roe}%` : '---' },
+                { label: '목표가',    value: stockDetail?.targetPrice ? `₩${stockDetail.targetPrice.toLocaleString()}` : '---' },
+              ].map(item => (
+                <div key={item.label} className="min-w-0">
+                  <p className="text-xs text-text-faint mb-0.5 truncate">{item.label}</p>
+                  <p className="text-sm font-bold text-text-primary truncate">{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* 52주 범위 내 현재가 위치 게이지 — 저점/고점 근접 여부를 시각화 */}
+            {high52w && low52w && stockDetail?.price && high52w > low52w && (
+              <div className="mt-4 pt-3 border-t border-border-subtle">
+                <div className="flex items-center justify-between text-xs text-text-faint mb-1.5">
+                  <span>52주 최저</span>
+                  <span>52주 최고</span>
+                </div>
+                <div className="relative h-2 bg-slate-800 rounded-full">
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full border-2 border-slate-900"
+                    style={{ left: `calc(${Math.min(100, Math.max(0, (stockDetail.price - low52w) / (high52w - low52w) * 100))}% - 6px)` }}
+                  />
+                </div>
+                <p className="text-xs text-text-muted mt-1.5 text-center">
+                  {(() => {
+                    const pct = (stockDetail.price - low52w) / (high52w - low52w) * 100;
+                    if (pct >= 90) return '52주 최고가 근처예요. 단기 고점에 주의하세요';
+                    if (pct >= 60) return '52주 범위 상단, 상승 흐름이에요';
+                    if (pct >= 40) return '52주 범위 중간 정도예요';
+                    if (pct >= 10) return '52주 범위 하단, 저점 근처일 수 있어요';
+                    return '52주 최저가 근처, 반등인지 하락 지속인지 확인하세요';
+                  })()}
+                </p>
+              </div>
+            )}
+          </Card>
         )}
 
         {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
@@ -641,7 +719,7 @@ function StockDetailContent({ code }: { code: string }) {
                   }
                   if (!hint) return null;
                   return (
-                    <p className="text-[11px] text-blue-400/80 mt-2 leading-relaxed border-t border-slate-800/50 pt-2">
+                    <p className="text-xs text-blue-400/80 mt-2 leading-relaxed border-t border-slate-800/50 pt-2">
                       💡 {hint}
                     </p>
                   );
@@ -649,7 +727,7 @@ function StockDetailContent({ code }: { code: string }) {
                 {/* 섹터 대비 PER 게이지 — 업종 중앙값 대비 현재가 위치 (6-2) */}
                 {sectorData && stockDetail?.per !== null && stockDetail?.per !== undefined && stockDetail.per > 0 && sectorData.medians.per && (
                   <div className="mt-2 pt-2 border-t border-slate-800/50">
-                    <p className="text-[10px] text-slate-600 mb-1">업종 중앙값 {sectorData.medians.per}배 대비</p>
+                    <p className="text-xs text-slate-600 mb-1">업종 중앙값 {sectorData.medians.per}배 대비</p>
                     <div className="flex items-center space-x-2">
                       <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                         <div
@@ -657,7 +735,7 @@ function StockDetailContent({ code }: { code: string }) {
                           style={{ width: `${Math.min(100, (stockDetail.per / (sectorData.medians.per * 2)) * 100)}%` }}
                         />
                       </div>
-                      <span className={`text-[10px] font-bold ${stockDetail.per < sectorData.medians.per ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      <span className={`text-xs font-bold ${stockDetail.per < sectorData.medians.per ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {stockDetail.per < sectorData.medians.per ? '업종 평균보다 저렴' : '업종 평균보다 높음'}
                       </span>
                     </div>
@@ -729,7 +807,7 @@ function StockDetailContent({ code }: { code: string }) {
                         : '성장 대비 고평가예요 (PEG > 2)'}
                     </p>
                     {growth !== null && (
-                      <p className="text-[11px] text-slate-600 mt-1">
+                      <p className="text-xs text-slate-600 mt-1">
                         EPS 성장률: {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
                       </p>
                     )}
@@ -1213,7 +1291,7 @@ function StockDetailContent({ code }: { code: string }) {
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                    <p className="text-xs text-slate-500 leading-relaxed">
                       평균 매수가: 여러 번 나눠 샀다면 평균을 입력해요. 수량은 증권사 앱에서 확인 가능. <span className="text-slate-400">비중은 잘 모르겠으면 비워두세요.</span>
                     </p>
                     {addForm.quantity !== '0' && addForm.avgPrice !== '0' && (
@@ -1251,10 +1329,10 @@ function StockDetailContent({ code }: { code: string }) {
                 <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest text-center italic">Signal Score</p>
                 <div className="text-3xl font-black text-center text-white">{computeProbability()}</div>
                 <p className="text-xs text-slate-500 text-center mt-1">종합 신호 점수 (0~100)</p>
-                <p className="text-[11px] text-slate-400 text-center mt-2 leading-relaxed">
+                <p className="text-xs text-slate-400 text-center mt-2 leading-relaxed">
                   💡 위 시장 분석 10점 점수에 목표가 괴리·이평선·변동성을 더해 0~100으로 환산한 보조 지표예요.
                 </p>
-                <p className="text-[11px] text-amber-400/80 text-center mt-1 leading-relaxed">
+                <p className="text-xs text-amber-400/80 text-center mt-1 leading-relaxed">
                   ⚠️ 실제 상승 확률이 아니에요.
                 </p>
               </div>

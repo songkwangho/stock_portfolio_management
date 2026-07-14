@@ -186,7 +186,7 @@ function PortfolioContent() {
         </div>
       )}
 
-      <div className="bg-slate-900/50 border border-blue-500/20 rounded-3xl p-6">
+      <div className="bg-slate-900/50 border border-blue-500/20 rounded-xl p-6">
         <h3 className="text-sm font-bold mb-4 flex items-center space-x-2">
           <PlusCircle size={16} className="text-blue-400" />
           <span>새 종목 추가</span>
@@ -213,12 +213,12 @@ function PortfolioContent() {
                   <div>
                     <label className="text-xs text-slate-300 mb-1 block font-bold">내가 산 평균 가격 (원)</label>
                     <input type="number" placeholder="예: 70000" value={newForm.avgPrice} onChange={(e) => setNewForm({ ...newForm, avgPrice: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500" />
-                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">여러 번 나눠 샀다면 평균을 입력해요. 예: 10만원에 5주, 11만원에 5주 → 105,000원</p>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">여러 번 나눠 샀다면 평균을 입력해요. 예: 10만원에 5주, 11만원에 5주 → 105,000원</p>
                   </div>
                   <div>
                     <label className="text-xs text-slate-300 mb-1 block font-bold">보유 주식 수 (주)</label>
                     <input type="number" placeholder="예: 10" value={newForm.quantity} onChange={(e) => setNewForm({ ...newForm, quantity: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500" />
-                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">증권사 앱 → 보유 종목에서 확인할 수 있어요.</p>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">증권사 앱 → 보유 종목에서 확인할 수 있어요.</p>
                   </div>
                 </div>
                 <div className="pt-2">
@@ -230,7 +230,7 @@ function PortfolioContent() {
         </div>
 
       {firstStockGuide && (
-        <div className="bg-gradient-to-br from-emerald-600/10 to-blue-600/10 border border-emerald-500/20 rounded-3xl p-6 relative">
+        <div className="bg-gradient-to-br from-emerald-600/10 to-blue-600/10 border border-emerald-500/20 rounded-2xl p-6 relative">
           <button onClick={() => setFirstStockGuide(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="가이드 닫기">
             <X size={18} />
           </button>
@@ -260,7 +260,7 @@ function PortfolioContent() {
           const weight = stock.value || 0;
           const concentrated = weight > 50;
           return (
-            <div key={stock.code} className={`bg-slate-900/50 border ${concentrated ? 'border-yellow-500/40' : 'border-slate-800'} rounded-3xl p-6 border-l-blue-500/30 border-l-2 transition-all group`}>
+            <div key={stock.code} className={`bg-slate-900/50 border ${concentrated ? 'border-yellow-500/40' : 'border-slate-800'} rounded-xl p-6 border-l-blue-500/30 border-l-2 transition-all group`}>
               {concentrated && (
                 <div className="mb-4 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-xs text-yellow-300/90 leading-relaxed">
                   ⚠️ <span className="font-bold">{stock.name} 비중이 {weight}%예요.</span> 한 종목에 집중되면 이 종목 하락 시 손실이 커져요. 분산 투자를 검토해보세요.
@@ -352,7 +352,7 @@ function PortfolioContent() {
                           <button onClick={() => onDetailClick({ ...stock, category: '보유 종목' })} className="text-xs text-blue-400 hover:underline">상세 보기 →</button>
                         </div>
                         <p className="mt-1.5 text-xs font-normal text-slate-400 leading-relaxed">{reason}</p>
-                        {cautionLike && <p className="mt-1 text-[11px] text-slate-500 italic leading-relaxed">이 신호는 참고용이에요. 판단은 본인이 해주세요. 실제 거래는 증권사 앱에서 직접 진행해 주세요.</p>}
+                        {cautionLike && <p className="mt-1 text-xs text-slate-500 italic leading-relaxed">이 신호는 참고용이에요. 판단은 본인이 해주세요. 실제 거래는 증권사 앱에서 직접 진행해 주세요.</p>}
                         {/* 3.9차 — 매도/관망 상태에 행동 가이드 스텝 추가 */}
                         {stock.holding_opinion === '매도' && (
                           <div className="mt-3 p-3 bg-slate-950/50 border border-red-500/10 rounded-xl">
@@ -473,7 +473,7 @@ function PortfolioContent() {
       </div>
 
       {holdings.length === 0 && (
-        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
           <p className="text-3xl mb-4">📊</p>
           <p className="text-slate-300 font-bold text-lg mb-2">아직 보유 종목이 없어요</p>
           <p className="text-slate-500 text-sm mb-6">위 폼에서 가진 주식을 추가하면 수익률을 한눈에 볼 수 있어요</p>

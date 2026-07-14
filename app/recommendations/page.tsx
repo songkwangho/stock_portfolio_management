@@ -178,7 +178,7 @@ export default function RecommendationsPage() {
             body = '전체 종목 분석이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
         }
         return (
-          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl px-6">
+          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl px-6">
             <TrendingUp size={40} className="mx-auto text-slate-700 mb-4" />
             <p className="text-slate-300 font-bold mb-2">{headline}</p>
             <p className="text-slate-500 text-sm leading-relaxed">{body}</p>

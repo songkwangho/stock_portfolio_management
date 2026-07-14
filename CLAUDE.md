@@ -417,6 +417,22 @@ PC (md: 이상):
 
 ---
 
+**3.10차 — DESIGN.md 디자인 시스템 도입 (2026-05-13)**
+
+Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[10/11px], rounded-3xl)을 토큰과 Tailwind 표준 클래스로 교체. 종목 상세에 "한눈에 보기" 9지표 그리드 신설. 기능 변경 없이 스타일만 개선.
+
+- [x] **[DS-1]** `docs/DESIGN.md` SSOT + `app/design-tokens.css` @theme 블록. `rounded.sm/md/lg`는 이미 Tailwind 기본 `rounded-lg/xl/2xl`과 정렬돼 있어 `--radius-*` 오버라이드 생략 (기존 badge/button 회귀 위험 차단)
+- [x] **[DS-2]** `components/ui/Card.tsx` — `primary`/`secondary`/`tertiary` variant + `tight`/`base`/`emphasis` padding + `accentBar` prop (positive/negative/neutral 좌측 4px 컬러바)
+- [x] **[DS-3]** Pretendard CDN 로드 (globals.css @import) + `--font-sans` 폴백 스택
+- [x] **[DS-4]** `text-[10px]`/`text-[11px]` 임의값 33건 전면 제거 → `text-xs` (12px). 위계는 이미 slate 명도로 표현되어 크기만 승격
+- [x] **[DS-5]** `/stock/[code]` "한눈에 보기" 9지표 그리드(현재가·전일·거래량·52w H/L·PER·PBR·ROE·목표가) + 52주 범위 내 현재가 위치 게이지(구간별 안내 문구 5단계)
+- [x] **[DS-6]** 결론 카드 `<Card variant="primary" accentBar={opinion}>` 위계 승격. 배경 tint 대신 accent bar로 절제
+- [x] **[DS-7]** `rounded-3xl` 24건 전면 교체 — 일반 카드 → `rounded-xl`(12px), 강조 카드/모달(대시보드·포트폴리오 gradient, HelpBottomSheet) → `rounded-2xl`(16px)
+- [ ] **[DS-8]** 정보성 blue → slate 절제 — 판단 위험이 커 3.10차에선 미실행. 인터랙티브 blue와 정보 blue 자동 분리 규칙 정의 후 별도 차수에서 진행
+- [x] **[DS-DOCS]** `docs/FRONTEND_UX.md` 디자인 시스템 섹션 갱신 — 컬러 팔레트를 토큰 클래스 기준으로 재작성, DEPRECATED 목록 명시
+
+---
+
 **3.7차 종목 확대 2차 (2026-05-13)**
 
 1차(EXPAND-1) 실행 후 일부 코드는 합병·코드변경·임시정지 등으로 실패. 2차 시도 + 신규 대상 추가로 200종목 근접을 목표.

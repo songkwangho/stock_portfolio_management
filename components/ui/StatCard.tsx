@@ -16,7 +16,7 @@ interface StatCardProps {
 const StatCard = ({ title, value, change, positive, icon, subtitle, tooltip }: StatCardProps) => {
   const [showTip, setShowTip] = useState(false);
   return (
-    <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 hover:border-slate-700 transition-all group">
+    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all group">
       <div className="flex items-center justify-between mb-4">
         <div className="p-3 bg-slate-950 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
           {icon}

@@ -49,7 +49,7 @@ const WatchlistContent = ({ onDetailClick }: WatchlistContentProps) => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-3xl">
+        <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
           <p className="text-3xl mb-4">👀</p>
           <p className="text-slate-300 font-bold text-lg mb-2">관심 종목이 없어요</p>
           <p className="text-slate-500 text-sm">마음에 드는 종목을 추가하면 한 곳에서 볼 수 있어요</p>

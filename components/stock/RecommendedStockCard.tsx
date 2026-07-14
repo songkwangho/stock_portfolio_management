@@ -63,7 +63,7 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
           >
             <Zap size={11} />
             <span>{stock.score}</span>
-            <span className="text-[10px] text-blue-300/70 ml-0.5">?</span>
+            <span className="text-xs text-blue-300/70 ml-0.5">?</span>
           </div>
         )}
       </div>
@@ -71,7 +71,7 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
       {/* 3.9차 — '왜 지금?' 결론형 이유 + 가격 차이 */}
       <div className="mb-4 flex-grow space-y-2">
         <div className="flex items-start space-x-2">
-          <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
+          <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
             왜 지금?
           </span>
           <div className="min-w-0">
@@ -81,7 +81,7 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
             {reasonLong && (
               <button
                 onClick={(e) => { e.stopPropagation(); setReasonExpanded(v => !v); }}
-                className="mt-1 text-[11px] font-bold text-blue-400 hover:text-blue-300"
+                className="mt-1 text-xs font-bold text-blue-400 hover:text-blue-300"
               >
                 {reasonExpanded ? '접기' : '더 보기'}
               </button>
@@ -91,14 +91,14 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
 
         {priceGapPct !== null && (
           <div className="flex items-start space-x-2">
-            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
               가격 차이
             </span>
             <p className="text-xs text-slate-400 leading-relaxed">
               적정가(₩{stock.fairPrice!.toLocaleString()}) 대비 현재가가{' '}
               <span className="text-emerald-400 font-bold">{priceGapPct}% 낮아요</span>
               {' '}— 아직 반영이 덜 됐을 수 있어요.
-              <span className="block text-[11px] text-slate-600 mt-0.5">
+              <span className="block text-xs text-slate-600 mt-0.5">
                 ※ 실제 수익률이 아니에요. 참고용 수치예요.
                 {stock.targetPrice && stock.fairPrice === stock.targetPrice
                   ? ' 애널리스트 목표가는 6~12개월 기준이라 현재 시세와 차이가 있을 수 있어요.'
@@ -164,7 +164,7 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
           <span>{inWatchlist ? '추가됨' : '관심'}</span>
         </button>
       </div>
-      <p className="text-[11px] text-slate-600 mt-2 text-center leading-relaxed">
+      <p className="text-xs text-slate-600 mt-2 text-center leading-relaxed">
         투자 결정은 본인이 직접 해주세요. 실제 거래는 증권사 앱에서 진행하세요.
       </p>
     </div>
