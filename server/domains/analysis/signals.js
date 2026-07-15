@@ -76,6 +76,27 @@ function detectCross(history) {
     return null;
 }
 
+// ── 차트 마커용: 최근 windowDays 구간의 모든 골든/데드크로스 ──
+// 신호 패널용 detectCross(어제 1일)와 별개. 차트는 20일을 표시하므로 창 내 전체 교차를 수집해야
+// 마커가 실질적으로 보인다(SIG-4 정상화). return: [{ date:'YYYYMMDD', type:'golden'|'dead' }].
+export function detectCrossHistory(history, windowDays = 20) {
+    const prices = history.map(h => h.price);
+    const n = prices.length;
+    if (n < 21) return [];
+    const s5 = smaSeries(prices, 5);
+    const s20 = smaSeries(prices, 20);
+    const out = [];
+    // i-1의 SMA20이 유효하려면 i >= 20. 최근 windowDays 바만 검사.
+    const start = Math.max(20, n - windowDays);
+    for (let i = start; i < n; i++) {
+        const a5 = s5[i], a20 = s20[i], p5 = s5[i - 1], p20 = s20[i - 1];
+        if ([a5, a20, p5, p20].some(v => v == null)) continue;
+        if (p5 <= p20 && a5 > a20) out.push({ date: history[i].date, type: 'golden' });
+        else if (p5 >= p20 && a5 < a20) out.push({ date: history[i].date, type: 'dead' });
+    }
+    return out;
+}
+
 // ── 2. 볼린저 스퀴즈 + 밴드 돌파 ──
 // 20일 이평 ± 2표준편차. 밴드폭 = (상단-하단)/중앙선.
 // 스퀴즈: 오늘 밴드폭이 최근 20일 중 하위 20% 수준.
@@ -372,6 +393,7 @@ export async function computeSignals(code) {
         signals,
         consensus: { positive, caution, total: signals.length, summary },
         asOf: asOfLabel,
+        markers: detectCrossHistory(history, 20),   // 3.12차 S5 — 차트 크로스 마커(최근 20일)
     };
     setCache(cacheKey, result);
     return result;
