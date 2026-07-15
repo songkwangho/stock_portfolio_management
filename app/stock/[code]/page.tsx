@@ -317,8 +317,11 @@ function StockDetailContent({ code }: { code: string }) {
   const low52w = historyForRange.length > 0
     ? Math.min(...historyForRange.filter(h => (h.low || h.price) > 0).map(h => h.low || h.price))
     : null;
-  const prevClose = chartData.length >= 2 ? chartData[chartData.length - 2].price : null;
-  const latestVolume = chartData.length > 0 ? chartData[chartData.length - 1].volume : null;
+  // 3.12차 S0 — "한눈에 보기"의 전일종가·거래량은 항상 일봉 원본(stockDetail.history) 기준.
+  // 기존엔 chartData(=chartTimeframe 의존)에서 파생해 월봉/주봉 전환 시 값이 오염됐음.
+  const dailyHistory = stockDetail?.history || [];
+  const prevClose = dailyHistory.length >= 2 ? dailyHistory[dailyHistory.length - 2].price : null;
+  const latestVolume = dailyHistory.length > 0 ? (dailyHistory[dailyHistory.length - 1].volume ?? null) : null;
   const perDisplay =
     stockDetail?.per == null ? '---'
     : stockDetail.per < 0 ? '적자'
