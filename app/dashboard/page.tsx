@@ -16,7 +16,7 @@ import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
-import type { StockSummary } from '@/types/stock';
+import type { StockSummary, SignalResult } from '@/types/stock';
 
 // 한국식 금액 단위 포매터 — Y축/툴팁 공용 (16차 5-2).
 // `₩35000k` 같은 영문 k 단위는 초보자가 직관적으로 이해하기 어려움.
@@ -54,6 +54,10 @@ export default function DashboardPage() {
   const [sharpe, setSharpe] = useState<number | null>(null);
   const [showSharpeHelp, setShowSharpeHelp] = useState(false);
 
+  // 3.11차 — 보유 종목별 관찰 신호 (보유 5개 이하만 조회, N 병렬 호출 부담 제한)
+  const [holdingSignals, setHoldingSignals] = useState<Record<string, SignalResult>>({});
+  const holdingCodesKey = holdings.map(h => h.code).sort().join(',');
+
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=holding`);
@@ -74,6 +78,22 @@ export default function DashboardPage() {
       .then(d => setSharpe(d.sharpe))
       .catch(() => setSharpe(null));
   }, [holdings.length]);
+
+  // 보유 종목별 신호 조회 — 보유 1~5개일 때만. 그 이상은 호출 부담으로 생략.
+  useEffect(() => {
+    const codes = holdingCodesKey ? holdingCodesKey.split(',') : [];
+    if (codes.length === 0 || codes.length > 5) { setHoldingSignals({}); return; }
+    let cancelled = false;
+    Promise.all(codes.map(c =>
+      stockApi.getSignals(c).then(r => [c, r] as const).catch(() => null)
+    )).then(pairs => {
+      if (cancelled) return;
+      const map: Record<string, SignalResult> = {};
+      for (const p of pairs) { if (p) map[p[0]] = p[1]; }
+      setHoldingSignals(map);
+    });
+    return () => { cancelled = true; };
+  }, [holdingCodesKey]);
 
   const fetchHistory = async () => {
     setHistoryError(null);
@@ -184,12 +204,20 @@ export default function DashboardPage() {
           </p>
         );
       })()}
-      {/* 3.9차 — 오늘 확인할 것: 매도/관망 종목 + 미읽 알림 */}
+      {/* 3.9차 — 오늘 확인할 것: 매도/관망 종목 + 미읽 알림. 3.11차 — 주의 신호 종목 추가. */}
       {(() => {
         const cautionHoldings = holdings.filter(
           h => h.holding_opinion === '매도' || h.holding_opinion === '관망'
         );
-        if (cautionHoldings.length === 0 && unreadCount === 0 && holdings.length > 0) {
+        // 3.11차 — 매도/관망은 아니지만 관찰 신호상 주의가 우세한 보유 종목.
+        const cautionOpinionCodes = new Set(cautionHoldings.map(h => h.code));
+        const signalCautionHoldings = holdings.filter(h => {
+          if (cautionOpinionCodes.has(h.code)) return false; // 이미 위에서 표시
+          const sig = holdingSignals[h.code];
+          return !!sig && sig.consensus.caution > 0 && sig.consensus.caution >= sig.consensus.positive;
+        });
+        const nothingToCheck = cautionHoldings.length === 0 && signalCautionHoldings.length === 0 && unreadCount === 0;
+        if (nothingToCheck && holdings.length > 0) {
           return (
             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center space-x-3">
               <span className="text-2xl">✅</span>
@@ -200,7 +228,7 @@ export default function DashboardPage() {
             </div>
           );
         }
-        if (cautionHoldings.length === 0 && unreadCount === 0) return null;
+        if (nothingToCheck) return null;
         return (
           <div className="bg-slate-900/50 border border-amber-500/20 rounded-2xl p-5">
             <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3">
@@ -230,6 +258,29 @@ export default function DashboardPage() {
                       : 'bg-yellow-500/10 text-yellow-400'
                   }`}>
                     {h.holding_opinion === '매도' ? '주의 필요' : '관망'}
+                  </span>
+                </button>
+              ))}
+              {/* 3.11차 — 관찰 신호상 주의가 우세한 보유 종목 */}
+              {signalCautionHoldings.map(h => (
+                <button
+                  key={`sig-${h.code}`}
+                  onClick={() => router.push(`/stock/${h.code}?from=holding`)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-950/50 hover:bg-slate-800/50 rounded-xl border border-slate-800 transition-all text-left min-h-[44px]"
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-sm font-bold text-blue-400 shrink-0">
+                      {h.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{h.name}</p>
+                      <p className="text-xs text-slate-500 truncate">
+                        어제 기준 주의 신호 {holdingSignals[h.code]?.consensus.caution}개 — 신호 요약 확인
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold px-2 py-1 rounded-lg shrink-0 ml-2 bg-red-500/10 text-red-400">
+                    주의 신호
                   </span>
                 </button>
               ))}

@@ -118,6 +118,7 @@ export interface InvestorEntry {
 
 export interface ChartDataPoint {
   name: string;
+  rawDate?: string;   // 원본 'YYYYMMDD' — 신호 마커(ReferenceDot) 매칭용
   price: number;
   open?: number;
   high?: number;
@@ -125,6 +126,21 @@ export interface ChartDataPoint {
   volume?: number;
   sma5: number | null;
   sma20: number | null;
+}
+
+// 3.11차 — 관찰형 매수/매도 신호. 백엔드 signals.js와 형태 일치.
+export interface StockSignal {
+  id: string;
+  type: 'positive' | 'caution' | 'neutral';
+  label: string;
+  description: string;
+  date?: string;   // 'YYYYMMDD' — 차트 마커용 (크로스·거래량 급증 등 발생일 있는 신호만)
+}
+
+export interface SignalResult {
+  signals: StockSignal[];
+  consensus: { positive: number; caution: number; total: number; summary: string };
+  asOf: string;
 }
 
 export interface StockSummary {

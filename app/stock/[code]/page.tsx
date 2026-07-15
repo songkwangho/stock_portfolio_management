@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, Cell, ReferenceLine
+  BarChart, Bar, Cell, ReferenceLine, ReferenceDot
 } from 'recharts';
 import { stockApi } from '@/lib/stockApi';
-import type { StockSummary, StockDetail, Holding, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag } from '@/types/stock';
+import type { StockSummary, StockDetail, Holding, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag, SignalResult } from '@/types/stock';
 import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import Card from '@/components/ui/Card';
@@ -180,6 +180,8 @@ function StockDetailContent({ code }: { code: string }) {
   const [showSector, setShowSector] = useState(false);
   // 3.7차 — 소속 테마 태그 (지연 로딩)
   const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
+  // 3.11차 — 관찰형 매수/매도 신호 (지연 로딩)
+  const [signals, setSignals] = useState<SignalResult | null>(null);
 
   // 종목 진입 시 스크롤 최상단으로 강제 — 이전 페이지 스크롤 위치 잔재 방지
   useEffect(() => {
@@ -209,6 +211,7 @@ function StockDetailContent({ code }: { code: string }) {
         stockApi.getNews(stock.code).then(setNews).catch(() => {});
         stockApi.getFinancials(stock.code).then(setFinancials).catch(() => {});
         stockApi.getStockThemes(stock.code).then(setStockThemes).catch(() => {});
+        stockApi.getSignals(stock.code).then(setSignals).catch(() => {});
         const cat = data?.category || stock.category;
         if (cat) {
           stockApi.getSectorComparison(cat).then(setSectorData).catch(() => {});
@@ -258,6 +261,7 @@ function StockDetailContent({ code }: { code: string }) {
       : d.date.slice(4, 6) + '/' + d.date.slice(6, 8);
     return {
       name: formatDate,
+      rawDate: d.date,   // 신호 마커 매칭용 원본 날짜 보존
       price: d.price,
       open: d.open,
       high: d.high,
@@ -593,6 +597,50 @@ function StockDetailContent({ code }: { code: string }) {
           </Card>
         )}
 
+        {/* 3.11차 — 관찰형 신호 요약 패널. 결론 카드/한눈에 보기 다음, 차트 이전.
+            명령형 금지 · "어제 종가 기준" 명시 · 긍정/주의 개수 서술. */}
+        {signals && signals.signals.length > 0 && (
+          <Card variant="secondary" padding="base" className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-text-body">🔍 신호 요약</h3>
+              <span className="text-xs text-text-faint">{signals.asOf}</span>
+            </div>
+
+            {/* 합의 요약 — 긍정/주의 개수 + 서술 */}
+            <div className={`p-3 rounded-lg mb-3 border ${
+              signals.consensus.caution > signals.consensus.positive
+                ? 'bg-red-500/5 border-red-500/20'
+                : signals.consensus.positive > signals.consensus.caution
+                ? 'bg-emerald-500/5 border-emerald-500/20'
+                : 'bg-slate-800/50 border-slate-700'
+            }`}>
+              <div className="flex items-center gap-3 mb-1.5">
+                <span className="text-xs font-bold text-emerald-400">긍정 {signals.consensus.positive}</span>
+                <span className="text-xs font-bold text-red-400">주의 {signals.consensus.caution}</span>
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed">{signals.consensus.summary}</p>
+            </div>
+
+            {/* 개별 신호 리스트 */}
+            <div className="space-y-2">
+              {signals.signals.map(sig => (
+                <div key={sig.id} className="flex items-start gap-2">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
+                    sig.type === 'positive' ? 'bg-emerald-500/10 text-emerald-400' :
+                    sig.type === 'caution' ? 'bg-red-500/10 text-red-400' :
+                    'bg-slate-500/10 text-slate-400'
+                  }`}>{sig.label}</span>
+                  <p className="text-xs text-slate-400 leading-relaxed">{sig.description}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-800/50 pt-2">
+              ※ 어제 종가 기준 관찰 결과예요. 투자 권유가 아니며, 실제 거래는 증권사 앱에서 직접 확인 후 진행하세요.
+            </p>
+          </Card>
+        )}
+
         {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
             PC는 우측 사이드바에 폼이 즉시 보이므로 lg 이상에서 숨김. */}
         {!isHolding && stockDetail?.market_opinion === '긍정적' && (
@@ -652,9 +700,32 @@ function StockDetailContent({ code }: { code: string }) {
                     <Line type="monotone" dataKey="price" name="종가" stroke="#3b82f6" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="sma5" name="5일 평균" stroke="#10b981" strokeWidth={1} dot={false} strokeDasharray="5 5" />
                     <Line type="monotone" dataKey="sma20" name="20일 평균" stroke="#f59e0b" strokeWidth={1} dot={false} strokeDasharray="3 3" />
+                    {/* 3.11차 — 골든/데드크로스 발생일 마커. rawDate로 매칭, 보이는 구간 밖이면 미표시. */}
+                    {signals?.signals
+                      .filter(s => s.date && (s.label === '골든크로스' || s.label === '데드크로스'))
+                      .map(s => {
+                        const idx = chartData.findIndex(d => d.rawDate === s.date);
+                        if (idx < 0) return null;
+                        return (
+                          <ReferenceDot key={s.id} x={chartData[idx].name} y={chartData[idx].price}
+                            r={5} fill={s.type === 'positive' ? '#10b981' : '#ef4444'}
+                            stroke="#0f172a" strokeWidth={2} />
+                        );
+                      })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
+              {/* 크로스 마커가 보이는 구간에 있을 때만 범례 노출 */}
+              {signals?.signals.some(s => s.date && (s.label === '골든크로스' || s.label === '데드크로스') && chartData.some(d => d.rawDate === s.date)) && (
+                <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> 골든크로스
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500" /> 데드크로스
+                  </span>
+                </div>
+              )}
 
               {/* Volume Bar */}
               <h4 className="text-sm font-semibold mt-6 mb-2 flex items-center space-x-2">
@@ -680,6 +751,19 @@ function StockDetailContent({ code }: { code: string }) {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              {/* 3.11차 — 거래량 흐름 한 줄 해석 (관찰형) */}
+              {volumeData.length >= 5 && (() => {
+                const window = volumeData.slice(-20);
+                const avg20 = window.length > 0 ? window.reduce((a, b) => a + b.volume, 0) / window.length : 0;
+                const latest = volumeData[volumeData.length - 1]?.volume || 0;
+                const ratio = avg20 > 0 ? latest / avg20 : 1;
+                let msg = '';
+                if (ratio >= 2) msg = '📊 최근 거래량이 평소의 2배 이상이에요. 관심이 크게 늘었어요.';
+                else if (ratio >= 1.3) msg = '📊 거래량이 평소보다 늘고 있어요.';
+                else if (ratio <= 0.5) msg = '📊 거래량이 평소보다 줄었어요. 관심이 식은 편이에요.';
+                else msg = '📊 거래량은 평소 수준이에요.';
+                return <p className="text-xs text-slate-400 mt-2 leading-relaxed">{msg}</p>;
+              })()}
             </div>
 
             {/* Metrics Grid */}

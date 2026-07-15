@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import pool, { query } from '../../db/connection.js';
 import { calculateIndicators } from './indicators.js';
+import { computeSignals } from './signals.js';
 import { median } from './scoring.js';
 import { buildWhereClause } from '../../helpers/queryBuilder.js';
 import { NAVER_FINANCE_URL } from '../../scrapers/naver.js';
@@ -16,6 +17,24 @@ router.get('/stock/:code/indicators', async (req, res) => {
     } catch (error) {
         console.error('Indicators Error:', error.message);
         res.status(500).json({ error: 'Failed to calculate indicators' });
+    }
+});
+
+// GET /api/stock/:code/signals - 관찰형 매수/매도 신호 7종 + 합의 요약 (3.11차)
+// 캐시는 computeSignals 내부에서 10분 TTL로 처리. 실패해도 빈 배열 + 안내 문구로 200 반환
+// (보조 패널이라 사용자 흐름을 막지 않음).
+router.get('/stock/:code/signals', async (req, res) => {
+    const { code } = req.params;
+    try {
+        const result = await computeSignals(code);
+        res.json(result);
+    } catch (error) {
+        console.error('Signals Error:', error.message);
+        res.json({
+            signals: [],
+            consensus: { positive: 0, caution: 0, total: 0, summary: '신호를 계산할 수 없어요. 데이터를 수집 중이에요.' },
+            asOf: '어제 종가 기준',
+        });
     }
 });
 

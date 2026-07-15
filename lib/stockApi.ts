@@ -49,6 +49,7 @@ function ensureInterceptors() {
         url.includes('/market/fear-greed') ||
         url.includes('/holdings/sharpe') ||
         url.includes('/volatility') ||
+        url.includes('/signals') ||
         url.includes('/news');
       if (!silent) {
         try {
@@ -106,6 +107,8 @@ export const stockApi = {
   addToWatchlist: async (code: string) => (await axios.post(`${API_BASE_URL}/watchlist`, { code })).data,
   removeFromWatchlist: async (code: string) => (await axios.delete(`${API_BASE_URL}/watchlist/${code}`)).data,
   getIndicators: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/indicators`)).data,
+  getSignals: async (code: string): Promise<import('@/types/stock').SignalResult> =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/signals`)).data,
   screener: async (filters: Record<string, string | number>) => (await axios.get(`${API_BASE_URL}/screener`, { params: filters })).data,
   getFinancials: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/financials`)).data,
   getNews: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/news`)).data,

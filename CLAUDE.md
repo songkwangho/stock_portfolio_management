@@ -417,6 +417,20 @@ PC (md: 이상):
 
 ---
 
+**3.11차 — 매수/매도 관찰 신호 강화 (2026-05-13)**
+
+일 1회 배치(어제 종가) 데이터로 7종 관찰 신호를 계산해 종목 상세·대시보드에 노출. **명령형("사세요"/"파세요") 절대 금지 — 전부 관찰형 서술.** 방향 중립 신호(스퀴즈)는 방향 단정 안 함. 백테스팅 미검증이라 "예측" 아닌 "관찰"로 표현.
+
+- [x] **[SIG-1]** `server/domains/analysis/signals.js` — 7종 관찰 신호 계산: 골든/데드크로스(SMA5×SMA20 교차), 볼린저 스퀴즈+돌파, RSI 과매도/과매수, MACD 히스토그램 전환, OBV 매집/분산, 거래량 급증, 외국인/기관 연속 순매수. 각 detect는 데이터 부족 시 null (전체 실패로 이어지지 않음). SMA/EMA는 시계열 헬퍼로 전환 시점(어제→오늘) 판정
+- [x] **[SIG-2]** `GET /api/stock/:code/signals` — `{ signals, consensus:{positive,caution,total,summary}, asOf }`. computeSignals 내부 10분 캐시. 실패 시 빈 배열 + 안내 문구로 200 반환. analysisRouter가 stockRouter보다 먼저 마운트돼 `/stock/:code`에 안 가로채임
+- [x] **[SIG-3]** 종목 상세 신호 요약 패널 (`Card` secondary) — 합의 요약(긍정 N/주의 M 색상 구분) + 개별 신호 라벨/관찰형 설명 + "어제 종가 기준" + 투자 권유 아님 면책. 결론 카드·한눈에 보기 다음, 차트 이전 배치
+- [x] **[SIG-4]** 차트 골든/데드크로스 `ReferenceDot` 마커 — `chartData.rawDate`로 발생일 매칭. 보이는 구간(일봉 20일)에 있을 때만 마커+범례 노출
+- [x] **[SIG-5]** 거래량 차트 하단 흐름 한 줄 해석 — 최근 거래량 vs 20일 평균 비율(2배↑/1.3배↑/0.5배↓/평소) 관찰 문구
+- [x] **[SIG-6]** 대시보드 "오늘 확인할 것" — 매도/관망 종목 외에 관찰 신호상 주의 우세(caution>0 && caution≥positive) 보유 종목 추가. **성능: 보유 5개 이하만 신호 조회**
+- [x] **[SIG-DOCS]** `types/stock.ts` `StockSignal`/`SignalResult` + `ChartDataPoint.rawDate`, `lib/stockApi.ts` `getSignals` + silent 목록 `/signals`
+
+---
+
 **3.10차 — DESIGN.md 디자인 시스템 도입 (2026-05-13)**
 
 Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[10/11px], rounded-3xl)을 토큰과 Tailwind 표준 클래스로 교체. 종목 상세에 "한눈에 보기" 9지표 그리드 신설. 기능 변경 없이 스타일만 개선.

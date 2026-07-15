@@ -118,7 +118,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (29개)
+## API 엔드포인트 (30개)
 
 ### 종목 (stock — 8개)
 
@@ -152,11 +152,12 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 > **`sma_available` 규칙**: false이면 `holding_opinion`은 항상 '보유'로 반환되지만 신뢰 불가.
 > 프론트는 `sma_available=false`일 때 반드시 "분석 중" 뱃지를 표시해야 한다.
 
-### 분석 (analysis — 7개)
+### 분석 (analysis — 8개)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/stock/:code/indicators` | RSI, MACD, 볼린저 + `*_available` 플래그 |
+| GET | `/api/stock/:code/signals` | 3.11차 신설. 7종 관찰 신호(크로스/스퀴즈/RSI/MACD/OBV/거래량/수급) + 합의 요약 `{positive, caution, total, summary}` + `asOf`. 관찰형 서술만(명령형 금지). 10분 캐시. 실패 시 빈 배열 200 |
 | GET | `/api/stock/:code/volatility` | 변동성 |
 | GET | `/api/stock/:code/financials` | 분기 재무제표 |
 | GET | `/api/stock/:code/news` | 뉴스 10건 |
