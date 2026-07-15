@@ -597,6 +597,15 @@ function StockDetailContent({ code }: { code: string }) {
           </Card>
         )}
 
+        {/* 3.12차 P2 — stale 종목(최근 데이터 미수집) amber 경고. 신호 패널 대신 노출. */}
+        {signals?.stale && (
+          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 mb-6">
+            <p className="text-xs text-amber-400 leading-relaxed">
+              ⚠️ 이 종목은 최근 데이터가 수집되지 않았어요. 거래가 중단됐거나 상장폐지된 종목일 수 있으니 증권사 앱에서 직접 확인해 주세요.
+            </p>
+          </div>
+        )}
+
         {/* 3.11차 — 관찰형 신호 요약 패널. 결론 카드/한눈에 보기 다음, 차트 이전.
             명령형 금지 · "어제 종가 기준" 명시 · 긍정/주의 개수 서술. */}
         {signals && signals.signals.length > 0 && (

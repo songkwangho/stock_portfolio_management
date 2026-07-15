@@ -104,7 +104,7 @@ const topStocks = [
     { code: '028050', name: '삼성엔지니어링' },
     { code: '000210', name: 'DL' },
     { code: '034020', name: '두산에너빌리티' },
-    { code: '042670', name: '두산인프라코어' },
+    // { code: '042670', name: '두산인프라코어' }, // 3.12차 P1 — 20260123 이후 데이터 중단(상장폐지/코드변경 정황) → 제거 (Cleanup-1 절차)
 ];
 
 // Deduplicate by code

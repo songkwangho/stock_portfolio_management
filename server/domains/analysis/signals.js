@@ -311,6 +311,27 @@ export async function computeSignals(code) {
         volume: Number(h.volume),
     }));
 
+    // 3.12차 P2 — stale 가드: 최신 history가 10일 이상 오래됐으면 신호 계산 중단.
+    // 상장폐지·거래정지 종목이 6개월 전 데이터로 "어제 종가 기준" 신호를 내는 것을 구조적으로 차단.
+    if (history.length > 0) {
+        const latestDate = history[history.length - 1].date; // 'YYYYMMDD'
+        const iso = `${latestDate.slice(0, 4)}-${latestDate.slice(4, 6)}-${latestDate.slice(6, 8)}`;
+        const daysSince = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+        if (daysSince > 10) {
+            const staleResult = {
+                signals: [],
+                consensus: {
+                    positive: 0, caution: 0, total: 0,
+                    summary: '최근 데이터를 수집하지 못해 신호를 계산할 수 없어요. 거래가 중단된 종목일 수 있어요.',
+                },
+                asOf: `${iso} 기준 (오래된 데이터)`,
+                stale: true,
+            };
+            setCache(cacheKey, staleResult);
+            return staleResult;
+        }
+    }
+
     const signals = [];
     // 개별 신호 계산 — 하나가 던져도 나머지는 계속.
     for (const fn of [detectCross, detectBollingerSqueeze, detectRSI, detectMACD, detectOBV, detectVolumeSpike]) {

@@ -141,6 +141,8 @@ export interface SignalResult {
   signals: StockSignal[];
   consensus: { positive: number; caution: number; total: number; summary: string };
   asOf: string;
+  stale?: boolean;   // 3.12차 P2 — 최신 데이터 10일 초과 시 true (거래중단/상장폐지 정황)
+  markers?: { date: string; type: 'golden' | 'dead' }[];   // 3.12차 S5 — 차트 크로스 마커(최근 20일)
 }
 
 export interface StockSummary {
