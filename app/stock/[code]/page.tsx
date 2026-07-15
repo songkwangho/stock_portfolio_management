@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, use, Suspense } from 'react';
+import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight, ChevronDown
+  ArrowLeft, RefreshCw, Trash2, Zap, ShieldCheck, Plus, ArrowUpRight
 } from 'lucide-react';
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -13,12 +13,13 @@ import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, StockDetail, Holding, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag, SignalResult } from '@/types/stock';
 import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
-import Card from '@/components/ui/Card';
-import { generateStockSummary, generateActionGuide } from '@/lib/stockDetail/summary';
-import { formatVol } from '@/lib/stockDetail/format';
 import InvestorChart from '@/components/stock/detail/InvestorChart';
 import FinancialsTable from '@/components/stock/detail/FinancialsTable';
 import NewsList from '@/components/stock/detail/NewsList';
+import ConclusionCard from '@/components/stock/detail/ConclusionCard';
+import StatsGrid from '@/components/stock/detail/StatsGrid';
+import SignalPanel from '@/components/stock/detail/SignalPanel';
+import SectorCompare from '@/components/stock/detail/SectorCompare';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { getThemeMeta } from '@/lib/themesMeta';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -81,9 +82,6 @@ function StockDetailContent({ code }: { code: string }) {
   const [sectorData, setSectorData] = useState<SectorComparison | null>(null);
   const [chartTimeframe, setChartTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
-  const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
-  // 정보 과부하 완화 — 초보자에게 어려운 섹션은 기본 접힘 (6-1)
-  const [showSector, setShowSector] = useState(false);
   // 3.7차 — 소속 테마 태그 (지연 로딩)
   const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
   // 3.11차 — 관찰형 매수/매도 신호 (지연 로딩)
@@ -93,12 +91,6 @@ function StockDetailContent({ code }: { code: string }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [code]);
-
-  useEffect(() => {
-    if (sectorData && currentSectorRowRef.current) {
-      currentSectorRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  }, [sectorData]);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -213,26 +205,6 @@ function StockDetailContent({ code }: { code: string }) {
   const allPrices = chartData.flatMap(d => [d.open || 0, d.high || 0, d.low || 0, d.price || 0]).filter(p => p > 0);
   const priceMin = Math.min(...allPrices) * 0.98;
   const priceMax = Math.max(...allPrices) * 1.02;
-
-  // 3.10차 (DS-5) — "한눈에 보기" 9지표 파생 값.
-  // 52주 범위는 chartData 슬라이스 이전 원본(stockDetail.history)을 써야 함 — 차트 탭에 따라 잘리지 않도록.
-  const historyForRange = stockDetail?.history || [];
-  const high52w = historyForRange.length > 0
-    ? Math.max(...historyForRange.map(h => h.high || h.price))
-    : null;
-  const low52w = historyForRange.length > 0
-    ? Math.min(...historyForRange.filter(h => (h.low || h.price) > 0).map(h => h.low || h.price))
-    : null;
-  // 3.12차 S0 — "한눈에 보기"의 전일종가·거래량은 항상 일봉 원본(stockDetail.history) 기준.
-  // 기존엔 chartData(=chartTimeframe 의존)에서 파생해 월봉/주봉 전환 시 값이 오염됐음.
-  const dailyHistory = stockDetail?.history || [];
-  const prevClose = dailyHistory.length >= 2 ? dailyHistory[dailyHistory.length - 2].price : null;
-  const latestVolume = dailyHistory.length > 0 ? (dailyHistory[dailyHistory.length - 1].volume ?? null) : null;
-  const perDisplay =
-    stockDetail?.per == null ? '---'
-    : stockDetail.per < 0 ? '적자'
-    : stockDetail.per === 0 ? '이익 없음'
-    : `${stockDetail.per}배`;
 
   const helpTexts: Record<string, string> = {
     rsi: 'RSI는 주가가 최근 얼마나 올랐는지/내렸는지를 0~100 사이 숫자로 보여줘요. 70 이상이면 "너무 많이 올랐다", 30 이하면 "너무 많이 내렸다"는 뜻이에요.',
@@ -385,174 +357,14 @@ function StockDetailContent({ code }: { code: string }) {
           </div>
         </div>
 
-        {/* 3.9차 — 결론 카드. 차트보다 먼저 노출해 "이 종목 한 줄 요약 + 다음 행동" 안내.
-            3.10차 (DS-6) — Card primary + 컬러바로 위계 최상단 표시. 배경 tint 대신 accent bar로 절제. */}
-        {stockDetail && (
-          <Card
-            variant="primary"
-            padding="emphasis"
-            accentBar={
-              stockDetail.market_opinion === '긍정적' ? 'positive' :
-              stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
-            }
-            className="mb-6"
-          >
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
-              📋 이 종목 한 줄 요약
-            </p>
-            <p className="text-base font-bold text-white mb-3 leading-relaxed">
-              {generateStockSummary(stockDetail, isHolding, holdingMatch)}
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                stockDetail.market_opinion === '긍정적'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : stockDetail.market_opinion === '부정적'
-                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                  : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-              }`}>
-                📊 시장 분석: {stockDetail.market_opinion || '분석 중'}
-              </span>
-              {isHolding && stockDetail.holding_opinion && (
-                <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                  stockDetail.holding_opinion === '매도'
-                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                    : stockDetail.holding_opinion === '관망'
-                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                    : stockDetail.holding_opinion === '추가매수'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                }`}>
-                  💼 내 종목 상태: {
-                    stockDetail.holding_opinion === '매도' ? '주의 필요' :
-                    stockDetail.holding_opinion === '추가매수' ? '추가 검토' :
-                    stockDetail.holding_opinion
-                  }
-                </span>
-              )}
-            </div>
-            <div className="border-t border-slate-700/50 pt-3">
-              <p className="text-xs font-bold text-slate-400 mb-2">지금 할 수 있는 것</p>
-              <div className="space-y-1.5">
-                {generateActionGuide(stockDetail, isHolding).map((action, i) => (
-                  <div key={i} className="flex items-start space-x-2">
-                    <span className="text-slate-500 text-xs mt-0.5 shrink-0">{i + 1}.</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">{action}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-              ※ 위 내용은 알고리즘 분석 결과예요. 실제 투자 결정은 본인이 직접 하시고,
-              거래는 증권사 앱에서 진행해 주세요.
-            </p>
-          </Card>
-        )}
+        {/* 결론 카드 (3.12차 S3: ConclusionCard 분리) */}
+        {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
 
-        {/* 3.10차 (DS-5) — "한눈에 보기" 9지표 그리드. 결론 카드 다음, 차트 이전.
-            초보자가 스크롤 없이 종목의 요약 상태(가격·거래·범위·밸류·목표가)를 파악. */}
-        {stockDetail && (
-          <Card variant="secondary" padding="base" className="mb-6">
-            <h3 className="text-sm font-bold text-text-body mb-3">📊 한눈에 보기</h3>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-3">
-              {[
-                { label: '현재가',    value: stockDetail?.price ? `₩${stockDetail.price.toLocaleString()}` : '---' },
-                { label: '전일종가',  value: prevClose ? `₩${prevClose.toLocaleString()}` : '---' },
-                { label: '거래량',    value: latestVolume ? formatVol(latestVolume) : '---' },
-                { label: '52주 최고', value: high52w ? `₩${high52w.toLocaleString()}` : '---' },
-                { label: '52주 최저', value: low52w ? `₩${low52w.toLocaleString()}` : '---' },
-                { label: 'PER',       value: perDisplay },
-                { label: 'PBR',       value: stockDetail?.pbr ? `${stockDetail.pbr}배` : '---' },
-                { label: 'ROE',       value: stockDetail?.roe ? `${stockDetail.roe}%` : '---' },
-                { label: '목표가',    value: stockDetail?.targetPrice ? `₩${stockDetail.targetPrice.toLocaleString()}` : '---' },
-              ].map(item => (
-                <div key={item.label} className="min-w-0">
-                  <p className="text-xs text-text-faint mb-0.5 truncate">{item.label}</p>
-                  <p className="text-sm font-bold text-text-primary truncate">{item.value}</p>
-                </div>
-              ))}
-            </div>
+        {/* "한눈에 보기" 9지표 + 52주 게이지 (3.12차 S3: StatsGrid 분리) */}
+        {stockDetail && <StatsGrid stockDetail={stockDetail} />}
 
-            {/* 52주 범위 내 현재가 위치 게이지 — 저점/고점 근접 여부를 시각화 */}
-            {high52w && low52w && stockDetail?.price && high52w > low52w && (
-              <div className="mt-4 pt-3 border-t border-border-subtle">
-                <div className="flex items-center justify-between text-xs text-text-faint mb-1.5">
-                  <span>52주 최저</span>
-                  <span>52주 최고</span>
-                </div>
-                <div className="relative h-2 bg-slate-800 rounded-full">
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full border-2 border-slate-900"
-                    style={{ left: `calc(${Math.min(100, Math.max(0, (stockDetail.price - low52w) / (high52w - low52w) * 100))}% - 6px)` }}
-                  />
-                </div>
-                <p className="text-xs text-text-muted mt-1.5 text-center">
-                  {(() => {
-                    const pct = (stockDetail.price - low52w) / (high52w - low52w) * 100;
-                    if (pct >= 90) return '52주 최고가 근처예요. 단기 고점에 주의하세요';
-                    if (pct >= 60) return '52주 범위 상단, 상승 흐름이에요';
-                    if (pct >= 40) return '52주 범위 중간 정도예요';
-                    if (pct >= 10) return '52주 범위 하단, 저점 근처일 수 있어요';
-                    return '52주 최저가 근처, 반등인지 하락 지속인지 확인하세요';
-                  })()}
-                </p>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* 3.12차 P2 — stale 종목(최근 데이터 미수집) amber 경고. 신호 패널 대신 노출. */}
-        {signals?.stale && (
-          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 mb-6">
-            <p className="text-xs text-amber-400 leading-relaxed">
-              ⚠️ 이 종목은 최근 데이터가 수집되지 않았어요. 거래가 중단됐거나 상장폐지된 종목일 수 있으니 증권사 앱에서 직접 확인해 주세요.
-            </p>
-          </div>
-        )}
-
-        {/* 3.11차 — 관찰형 신호 요약 패널. 결론 카드/한눈에 보기 다음, 차트 이전.
-            명령형 금지 · "어제 종가 기준" 명시 · 긍정/주의 개수 서술. */}
-        {signals && signals.signals.length > 0 && (
-          <Card variant="secondary" padding="base" className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-text-body">🔍 신호 요약</h3>
-              <span className="text-xs text-text-faint">{signals.asOf}</span>
-            </div>
-
-            {/* 합의 요약 — 긍정/주의 개수 + 서술 */}
-            <div className={`p-3 rounded-lg mb-3 border ${
-              signals.consensus.caution > signals.consensus.positive
-                ? 'bg-red-500/5 border-red-500/20'
-                : signals.consensus.positive > signals.consensus.caution
-                ? 'bg-emerald-500/5 border-emerald-500/20'
-                : 'bg-slate-800/50 border-slate-700'
-            }`}>
-              <div className="flex items-center gap-3 mb-1.5">
-                <span className="text-xs font-bold text-emerald-400">긍정 {signals.consensus.positive}</span>
-                <span className="text-xs font-bold text-red-400">주의 {signals.consensus.caution}</span>
-              </div>
-              <p className="text-sm text-slate-300 leading-relaxed">{signals.consensus.summary}</p>
-            </div>
-
-            {/* 개별 신호 리스트 */}
-            <div className="space-y-2">
-              {signals.signals.map(sig => (
-                <div key={sig.id} className="flex items-start gap-2">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded shrink-0 ${
-                    sig.type === 'positive' ? 'bg-emerald-500/10 text-emerald-400' :
-                    sig.type === 'caution' ? 'bg-red-500/10 text-red-400' :
-                    'bg-slate-500/10 text-slate-400'
-                  }`}>{sig.label}</span>
-                  <p className="text-xs text-slate-400 leading-relaxed">{sig.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-800/50 pt-2">
-              ※ 어제 종가 기준 관찰 결과예요. 투자 권유가 아니며, 실제 거래는 증권사 앱에서 직접 확인 후 진행하세요.
-            </p>
-          </Card>
-        )}
+        {/* 관찰형 신호 요약 + stale 경고 (3.12차 S3: SignalPanel 분리) */}
+        <SignalPanel signals={signals} />
 
         {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
             PC는 우측 사이드바에 폼이 즉시 보이므로 lg 이상에서 숨김. */}
@@ -922,118 +734,8 @@ function StockDetailContent({ code }: { code: string }) {
             {/* Financial Statements — 아코디언 (3.12차 S2: FinancialsTable 분리) */}
             <FinancialsTable financials={financials} />
 
-            {/* Sector Comparison — 아코디언(기본 접힘) */}
-            {sectorData && sectorData.stocks.length > 1 && (() => {
-              // 현재 종목의 업종 내 백분위 계산 — "나는 어디 위치인가" 맥락 제공
-              const me = sectorData.stocks.find(s => s.code === stock.code);
-              const computePercentile = (key: 'per' | 'pbr' | 'roe', lowerIsBetter: boolean) => {
-                const myVal = me?.[key];
-                if (myVal === null || myVal === undefined) return null;
-                const others = sectorData.stocks.map(s => s[key]).filter((v): v is number => v !== null && v !== undefined && v > 0);
-                if (others.length < 2) return null;
-                const sorted = [...others].sort((a, b) => a - b);
-                const rank = sorted.findIndex(v => v >= myVal); // 0-indexed
-                const pct = Math.round((rank / sorted.length) * 100); // 하위 N%
-                return lowerIsBetter ? pct : 100 - pct; // PER/PBR은 낮을수록 좋음
-              };
-              const perPct = computePercentile('per', true);
-              const pbrPct = computePercentile('pbr', true);
-              const roePct = computePercentile('roe', false);
-              const interpret = (pct: number | null, label: string) => {
-                if (pct === null) return null;
-                const tier = pct <= 25 ? '상위 25%' : pct <= 50 ? '상위 50%' : pct <= 75 ? '하위 50%' : '하위 25%';
-                const tone = pct <= 50 ? '✓ 우수한 편' : '주의 필요';
-                return `${label}: 업종 내 ${tier} (${tone})`;
-              };
-              return (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <button onClick={() => setShowSector(v => !v)} className="w-full flex items-center justify-between min-h-[44px] mb-2">
-                  <h3 className="text-lg font-semibold">같은 업종 비교</h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-slate-500">{showSector ? '접기' : '펼치기'}</span>
-                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showSector ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-                {showSector && <>
-                <p className="text-xs text-slate-500 mb-3">
-                  <span className="text-blue-400 font-bold">{sectorData.category}</span> 업종 중앙값과 비교해요.
-                  PER이 중앙값보다 낮고 ROE가 높으면 좋아요!
-                </p>
-                {/* 업종 내 백분위 요약 — 평균값 비교보다 직관적 */}
-                {(perPct !== null || pbrPct !== null || roePct !== null) && (
-                  <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-1">
-                    <p className="text-xs font-bold text-blue-300 mb-1">📊 이 종목의 업종 내 위치</p>
-                    {perPct !== null && <p className="text-xs text-blue-200/90">{interpret(perPct, 'PER')}</p>}
-                    {pbrPct !== null && <p className="text-xs text-blue-200/90">{interpret(pbrPct, 'PBR')}</p>}
-                    {roePct !== null && <p className="text-xs text-blue-200/90">{interpret(roePct, 'ROE')}</p>}
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-slate-900/50 rounded-xl border border-slate-800/50">
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-1">업종 중앙값 PER</p>
-                    <p className="text-sm font-bold text-blue-400">{sectorData.medians.per}배</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-1">업종 중앙값 PBR</p>
-                    <p className="text-sm font-bold text-blue-400">{sectorData.medians.pbr}배</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-slate-500 mb-1">업종 중앙값 ROE</p>
-                    <p className="text-sm font-bold text-blue-400">{sectorData.medians.roe}%</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                  <table className="w-full text-xs min-w-[600px]">
-                    <thead className="sticky top-0 bg-slate-950">
-                      <tr className="border-b border-slate-800">
-                        <th className="text-left py-2 px-3 text-xs text-slate-500 font-bold">종목</th>
-                        <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">PER</th>
-                        <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">PBR</th>
-                        <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">ROE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sectorData.stocks.map(s => {
-                        const isCurrent = s.code === stock.code;
-                        return (
-                          <tr
-                            key={s.code}
-                            ref={isCurrent ? currentSectorRowRef : undefined}
-                            className={`border-b border-slate-800/30 ${isCurrent ? 'bg-blue-600/10' : ''}`}
-                          >
-                            <td className="py-2 px-3">
-                              <span className={isCurrent ? 'text-blue-400 font-bold' : 'text-slate-300'}>{s.name}</span>
-                              {isCurrent && <span className="text-xs text-blue-500 ml-1">← 현재</span>}
-                            </td>
-                            <td className="text-right py-2 px-3">
-                              <span className="text-slate-300">{s.per || '---'}</span>
-                              {s.perVsAvg !== null && (
-                                <span className={`text-xs ml-1 ${s.perVsAvg < 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                  ({s.perVsAvg > 0 ? '+' : ''}{s.perVsAvg}%)
-                                </span>
-                              )}
-                            </td>
-                            <td className="text-right py-2 px-3">
-                              <span className="text-slate-300">{s.pbr || '---'}</span>
-                            </td>
-                            <td className="text-right py-2 px-3">
-                              <span className="text-slate-300">{s.roe ? `${s.roe}%` : '---'}</span>
-                              {s.roeVsAvg !== null && (
-                                <span className={`text-xs ml-1 ${s.roeVsAvg > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                  ({s.roeVsAvg > 0 ? '+' : ''}{s.roeVsAvg}%)
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                </>}
-              </div>
-              );
-            })()}
+            {/* 같은 업종 비교 (3.12차 S3: SectorCompare 분리) */}
+            <SectorCompare sectorData={sectorData} currentCode={stock.code} />
 
             {/* News (Phase 2 지연 로딩) — 3.12차 S2: NewsList 분리 */}
             <NewsList news={news} />

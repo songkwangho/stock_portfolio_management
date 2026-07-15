@@ -1,0 +1,134 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
+import type { SectorComparison } from '@/types/stock';
+
+// 같은 업종 비교 아코디언 (3.12차 S3 분리). scroll ref + effect 함께 이동. 본문 동일.
+interface SectorCompareProps {
+  sectorData: SectorComparison | null;
+  currentCode: string;
+}
+
+export default function SectorCompare({ sectorData, currentCode }: SectorCompareProps) {
+  const [showSector, setShowSector] = useState(false);
+  const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    if (sectorData && currentSectorRowRef.current) {
+      currentSectorRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [sectorData]);
+
+  if (!sectorData || sectorData.stocks.length <= 1) return null;
+
+  // 현재 종목의 업종 내 백분위 계산 — "나는 어디 위치인가" 맥락 제공
+  const me = sectorData.stocks.find(s => s.code === currentCode);
+  const computePercentile = (key: 'per' | 'pbr' | 'roe', lowerIsBetter: boolean) => {
+    const myVal = me?.[key];
+    if (myVal === null || myVal === undefined) return null;
+    const others = sectorData.stocks.map(s => s[key]).filter((v): v is number => v !== null && v !== undefined && v > 0);
+    if (others.length < 2) return null;
+    const sorted = [...others].sort((a, b) => a - b);
+    const rank = sorted.findIndex(v => v >= myVal); // 0-indexed
+    const pct = Math.round((rank / sorted.length) * 100); // 하위 N%
+    return lowerIsBetter ? pct : 100 - pct; // PER/PBR은 낮을수록 좋음
+  };
+  const perPct = computePercentile('per', true);
+  const pbrPct = computePercentile('pbr', true);
+  const roePct = computePercentile('roe', false);
+  const interpret = (pct: number | null, label: string) => {
+    if (pct === null) return null;
+    const tier = pct <= 25 ? '상위 25%' : pct <= 50 ? '상위 50%' : pct <= 75 ? '하위 50%' : '하위 25%';
+    const tone = pct <= 50 ? '✓ 우수한 편' : '주의 필요';
+    return `${label}: 업종 내 ${tier} (${tone})`;
+  };
+  return (
+    <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
+      <button onClick={() => setShowSector(v => !v)} className="w-full flex items-center justify-between min-h-[44px] mb-2">
+        <h3 className="text-lg font-semibold">같은 업종 비교</h3>
+        <div className="flex items-center space-x-2">
+          <span className="text-xs text-slate-500">{showSector ? '접기' : '펼치기'}</span>
+          <ChevronDown size={16} className={`text-slate-500 transition-transform ${showSector ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+      {showSector && <>
+      <p className="text-xs text-slate-500 mb-3">
+        <span className="text-blue-400 font-bold">{sectorData.category}</span> 업종 중앙값과 비교해요.
+        PER이 중앙값보다 낮고 ROE가 높으면 좋아요!
+      </p>
+      {/* 업종 내 백분위 요약 — 평균값 비교보다 직관적 */}
+      {(perPct !== null || pbrPct !== null || roePct !== null) && (
+        <div className="mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-1">
+          <p className="text-xs font-bold text-blue-300 mb-1">📊 이 종목의 업종 내 위치</p>
+          {perPct !== null && <p className="text-xs text-blue-200/90">{interpret(perPct, 'PER')}</p>}
+          {pbrPct !== null && <p className="text-xs text-blue-200/90">{interpret(pbrPct, 'PBR')}</p>}
+          {roePct !== null && <p className="text-xs text-blue-200/90">{interpret(roePct, 'ROE')}</p>}
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-slate-900/50 rounded-xl border border-slate-800/50">
+        <div className="text-center">
+          <p className="text-xs text-slate-500 mb-1">업종 중앙값 PER</p>
+          <p className="text-sm font-bold text-blue-400">{sectorData.medians.per}배</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xs text-slate-500 mb-1">업종 중앙값 PBR</p>
+          <p className="text-sm font-bold text-blue-400">{sectorData.medians.pbr}배</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xs text-slate-500 mb-1">업종 중앙값 ROE</p>
+          <p className="text-sm font-bold text-blue-400">{sectorData.medians.roe}%</p>
+        </div>
+      </div>
+      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+        <table className="w-full text-xs min-w-[600px]">
+          <thead className="sticky top-0 bg-slate-950">
+            <tr className="border-b border-slate-800">
+              <th className="text-left py-2 px-3 text-xs text-slate-500 font-bold">종목</th>
+              <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">PER</th>
+              <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">PBR</th>
+              <th className="text-right py-2 px-3 text-xs text-slate-500 font-bold">ROE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sectorData.stocks.map(s => {
+              const isCurrent = s.code === currentCode;
+              return (
+                <tr
+                  key={s.code}
+                  ref={isCurrent ? currentSectorRowRef : undefined}
+                  className={`border-b border-slate-800/30 ${isCurrent ? 'bg-blue-600/10' : ''}`}
+                >
+                  <td className="py-2 px-3">
+                    <span className={isCurrent ? 'text-blue-400 font-bold' : 'text-slate-300'}>{s.name}</span>
+                    {isCurrent && <span className="text-xs text-blue-500 ml-1">← 현재</span>}
+                  </td>
+                  <td className="text-right py-2 px-3">
+                    <span className="text-slate-300">{s.per || '---'}</span>
+                    {s.perVsAvg !== null && (
+                      <span className={`text-xs ml-1 ${s.perVsAvg < 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        ({s.perVsAvg > 0 ? '+' : ''}{s.perVsAvg}%)
+                      </span>
+                    )}
+                  </td>
+                  <td className="text-right py-2 px-3">
+                    <span className="text-slate-300">{s.pbr || '---'}</span>
+                  </td>
+                  <td className="text-right py-2 px-3">
+                    <span className="text-slate-300">{s.roe ? `${s.roe}%` : '---'}</span>
+                    {s.roeVsAvg !== null && (
+                      <span className={`text-xs ml-1 ${s.roeVsAvg > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        ({s.roeVsAvg > 0 ? '+' : ''}{s.roeVsAvg}%)
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      </>}
+    </div>
+  );
+}
