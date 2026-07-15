@@ -417,6 +417,25 @@ PC (md: 이상):
 
 ---
 
+**3.12차 — 종목상세 리팩터링 (2026-07-15)**
+
+1444줄 `app/stock/[code]/page.tsx`가 멀티에이전트 리뷰를 stall시켜 리뷰 자동화 복구가 목적. 계획 문서 `docs/REFACTOR_PLAN_STOCK_DETAIL.md` 기반, 단계별 독립 커밋(각 tsc 통과). Sprint 3 [M1] "차트 분리" 흡수.
+
+- [x] **[P1]** 042670(두산인프라코어) 상장폐지 정황 제거 — `majorStocks`에서 제거. **Neon 행 삭제는 운영자 수동(로컬 DATABASE_URL 부재)**. P2가 구조적으로 무력화하므로 삭제 전에도 거짓 신호 없음
+- [x] **[P2]** `signals.js` stale 가드 — 최신 history 10일 초과 시 신호 중단 + `stale:true` + amber 배너. `SignalResult.stale` 추가
+- [ ] **[P3]** 041040(CJ CGV) — expand-2 삽입 실패분. **재삽입은 운영자 수동**. DisclaimerModal "178개"→"180여 개" 근사 표현으로 변경
+- [x] **[S0]** StatsGrid ↔ chartTimeframe 결합 해소 (월봉 전환 시 전일종가·거래량 오염 수정) — 단독 커밋
+- [x] **[S1]** 순수 함수 → `lib/stockDetail/{summary,format}.ts` (+ `helpTexts.ts` 정적 맵)
+- [x] **[S2]** InvestorChart / FinancialsTable / NewsList (리프)
+- [x] **[S3]** ConclusionCard / StatsGrid / SignalPanel / SectorCompare
+- [x] **[S4]** MetricsGrid / IndicatorPanel — `onHelp(t)` 콜백 배선 (Context 미도입)
+- [x] **[S5]** **ChartSection 통합 추출**(PriceChart/VolumeChart 분리안 폐기) + `detectCrossHistory` 신설 → `/signals` 응답 `markers[]`(최근 20일 크로스). 기존 "어제 1일" 마커의 노출 확률 ~4% → SIG-4 정상화. 헤더·사이드바 점수는 일봉 기준 계산으로 이동(S0와 동일 결합 해소)
+- [x] **[S6]** DetailHeader / RightSidebar / PortfolioAddForm — refresh는 셸 소유(콜백). `id="portfolio-add-form"` DOM 계약 보존
+- [x] **[S7]** 셸 **1444 → 254줄** (fetch 오케스트레이션 + 일봉 점수 + 레이아웃 조립만). `components/stock/detail/` 13개 + `lib/stockDetail/` 3개
+- 검증: 각 단계 tsc 0 error. 구조 스냅샷(`docs/refactor-baseline/`) 대비 차트 높이(288/96/264) + DOM id 보존 확인. 스크린샷은 로컬 dev(lightningcss) 불가로 구조 grep 대체
+
+---
+
 **3.11차 — 매수/매도 관찰 신호 강화 (2026-05-13)**
 
 일 1회 배치(어제 종가) 데이터로 7종 관찰 신호를 계산해 종목 상세·대시보드에 노출. **명령형("사세요"/"파세요") 절대 금지 — 전부 관찰형 서술.** 방향 중립 신호(스퀴즈)는 방향 단정 안 함. 백테스팅 미검증이라 "예측" 아닌 "관찰"로 표현.
