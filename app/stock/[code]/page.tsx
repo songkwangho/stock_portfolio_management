@@ -170,7 +170,6 @@ function StockDetailContent({ code }: { code: string }) {
       </button>
 
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
-        {/* Header */}
         {/* 헤더 (3.12차 S6: DetailHeader 분리) */}
         <DetailHeader
           stock={stock}
