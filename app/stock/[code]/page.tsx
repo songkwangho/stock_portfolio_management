@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, Cell, ReferenceLine, ReferenceDot
+  BarChart, Bar, Cell, ReferenceDot
 } from 'recharts';
 import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, StockDetail, Holding, ChartDataPoint, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, HistoryEntry, StockThemeTag, SignalResult } from '@/types/stock';
@@ -16,6 +16,9 @@ import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomShe
 import Card from '@/components/ui/Card';
 import { generateStockSummary, generateActionGuide } from '@/lib/stockDetail/summary';
 import { formatVol } from '@/lib/stockDetail/format';
+import InvestorChart from '@/components/stock/detail/InvestorChart';
+import FinancialsTable from '@/components/stock/detail/FinancialsTable';
+import NewsList from '@/components/stock/detail/NewsList';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { getThemeMeta } from '@/lib/themesMeta';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -80,8 +83,6 @@ function StockDetailContent({ code }: { code: string }) {
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
   const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
   // 정보 과부하 완화 — 초보자에게 어려운 섹션은 기본 접힘 (6-1)
-  const [showInvestor, setShowInvestor] = useState(false);
-  const [showFinancials, setShowFinancials] = useState(false);
   const [showSector, setShowSector] = useState(false);
   // 3.7차 — 소속 테마 태그 (지연 로딩)
   const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
@@ -915,102 +916,11 @@ function StockDetailContent({ code }: { code: string }) {
               </div>
             )}
 
-            {/* Investor Trading Trends — 아코디언(기본 접힘, 초보자에게 어려운 내용) */}
-            {stockDetail?.investorData && stockDetail.investorData.length > 0 && (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <button onClick={() => setShowInvestor(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-semibold">투자자별 매매동향</h3>
-                    <span onClick={(e) => { e.stopPropagation(); setHelpTerm('supplyDemand'); }} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-slate-500">{showInvestor ? '접기' : '펼치기'}</span>
-                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showInvestor ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-                {showInvestor && (
-                  <div className="mt-4">
-                    <p className="text-xs text-slate-500 mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
-                    <p className="text-xs text-slate-600 mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
-                    <div className="h-64 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stockDetail.investorData.slice(-10).map((d) => ({
-                          ...d, name: d.date.slice(4, 6) + '/' + d.date.slice(6, 8),
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                          <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? '+' : ''}${Math.round(v / 1000)}k`} />
-                          <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
-                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                          <ReferenceLine y={0} stroke="#334155" />
-                          <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#facc15" />
-                          <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#ec4899" />
-                          <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6366f1" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Investor Trading Trends — 아코디언 (3.12차 S2: InvestorChart 분리) */}
+            {stockDetail && <InvestorChart stockDetail={stockDetail} onHelp={setHelpTerm} />}
 
-            {/* Financial Statements — 아코디언(기본 접힘) */}
-            {financials && financials.financials.length > 0 && (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <button onClick={() => setShowFinancials(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
-                  <h3 className="text-lg font-semibold">분기별 실적</h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-slate-500">{showFinancials ? '접기' : '펼치기'}</span>
-                    <ChevronDown size={16} className={`text-slate-500 transition-transform ${showFinancials ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-                {showFinancials && <div className="mt-4">
-                <p className="text-xs text-slate-500 mb-1">최근 분기별 매출과 이익 추이예요. 꾸준히 늘어나면 좋은 신호!</p>
-                <p className="text-xs text-slate-600 mb-4">단위: 억 원 (네이버 증권 기준). 1조 = 10,000억</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-800">
-                        <th className="text-left py-2 px-3 text-xs text-slate-500 font-bold">구분</th>
-                        {financials.periods.slice(0, 5).map(p => (
-                          <th key={p} className="text-right py-2 px-3 text-xs text-slate-500 font-bold">{p}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {financials.financials.map(row => (
-                        <tr key={row.label} className="border-b border-slate-800/30">
-                          <td className="py-2.5 px-3 text-slate-300 font-semibold">{row.label}</td>
-                          {row.values.slice(0, 5).map((v, i) => {
-                            const prev = i > 0 ? row.values[i - 1] : null;
-                            const isGrowing = v !== null && prev !== null && v > prev;
-                            // 1조(10,000억) 이상은 "X조 Y,YYY억"으로, 그 외는 "N,NNN억"
-                            let formatted = '---';
-                            if (v !== null) {
-                              const abs = Math.abs(v);
-                              const sign = v < 0 ? '-' : '';
-                              if (abs >= 10000) {
-                                const jo = Math.floor(abs / 10000);
-                                const eok = abs % 10000;
-                                formatted = `${sign}${jo}조${eok > 0 ? ` ${eok.toLocaleString()}억` : ''}`;
-                              } else {
-                                formatted = `${sign}${abs.toLocaleString()}억`;
-                              }
-                            }
-                            return (
-                              <td key={i} className={`text-right py-2.5 px-3 ${v === null ? 'text-slate-600' : isGrowing ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                {formatted}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                </div>}
-              </div>
-            )}
+            {/* Financial Statements — 아코디언 (3.12차 S2: FinancialsTable 분리) */}
+            <FinancialsTable financials={financials} />
 
             {/* Sector Comparison — 아코디언(기본 접힘) */}
             {sectorData && sectorData.stocks.length > 1 && (() => {
@@ -1125,37 +1035,8 @@ function StockDetailContent({ code }: { code: string }) {
               );
             })()}
 
-            {/* News (Phase 2 지연 로딩) */}
-            {news === null && (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50 animate-pulse">
-                <div className="h-4 bg-slate-800 rounded w-24 mb-4"></div>
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => <div key={i} className="h-12 bg-slate-800/50 rounded-xl"></div>)}
-                </div>
-              </div>
-            )}
-            {news !== null && news.length > 0 && (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <h3 className="text-lg font-semibold mb-2">최신 뉴스</h3>
-                <p className="text-xs text-slate-500 mb-4">이 종목과 관련된 최근 뉴스예요. 투자 전 꼭 확인해보세요!</p>
-                <div className="space-y-3">
-                  {news.map((item, i) => (
-                    <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
-                      className="block p-3 bg-slate-900/50 rounded-xl border border-slate-800/50 hover:border-blue-500/30 hover:bg-slate-900 transition-all group">
-                      <p className="text-sm text-slate-200 group-hover:text-blue-400 transition-colors leading-relaxed mb-1">
-                        {item.title}
-                      </p>
-                      <div className="flex items-center space-x-2 text-xs text-slate-600">
-                        <span>{item.source}</span>
-                        <span>·</span>
-                        <span>{item.date}</span>
-                        <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 text-blue-400 transition-opacity" />
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* News (Phase 2 지연 로딩) — 3.12차 S2: NewsList 분리 */}
+            <NewsList news={news} />
           </div>
 
           {/* Right Sidebar */}
