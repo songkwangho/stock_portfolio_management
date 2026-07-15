@@ -20,6 +20,9 @@ import ConclusionCard from '@/components/stock/detail/ConclusionCard';
 import StatsGrid from '@/components/stock/detail/StatsGrid';
 import SignalPanel from '@/components/stock/detail/SignalPanel';
 import SectorCompare from '@/components/stock/detail/SectorCompare';
+import MetricsGrid from '@/components/stock/detail/MetricsGrid';
+import IndicatorPanel from '@/components/stock/detail/IndicatorPanel';
+import { helpTexts } from '@/lib/stockDetail/helpTexts';
 import { getDataFreshnessLabel } from '@/lib/dataFreshness';
 import { getThemeMeta } from '@/lib/themesMeta';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -205,14 +208,6 @@ function StockDetailContent({ code }: { code: string }) {
   const allPrices = chartData.flatMap(d => [d.open || 0, d.high || 0, d.low || 0, d.price || 0]).filter(p => p > 0);
   const priceMin = Math.min(...allPrices) * 0.98;
   const priceMax = Math.max(...allPrices) * 1.02;
-
-  const helpTexts: Record<string, string> = {
-    rsi: 'RSI는 주가가 최근 얼마나 올랐는지/내렸는지를 0~100 사이 숫자로 보여줘요. 70 이상이면 "너무 많이 올랐다", 30 이하면 "너무 많이 내렸다"는 뜻이에요.',
-    macd: 'MACD는 최근 주가 흐름의 방향을 보여줘요. 막대가 위로 올라가면 상승 힘이 강하고, 아래로 내려가면 하락 힘이 강하다는 신호예요.',
-    bollinger: '볼린저밴드는 주가가 평소 움직이는 범위를 보여줘요. 상단에 가까우면 평소보다 많이 올랐고, 하단에 가까우면 많이 내려간 거예요.',
-    candle: '빨간 봉은 주가가 내린 날, 초록 봉은 오른 날이에요. 봉의 길이가 길수록 하루 동안 가격이 많이 변했다는 뜻이에요.',
-    volume: '거래량은 하루 동안 주식이 얼마나 많이 거래됐는지를 보여줘요. 거래량이 많으면 관심이 많다는 뜻이에요.',
-  };
 
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-8">
@@ -491,242 +486,11 @@ function StockDetailContent({ code }: { code: string }) {
               })()}
             </div>
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PER (주가수익비율)</h4>
-                  <button onClick={() => setHelpTerm('per')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="PER 도움말">[?]</button>
-                </div>
-                <p className={`text-xl font-bold ${stockDetail?.per != null && stockDetail.per <= 0 ? 'text-yellow-400' : 'text-white'}`}>
-                  {stockDetail?.per == null ? '---'
-                    : stockDetail.per < 0 ? '적자'
-                    : stockDetail.per === 0 ? '이익 없음'
-                    : `${stockDetail.per}배`}
-                </p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  {stockDetail?.per && stockDetail.per < 0
-                    ? '현재 이익이 마이너스인 기업이에요'
-                    : stockDetail?.per && stockDetail.per < 15
-                    ? '업종 평균보다 저렴한 편이에요'
-                    : stockDetail?.per && stockDetail.per < 30
-                    ? '적정 수준이에요'
-                    : stockDetail?.per ? '고평가 구간이에요' : '데이터 없음'}
-                </p>
-                {/* 업종별 PER 맥락 안내 — 초보자가 단순 숫자만 보고 판단하지 않도록 */}
-                {(() => {
-                  const cat = stockDetail?.category || stock.category;
-                  let hint = '';
-                  if (cat?.includes('기술') || cat?.includes('IT')) {
-                    hint = 'IT 기업은 PER 20~40배도 정상이에요. 성장성을 함께 봐야 해요.';
-                  } else if (cat?.includes('금융') || cat?.includes('지주')) {
-                    hint = '금융 기업은 PER 5~15배가 일반적이에요. 단순히 낮다고 저평가는 아니에요.';
-                  } else if (cat?.includes('바이오') || cat?.includes('헬스')) {
-                    hint = '바이오 기업은 R&D 투자로 일시 적자가 많아요. 부실로 단정하지 마세요.';
-                  } else if (cat?.includes('에너지') || cat?.includes('소재')) {
-                    hint = '에너지·소재는 원자재 가격에 따라 PER이 출렁여요.';
-                  }
-                  if (!hint) return null;
-                  return (
-                    <p className="text-xs text-blue-400/80 mt-2 leading-relaxed border-t border-slate-800/50 pt-2">
-                      💡 {hint}
-                    </p>
-                  );
-                })()}
-                {/* 섹터 대비 PER 게이지 — 업종 중앙값 대비 현재가 위치 (6-2) */}
-                {sectorData && stockDetail?.per !== null && stockDetail?.per !== undefined && stockDetail.per > 0 && sectorData.medians.per && (
-                  <div className="mt-2 pt-2 border-t border-slate-800/50">
-                    <p className="text-xs text-slate-600 mb-1">업종 중앙값 {sectorData.medians.per}배 대비</p>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${stockDetail.per < sectorData.medians.per ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                          style={{ width: `${Math.min(100, (stockDetail.per / (sectorData.medians.per * 2)) * 100)}%` }}
-                        />
-                      </div>
-                      <span className={`text-xs font-bold ${stockDetail.per < sectorData.medians.per ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {stockDetail.per < sectorData.medians.per ? '업종 평균보다 저렴' : '업종 평균보다 높음'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PBR (주가순자산비율)</h4>
-                  <button onClick={() => setHelpTerm('pbr')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="PBR 도움말">[?]</button>
-                </div>
-                <p className="text-xl font-bold text-white">{stockDetail?.pbr ? `${stockDetail.pbr}배` : '---'}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  {stockDetail?.pbr && stockDetail.pbr <= 1
-                    ? '자산 대비 저평가 상태예요'
-                    : stockDetail?.pbr && stockDetail.pbr <= 3
-                    ? '적정 수준이에요'
-                    : stockDetail?.pbr ? '자산 대비 비싼 편이에요' : '데이터 없음'}
-                </p>
-              </div>
-              <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">ROE (자기자본이익률)</h4>
-                  <button onClick={() => setHelpTerm('roe')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="ROE 도움말">[?]</button>
-                </div>
-                <p className="text-xl font-bold text-white">{stockDetail?.roe ? `${stockDetail.roe}%` : '---'}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  {stockDetail?.roe
-                    ? `자기자본으로 ${stockDetail.roe}%를 벌었어요. ${stockDetail.roe >= 15 ? '우량 기업이에요!' : stockDetail.roe >= 10 ? '양호한 수준이에요' : '개선이 필요해요'}`
-                    : '데이터 없음'}
-                </p>
-              </div>
-              <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
-                <h4 className="text-xs font-bold mb-1 text-slate-500 uppercase tracking-widest">목표가</h4>
-                <p className="text-xl font-bold text-emerald-400">{stockDetail?.targetPrice ? `₩${stockDetail.targetPrice.toLocaleString()}` : '---'}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  {stockDetail?.targetPrice && stockDetail?.price
-                    ? stockDetail.price < stockDetail.targetPrice
-                      ? `애널리스트 목표가 기준 현재가 대비 +${((stockDetail.targetPrice - stockDetail.price) / stockDetail.price * 100).toFixed(0)}%`
-                      : '현재가가 목표가에 도달했어요'
-                    : '증권사 애널리스트 평균 예상가'}
-                </p>
-              </div>
-              {/* 3.8차 PEG 카드 — EPS 성장률로 보정한 PER */}
-              {(() => {
-                const epsCur = stockDetail?.eps_current;
-                const epsPrev = stockDetail?.eps_previous;
-                const per = stockDetail?.per;
-                const growth = (epsCur != null && epsPrev != null && epsPrev !== 0)
-                  ? ((epsCur - epsPrev) / Math.abs(epsPrev) * 100)
-                  : null;
-                const peg = (growth !== null && growth > 0 && per != null && per > 0)
-                  ? +(per / growth).toFixed(2)
-                  : null;
-                return (
-                  <div className="p-5 bg-slate-950/30 rounded-2xl border border-slate-800">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">PEG (성장 보정)</h4>
-                      <button onClick={() => setHelpTerm('peg')} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label="PEG 도움말">[?]</button>
-                    </div>
-                    <p className="text-xl font-bold text-white">{peg !== null ? `${peg}배` : '---'}</p>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      {peg === null
-                        ? 'EPS 성장률 데이터 부족 또는 마이너스 성장'
-                        : peg < 1
-                        ? '성장 대비 저평가예요 (PEG < 1)'
-                        : peg < 2
-                        ? '적정 수준이에요 (PEG 1~2)'
-                        : '성장 대비 고평가예요 (PEG > 2)'}
-                    </p>
-                    {growth !== null && (
-                      <p className="text-xs text-slate-600 mt-1">
-                        EPS 성장률: {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+            {/* Metrics Grid (3.12차 S4: MetricsGrid 분리) */}
+            {stockDetail && <MetricsGrid stockDetail={stockDetail} category={stock.category} sectorData={sectorData} onHelp={setHelpTerm} />}
 
-            {/* 초보자 친화적 보조지표 패널 */}
-            {indicators?.summary && (
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
-                <h3 className="text-lg font-semibold mb-4">기술적 지표 종합 분석</h3>
-
-                {/* 종합 신호 - 큰 카드 */}
-                <div className={`p-5 rounded-2xl mb-6 border ${
-                  indicators.summary.signal === '긍정적' ? 'bg-emerald-500/5 border-emerald-500/20' :
-                  indicators.summary.signal === '주의' ? 'bg-red-500/5 border-red-500/20' :
-                  'bg-blue-500/5 border-blue-500/20'
-                }`}>
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className={`text-2xl font-black ${
-                      indicators.summary.signal === '긍정적' ? 'text-emerald-400' :
-                      indicators.summary.signal === '주의' ? 'text-red-400' : 'text-blue-400'
-                    }`}>{indicators.summary.signal}</span>
-                    <span className="text-xs text-slate-500">종합 기술적 신호</span>
-                  </div>
-                  <p className="text-sm text-slate-400 leading-relaxed">{indicators.summary.description}</p>
-                </div>
-
-                {/* 개별 지표 카드들 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {indicators.summary.details.map((detail) => {
-                    const termKey: HelpTermKey | null = detail.indicator === 'RSI' ? 'rsi' : detail.indicator === 'MACD' ? 'macd' : detail.indicator === '볼린저밴드' ? 'bollinger' : null;
-                    return (
-                    <div key={detail.indicator} className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-bold text-slate-300">{detail.indicator}</h4>
-                        {termKey && (
-                          <button onClick={() => setHelpTerm(termKey)} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center" aria-label={`${detail.indicator} 도움말`}>[?]</button>
-                        )}
-                      </div>
-                      <p className={`text-lg font-black mb-1 ${
-                        detail.color === 'green' ? 'text-emerald-400' :
-                        detail.color === 'red' ? 'text-red-400' : 'text-blue-400'
-                      }`}>{detail.signal}</p>
-                      <p className="text-xs text-slate-500 leading-relaxed">{detail.description}</p>
-                      <div className="mt-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-xs text-blue-300 leading-relaxed">
-                        {helpTexts[detail.indicator === 'RSI' ? 'rsi' : detail.indicator === 'MACD' ? 'macd' : 'bollinger']}
-                      </div>
-                      {/* Numeric values */}
-                      <div className="mt-2 pt-2 border-t border-slate-800/50">
-                        {detail.indicator === 'RSI' && indicators.rsi !== null && (
-                          <div className="flex items-center space-x-2">
-                            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full ${indicators.rsi > 70 ? 'bg-red-500' : indicators.rsi < 30 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                                style={{ width: `${indicators.rsi}%` }} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-400">{indicators.rsi}</span>
-                          </div>
-                        )}
-                        {detail.indicator === 'MACD' && indicators.macd && (
-                          <p className="text-xs text-slate-600">MACD {indicators.macd.macdLine.toLocaleString()} / 시그널 {indicators.macd.signal.toLocaleString()}</p>
-                        )}
-                        {detail.indicator === '볼린저밴드' && indicators.bollinger && (
-                          <div className="flex items-center space-x-2">
-                            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full ${indicators.bollinger.percentB > 80 ? 'bg-red-500' : indicators.bollinger.percentB < 20 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                                style={{ width: `${Math.max(2, Math.min(100, indicators.bollinger.percentB))}%` }} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-400">{indicators.bollinger.percentB}%</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    );
-                  })}
-                </div>
-
-                {/* 지표 가용성 안내 — 히스토리 부족으로 일부 지표 미계산 시 (sma_available과 동일 패턴) */}
-                {(() => {
-                  const histDays = indicators.history_days ?? 0;
-                  const pending: { name: string; need: number }[] = [];
-                  if (indicators.rsi_available === false) pending.push({ name: 'RSI', need: 15 });
-                  if (indicators.macd_available === false) pending.push({ name: 'MACD', need: 26 });
-                  if (indicators.bollinger_available === false) pending.push({ name: '볼린저밴드', need: 20 });
-                  if (pending.length === 0) return null;
-                  return (
-                    <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50">
-                      <p className="text-xs font-bold text-slate-300 mb-2">⏳ 일부 지표는 데이터 수집 중이에요</p>
-                      <div className="space-y-1.5">
-                        {pending.map(p => (
-                          <p key={p.name} className="text-xs text-slate-500 leading-relaxed">
-                            <span className="font-bold text-slate-400">{p.name}</span> — 최소 {p.need}일 데이터가 필요해요. 현재 {histDays}일치 수집됨, 약 {Math.max(0, p.need - histDays)}일 후 표시돼요.
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* 변동성 */}
-                <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800/50 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-300 mb-1">가격 변동성</h4>
-                    <p className="text-xs text-slate-500">숫자가 클수록 가격이 많이 움직여요</p>
-                  </div>
-                  <p className="text-xl font-bold">{volatility !== null ? `±${volatility}%` : '---'}</p>
-                </div>
-              </div>
-            )}
+            {/* 기술적 지표 종합 (3.12차 S4: IndicatorPanel 분리) */}
+            <IndicatorPanel indicators={indicators} volatility={volatility} onHelp={setHelpTerm} />
 
             {/* Investor Trading Trends — 아코디언 (3.12차 S2: InvestorChart 분리) */}
             {stockDetail && <InvestorChart stockDetail={stockDetail} onHelp={setHelpTerm} />}
