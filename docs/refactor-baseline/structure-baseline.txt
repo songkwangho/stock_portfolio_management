@@ -1,0 +1,33 @@
+# Baseline structural snapshot — app/stock/[code]/page.tsx @ commit 49493bc
+## line count
+1453
+## chart height wrappers (risk #1)
+695:              <div className="h-72 w-full">
+746:              <div className="h-24 w-full">
+1032:                    <div className="h-64 w-full">
+## ResponsiveContainer count
+7
+## DOM id contracts (risk #7)
+658:              onClick={() => document.getElementById('portfolio-add-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+1361:                <div id="portfolio-add-form" className="bg-slate-950/50 border border-slate-800 rounded-2xl p-6 mb-6 scroll-mt-20">
+## Recharts chart components
+8
+## section order (JSX comment markers)
+349: {/* Header */}
+484: {/* 3.9차 — 결론 카드. 차트보다 먼저 노출해 "이 종목 한 줄 요약 + 다음 행동" 안내.
+548: {/* 3.10차 (DS-5) — "한눈에 보기" 9지표 그리드. 결론 카드 다음, 차트 이전.
+600: {/* 3.12차 P2 — stale 종목(최근 데이터 미수집) amber 경고. 신호 패널 대신 노출. */}
+609: {/* 3.11차 — 관찰형 신호 요약 패널. 결론 카드/한눈에 보기 다음, 차트 이전.
+633: {/* 개별 신호 리스트 */}
+653: {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
+669: {/* Candlestick + Volume Chart */}
+674: {/* 캔들 차트 토글: Recharts 커스텀 shape의 wick 좌표 버그로 비활성.
+739: {/* Volume Bar */}
+763: {/* 3.11차 — 거래량 흐름 한 줄 해석 (관찰형) */}
+778: {/* Metrics Grid */}
+917: {/* 종합 신호 - 큰 카드 */}
+1015: {/* Investor Trading Trends — 아코디언(기본 접힘, 초보자에게 어려운 내용) */}
+1054: {/* Financial Statements — 아코디언(기본 접힘) */}
+1112: {/* Sector Comparison — 아코디언(기본 접힘) */}
+1225: {/* News (Phase 2 지연 로딩) */}
+1258: {/* Right Sidebar */}
