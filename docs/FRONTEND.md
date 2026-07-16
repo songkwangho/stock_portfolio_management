@@ -364,7 +364,7 @@ interface StatCardProps {
 | getPortfolioSharpe() | GET /holdings/sharpe (3.8차 위험대비수익) |
 | getHealth() | GET /health |
 
-> **⚠️ 알려진 이슈(3.12차 조사, 미수정)**: `usePortfolioStore.addHolding`은 `AddHoldingPayload {code, name, avgPrice, value, quantity}`를 받지만 `stockApi.addHolding` 호출 시 **`weight: 0`을 하드코딩하고 `stock.value`(사용자가 입력한 총자산 비중%)를 버린다**([stores/usePortfolioStore.ts](../stores/usePortfolioStore.ts) L49-55). `updateHolding`도 avgPrice+quantity만 전송하고 비중을 무시. → **매수 폼의 "총 자산의 몇 %" 입력값이 서버에 저장되지 않음**. 3.12 이전부터 있던 동작이며, 리팩터링(순수 이동) 범위 밖이라 이번엔 미수정. 별도 차수에서 (a) 폼 필드 제거 또는 (b) weight 실제 전송으로 정리 필요.
+> **비중(weight) 처리 (3.12.1 해소)**: 비중은 **서버가 매수가·수량으로 자동 계산**한다 — `recalcWeights`([server/domains/portfolio/service.js](../server/domains/portfolio/service.js))가 `weight = round(cost / totalCost × 100)`을 add/update/delete마다 재계산. `POST /holdings`는 body의 weight를 읽지 않으므로 `addHolding`이 `weight:0`을 보내도 무해(즉시 덮어씀). `GET /holdings`의 `weight` → store `fetchHoldings`가 `Holding.value`로 매핑 → `portfolio/page.tsx` 집중도 경고(`value > 50`)가 자동 계산값으로 동작. 3.12.1에서 **매수/수정 폼의 수동 "총 자산의 몇 %" 입력 필드를 제거**(사용자 외부 자산까지 포함한 값이라 앱의 원가 기준 비중과 충돌하는 거짓 UI였음). 이제 폼은 매수가·수량만 받고 비중은 "자동 계산" 안내.
 
 ---
 
