@@ -31,7 +31,8 @@ export default function DetailHeader({
 }: DetailHeaderProps) {
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ avgPrice: '', quantity: '', weight: '' });
+  // 3.12.1 FIX-2: 비중(%)은 서버 자동 계산이라 수정 폼에서도 제거.
+  const [editForm, setEditForm] = useState({ avgPrice: '', quantity: '' });
 
   return (
     <div className="flex justify-between items-start mb-8">
@@ -100,7 +101,6 @@ export default function DetailHeader({
                   setEditForm({
                     avgPrice: String(stock.avgPrice || ''),
                     quantity: String(stock.quantity || '0'),
-                    weight: String(stock.value || '5'),
                   });
                 }}
                 className="text-xs text-blue-400 hover:text-blue-300 font-bold bg-blue-500/10 px-4 py-2.5 min-h-[44px] rounded-lg transition-colors"
@@ -132,23 +132,15 @@ export default function DetailHeader({
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
-              <div className="w-24">
-                <label className="text-xs text-slate-500 mb-1 block">비중 (%)</label>
-                <input
-                  type="number"
-                  value={editForm.weight}
-                  onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                />
-              </div>
               <button
                 onClick={async () => {
+                  // value(비중)는 서버 recalcWeights가 자동 계산 (updateHolding은 avgPrice·quantity만 전송).
                   await onUpdate({
                     code: stock.code,
                     name: stock.name,
                     avgPrice: parseInt(editForm.avgPrice),
                     quantity: parseInt(editForm.quantity || '0'),
-                    value: parseInt(editForm.weight || '5'),
+                    value: 0,
                   });
                   setEditMode(false);
                 }}
