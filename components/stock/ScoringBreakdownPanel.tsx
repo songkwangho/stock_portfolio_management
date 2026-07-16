@@ -21,10 +21,10 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
     key: 'technical', label: '기술지표', max: 3,
     descFn: (score, _d) => {
       const pct = score / 3;
-      if (pct >= 0.8) return '매수 신호가 강하게 나타나고 있어요';
+      if (pct >= 0.8) return '기술 지표가 강한 상승 흐름을 보이고 있어요';
       if (pct >= 0.6) return '보통 수준의 기술적 신호예요';
       if (pct >= 0.25) return '약한 기술적 신호예요';
-      return '매도 신호가 나타나고 있어요';
+      return '기술 지표가 하락 흐름을 보이고 있어요';
     }
   },
   {

@@ -84,7 +84,7 @@ export function generateActionGuide(stock: StockDetail, isHolding: boolean): str
         return [
             '아래 차트와 기술지표를 확인해서 지금 타이밍이 맞는지 생각해보세요',
             '관심 종목에 추가하고 알림을 설정하면 변화를 놓치지 않아요',
-            '투자하기로 했다면 포트폴리오에 추가하고 증권사 앱에서 매수하세요',
+            '투자하기로 했다면 포트폴리오에 추가하고, 실제 매수는 증권사 앱에서 직접 진행해 주세요',
         ];
     }
     if (opinion === '부정적') {

@@ -91,19 +91,14 @@ describe('generateActionGuide', () => {
     }
   });
 
-  it('명령형 "사세요"/"파세요" 미포함 (관찰형 원칙)', () => {
+  // 3.12.1 FIX-1: 명령형 금지 재발 방지. "매수하세요/매도하세요"도 포함(관찰형 원칙).
+  // "진행해 주세요"(거래 실행 절차 안내)는 허용 — 투자 권유가 아님.
+  it('행동 가이드에 명령형 표현이 없다 (사세요/파세요/매수하세요/매도하세요)', () => {
+    const FORBIDDEN = /매수하세요|매도하세요|사세요|파세요/;
     for (const [label, s, isHolding] of cases) {
       for (const step of generateActionGuide(s, isHolding)) {
-        expect(step, label).not.toMatch(/사세요|파세요/);
+        expect(step, `${label}: ${step}`).not.toMatch(FORBIDDEN);
       }
     }
-  });
-
-  // ⚠️ 알려진 이슈 고정: 긍정적 미보유 액션 가이드 3번째 스텝에 "매수하세요"(명령형 register)가 존재.
-  // 3.9차 원본 문구로, 증권사 앱 실행을 조건부로 안내("투자하기로 했다면 ...")하는 맥락.
-  // 관찰형 원칙과의 정합성은 별도 차수 검토 대상. 현재 동작을 고정해 향후 변경이 의도적이도록 함.
-  it('[known] 긍정적 액션 가이드에 "매수하세요"가 현재 존재 (문구 정리 시 이 테스트 갱신)', () => {
-    const guide = generateActionGuide(sd({ market_opinion: '긍정적' }), false);
-    expect(guide.some(s => s.includes('매수하세요'))).toBe(true);
   });
 });
