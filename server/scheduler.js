@@ -55,7 +55,17 @@ export function setupCleanup(pool) {
                 "DELETE FROM recommended_stocks WHERE created_at < $1 AND source != 'manual'",
                 [thresholdStr]
             );
-            console.log(`Cleanup complete: Deleted ${delAnalysis.rowCount} analysis rows and ${delRecs.rowCount} recommendation rows.`);
+
+            // 3.13 BUG-2: alerts는 그동안 cleanup 대상이 아니어서 무한 누적됐다(보유 2종목인데 110개).
+            // 30일 지난 알림은 읽음 여부와 무관하게 삭제한다 — 한 달 전의 "5일 평균 이탈" 같은
+            // 가격 알림은 더 이상 유효한 정보가 아니라 노이즈다 (일 캡 2건/종목은 정상 동작 중).
+            const alertThreshold = new Date();
+            alertThreshold.setDate(alertThreshold.getDate() - 30);
+            const delAlerts = await pool.query(
+                'DELETE FROM alerts WHERE created_at < $1',
+                [alertThreshold.toISOString()]
+            );
+            console.log(`Cleanup complete: Deleted ${delAnalysis.rowCount} analysis rows, ${delRecs.rowCount} recommendation rows, ${delAlerts.rowCount} alert rows.`);
         } catch (error) {
             console.error('Cleanup Error:', error.message);
         }
