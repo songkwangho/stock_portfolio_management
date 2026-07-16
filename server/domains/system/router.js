@@ -130,9 +130,11 @@ router.get('/market/fear-greed', async (req, res) => {
 // GET /api/market/indices - KOSPI / KOSDAQ scrape
 router.get('/market/indices', async (req, res) => {
     try {
+        // 네이버 sise_index는 심볼(KOSPI/KOSDAQ)을 code로 받는다. 레거시 숫자코드(0001/1001)는
+        // 둘 다 KOSPI 페이지로 폴백돼 KOSPI=KOSDAQ 동일값 버그를 유발했다 (3.13 BUG-1).
         const indices = [
-            { symbol: 'KOSPI', code: '0001' },
-            { symbol: 'KOSDAQ', code: '1001' }
+            { symbol: 'KOSPI', code: 'KOSPI' },
+            { symbol: 'KOSDAQ', code: 'KOSDAQ' }
         ];
         const results = await Promise.all(indices.map(async (idx) => {
             try {
