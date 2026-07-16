@@ -1,7 +1,7 @@
+/* @import 규칙은 다른 규칙(@theme 포함)보다 먼저 와야 한다 (CSS 스펙). Pretendard를 위로. */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 @import "tailwindcss";
 @import "./design-tokens.css";
-/* Pretendard — 한글 가독성. 로드 실패 시 시스템 폰트 fallback (design-tokens.css의 --font-sans). */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 html, body {
   background-color: var(--color-paper);
