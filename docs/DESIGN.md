@@ -1,261 +1,221 @@
 ---
-version: alpha
+version: beta
 name: Stock Analyzer
-description: 한국 주식 초보자를 위한 의사결정 지원 다크 테마 디자인 시스템
+description: 한국 주식 초보자를 위한 의사결정 지원 라이트 테마 디자인 시스템 (3.13차 리디자인)
 colors:
-  # ── 배경 계층 (elevation) ──
-  bg-deep: "#020617"          # slate-950 — 페이지 최하단 배경
-  bg-card: "#0f172a"          # slate-900 — 기본 카드 (secondary)
-  bg-card-raised: "#1e293b"   # slate-800 — 강조 카드 (primary)
-  bg-inset: "#020617"         # slate-950 — 카드 내부 함몰 영역 (입력창, 통계 셀)
+  # ── 표면 (light) ──
+  paper: "#FAFAF8"          # 페이지 배경 — 종이 톤 (순백보다 눈부심 완화)
+  surface: "#FFFFFF"        # 카드 표면
+  inset: "#FAFAF8"          # 함몰 영역 (카드 아님 — 배경과 동일면)
 
-  # ── 테두리 ──
-  border-subtle: "#1e293b"    # slate-800 — 기본 테두리
-  border-muted: "#334155"     # slate-700 — 강조 테두리
-  border-focus: "#2563eb"     # blue-600 — 포커스 링
+  # ── 잉크 / 텍스트 계층 ──
+  ink: "#17181C"            # 본문 + 주요 버튼 배경 (near-black)
+  muted: "#6E7076"          # 보조 텍스트
+  faint: "#85878D"          # 캡션·단위·타임스탬프 (최소 위계, WCAG AA-large)
 
-  # ── 의미색 (3 + 1 제한) ──
-  positive: "#10b981"         # emerald-500 — 상승/긍정/수익
-  positive-soft: "#10b98118"  # emerald-500 10% — 긍정 배경
-  negative: "#ef4444"         # red-500 — 하락/부정/손실
-  negative-soft: "#ef444418"  # red-500 10% — 부정 배경
-  accent: "#2563eb"           # blue-600 — 인터랙션 전용 (버튼/링크)
-  accent-hover: "#3b82f6"     # blue-500 — 인터랙션 hover
-  caution: "#f59e0b"          # amber-500 — 관망/미검증 데이터 (제한적)
-  caution-soft: "#f59e0b18"   # amber-500 10% — 경고 배경
+  # ── 의미색 (한국 증시 관습) ──
+  rise: "#D91C1C"           # 상승·수익·긍정·매수방향 (빨강) — WCAG AA 5.08:1
+  fall: "#1B5FD0"           # 하락·손실·부정·매도방향 (파랑) — WCAG AA 5.84:1
+  caution: "#9A5B08"        # 관망·미검증 데이터 — 비방향성 경고 (앰버 계열) — AA 5.42:1
 
-  # ── 텍스트 계층 ──
-  text-primary: "#f8fafc"     # slate-50 — 제목/핵심 수치
-  text-body: "#cbd5e1"        # slate-300 — 본문
-  text-muted: "#94a3b8"       # slate-400 — 보조 설명
-  text-faint: "#64748b"       # slate-500 — 레이블/캡션
+  # ── 선 ──
+  line: "#E7E7E3"           # 기본 구분선·테두리
+  line-strong: "#D4D4CE"    # 강조 구분선
 
-  # ── 차트 전용 팔레트 (범주형, 채도 억제) ──
-  chart-1: "#3b82f6"          # blue-500 — 종가/주선
-  chart-2: "#10b981"          # emerald-500 — SMA5/보조선1
-  chart-3: "#f59e0b"          # amber-500 — SMA20/보조선2
-  chart-individual: "#94a3b8" # slate-400 — 개인 투자자 (중립 채도)
-  chart-foreign: "#3b82f6"    # blue-500 — 외국인
-  chart-institution: "#8b5cf6" # violet-500 — 기관
+  # ── 소프트 배경 (뱃지·강조 영역, 원색 대신 틴트) ──
+  rise-soft: "#D91C1C14"    # rise 8%
+  fall-soft: "#1B5FD014"    # fall 8%
+  caution-soft: "#9A5B0814" # caution 8%
+
+  # ── 차트 팔레트 ──
+  # 방향(등락)은 rise/fall, 방향 무관(종가선·이평선)은 무채색, 범주(투자주체)는 무채색 계조.
+  chart-price: "#17181C"    # 종가선 = ink (방향 무관)
+  chart-sma5: "#D91C1C"     # 5일 이평선 = rise 계열 (단기)
+  chart-sma20: "#9A5B08"    # 20일 이평선 = caution 계열 (중기)
+  chart-rise: "#D91C1C"     # 골든크로스·상승 거래량
+  chart-fall: "#1B5FD0"     # 데드크로스·하락 거래량
+  chart-individual: "#85878D"  # 개인 = faint (범주, 무채색)
+  chart-foreign: "#17181C"     # 외국인 = ink
+  chart-institution: "#6E7076" # 기관 = muted
 
 typography:
+  display:
+    fontFamily: Pretendard
+    fontSize: 2.25rem        # 36px — 히어로 수치
+    fontWeight: 800
+    lineHeight: 1.1
   h1:
     fontFamily: Pretendard
-    fontSize: 1.5rem          # 24px — 페이지 제목
+    fontSize: 1.5rem         # 24px
     fontWeight: 700
     lineHeight: 1.3
   h2:
     fontFamily: Pretendard
-    fontSize: 1.125rem        # 18px — 섹션 제목
+    fontSize: 1.125rem       # 18px
     fontWeight: 700
     lineHeight: 1.4
-  h3:
+  body:
     fontFamily: Pretendard
-    fontSize: 1rem            # 16px — 카드 제목
-    fontWeight: 600
-    lineHeight: 1.4
-  body-md:
-    fontFamily: Pretendard
-    fontSize: 0.875rem        # 14px — 본문
+    fontSize: 0.875rem       # 14px
     fontWeight: 400
     lineHeight: 1.6
-  body-sm:
+  sm:
     fontFamily: Pretendard
-    fontSize: 0.75rem         # 12px — 보조 (최소 크기)
+    fontSize: 0.75rem        # 12px — 최소
     fontWeight: 400
     lineHeight: 1.5
-  label:
-    fontFamily: Pretendard
-    fontSize: 0.75rem         # 12px — 레이블
-    fontWeight: 700
-    letterSpacing: 0.05em
-  stat-value:
-    fontFamily: Pretendard
-    fontSize: 1.25rem         # 20px — 통계 수치 강조
-    fontWeight: 800
-    lineHeight: 1.2
+  numeric:
+    # 모든 금융 수치는 tabular figures. 표·목록에서 자릿수가 세로로 맞아야 한다.
+    fontFeatureSettings: "'tnum'"
+    fontVariantNumeric: tabular-nums
 
 rounded:
-  sm: 8px                     # rounded-lg — 뱃지/조밀 요소
-  md: 12px                    # rounded-xl — 기본 카드
-  lg: 16px                    # rounded-2xl — 강조 카드/모달
+  sm: 6px                    # 뱃지
+  md: 10px                   # 기본 카드
+  lg: 14px                   # 모달·강조
 
 spacing:
-  tight: 12px                 # p-3 — 조밀 그리드 (통계 셀)
-  base: 16px                  # p-4 — 기본 카드
-  emphasis: 24px              # p-6 — 강조 카드 (결론/모달)
-
-sizing:
-  touch-min: 44px             # 최소 터치 타겟 (iOS HIG 기준)
-  gauge-height: 8px           # 게이지 바 높이
-  icon-sm: 16px
-  icon-md: 20px
+  tight: 12px
+  base: 16px
+  emphasis: 24px
 
 components:
   card-primary:
-    backgroundColor: "{colors.bg-card-raised}"
-    textColor: "{colors.text-body}"
-    borderColor: "{colors.border-muted}"
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.line-strong}"
+    shadow: sm
     rounded: "{rounded.md}"
     padding: "{spacing.emphasis}"
   card-secondary:
-    backgroundColor: "{colors.bg-card}"
-    textColor: "{colors.text-body}"
-    borderColor: "{colors.border-subtle}"
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.line}"
     rounded: "{rounded.md}"
     padding: "{spacing.base}"
   card-tertiary:
-    backgroundColor: "{colors.bg-inset}"
-    textColor: "{colors.text-muted}"
-    borderColor: "{colors.border-subtle}"
+    backgroundColor: "{colors.inset}"
+    borderColor: none
     rounded: "{rounded.sm}"
     padding: "{spacing.tight}"
   button-primary:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.text-primary}"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.surface}"
     rounded: "{rounded.md}"
-    padding: 12px
-    minHeight: "{sizing.touch-min}"
+    minHeight: 44px
   button-secondary:
-    backgroundColor: "{colors.bg-card-raised}"
-    textColor: "{colors.text-body}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.line-strong}"
     rounded: "{rounded.md}"
-    padding: 12px
-    minHeight: "{sizing.touch-min}"
+    minHeight: 44px
   input:
-    backgroundColor: "{colors.bg-inset}"
-    textColor: "{colors.text-body}"
-    borderColor: "{colors.border-subtle}"
+    backgroundColor: "{colors.surface}"
+    borderColor: "{colors.line-strong}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.md}"
-    padding: 12px
-    minHeight: "{sizing.touch-min}"
-  badge-positive:
-    backgroundColor: "{colors.positive-soft}"
-    textColor: "{colors.positive}"
+    minHeight: 44px
+  badge-rise:
+    backgroundColor: "{colors.rise-soft}"
+    textColor: "{colors.rise}"
     rounded: "{rounded.sm}"
-  badge-negative:
-    backgroundColor: "{colors.negative-soft}"
-    textColor: "{colors.negative}"
+  badge-fall:
+    backgroundColor: "{colors.fall-soft}"
+    textColor: "{colors.fall}"
     rounded: "{rounded.sm}"
   badge-caution:
     backgroundColor: "{colors.caution-soft}"
     textColor: "{colors.caution}"
     rounded: "{rounded.sm}"
   badge-neutral:
-    backgroundColor: "#64748b18"
-    textColor: "{colors.text-muted}"
+    backgroundColor: "{colors.inset}"
+    textColor: "{colors.muted}"
+    borderColor: "{colors.line}"
     rounded: "{rounded.sm}"
 ---
 
 ## Overview
 
-Stock Analyzer는 주식 지식이 없는 초보자가 "그래서 무엇을 해야 하는가"를
-바로 알 수 있도록 돕는 의사결정 지원 도구다. 디자인의 목적은 화려함이
-아니라 명료함이다. 모든 시각적 결정은 "초보자가 결론과 다음 행동을
-더 빨리 찾을 수 있는가"라는 질문을 통과해야 한다.
+Stock Analyzer는 주식 지식이 없는 초보자가 "그래서 무엇을 해야 하는가"를 바로
+알 수 있도록 돕는 의사결정 지원 도구다. 3.13차에서 다크(slate+blue) 테마를
+**라이트 테마 + 한국 증시 색 관습**으로 전환했다.
 
-핵심 원칙 세 가지:
-1. **결론 우선** — 데이터보다 결론과 행동 가이드를 시각적으로 앞세운다.
-2. **색의 절제** — 색은 의미가 있을 때만 쓴다. 의미색은 3~4개로 제한한다.
-3. **밀도의 균형** — 정보가 많은 곳은 조밀하게, 강조할 곳은 넉넉하게.
+핵심 원칙:
+1. **사용자의 세계에 맞춘다** — 타깃은 토스증권·네이버금융·삼성증권을 쓰는 한국
+   초보 투자자다. 이들 앱은 전부 라이트이고, 상승은 빨강·하락은 파랑이다.
+2. **색은 의미가 있을 때만** — 빨강/파랑은 가격 방향에 예약한다. 그 외 요소는 무채색.
+3. **위계는 크기와 면으로** — 다크에서 명도로만 위계를 표현하던 방식을 버리고,
+   라이트에서는 카드의 면·그림자·타이포 크기로 위계를 만든다.
 
-## Colors
+## Why Light
 
-팔레트는 고대비 중립색(slate 계열)을 기반으로 하고, 의미를 가진 색은
-엄격히 제한한다.
+기존 다크 slate+blue는 "AI가 만든 대시보드"의 기본값이지 사용자의 세계가 아니다.
+한국 개인 투자자가 매일 보는 화면(토스증권·네이버금융)은 전부 흰 바탕이고,
+빨강/파랑 호가는 흰 배경에서만 선명하게 대비된다. 라이트 전환은 취향이 아니라
+사용자가 이미 학습한 시각 문법에 맞추는 것이다.
 
-**의미색 (남용 금지):**
-- **positive (#10b981):** 상승·긍정·수익. "좋다"는 직관과 일치하는 초록.
-- **negative (#ef4444):** 하락·부정·손실. "주의"의 신호인 빨강.
-- **accent (#2563eb):** 버튼·링크 등 상호작용 요소 **전용**. 정보 표시에는
-  절대 쓰지 않는다. 사용자가 파란 요소를 보면 "누를 수 있다"고 학습하게 한다.
-- **caution (#f59e0b):** 관망 상태, 백테스팅 전 미검증 데이터 등 제한적 경고.
+## Korean Market Colors (핵심)
 
-**왜 색을 제한하는가:** 초보자는 색이 많을수록 "각 색이 무슨 의미인지"를
-학습해야 한다. 매매동향 차트에서 개인/외국인/기관을 노랑/분홍/보라로
-칠하면, 사용자는 색과 주체를 매핑하느라 인지 부하가 늘어난다. 정보의
-위계는 색이 아니라 명도(slate 계층)로 표현하는 것이 원칙이다.
+**상승·수익·긍정 = 빨강(rise), 하락·손실·부정 = 파랑(fall).**
 
-**소프트 배경색:** positive-soft, negative-soft 등 10% 불투명도 변형은
-뱃지·강조 영역 배경으로 쓴다. 원색 배경은 텍스트 대비를 해치므로 금지한다.
+기존 코드는 emerald(초록)=상승 / red=하락의 **미국 관습**을 썼다. 그 결과 한 화면에서
+빨강이 "올랐다"(시장 온도 게이지)이자 "잃었다"(손익 숫자)로 모순되게 쓰였다.
+한국 사용자에게 빨간 -40%는 순간 "올랐네"로 오독된다.
+
+- **rise (#D91C1C):** 상승·수익·플러스 수익률·market_opinion 긍정·매수 방향.
+- **fall (#1B5FD0):** 하락·손실·마이너스 수익률·market_opinion 부정·매도 방향·관망은 아님.
+- **caution (#9A5B08):** 관망·미검증 데이터·stale·집중도 경고 등 **방향이 없는** 경고.
+- **무채색(ink/muted/faint):** 중립 의견·투자 주체 범주·방향 무관 요소.
+
+## No Accent
+
+인터랙션 전용 accent 색(파란 버튼)을 두지 않는다. 파랑은 이미 "하락"에 예약됐으므로
+파란 버튼은 의미색과 충돌한다. **주요 버튼은 ink(near-black)** 를 쓴다 — 흰 바탕 위
+검정 버튼은 의미색과 경쟁하지 않고, 액션임이 분명하다. 링크는 ink + underline 또는 muted.
 
 ## Typography
 
-한글 가독성을 위해 Pretendard를 기본 폰트로 한다(시스템 폰트 fallback:
--apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif).
+Pretendard 유지. **모든 금융 수치는 tabular-nums**(`font-variant-numeric: tabular-nums`) —
+금융앱의 콘텐츠는 숫자이고 표·목록에서 자릿수가 세로로 맞아야 한다. 히어로 수치는
+display(36px, 800). 최소 폰트는 sm(12px), 그보다 작은 임의값(10/11px) 금지 —
+낮은 위계는 크기가 아니라 색(muted→faint)으로.
 
-**최소 폰트 크기는 body-sm(12px)다.** 그보다 작은 임의값(10px, 11px)은
-전면 금지한다. 더 낮은 위계가 필요하면 크기를 줄이는 대신 색상
-(text-muted → text-faint)으로 표현한다. 이는 초보자·고령 사용자의
-가독성을 보장하기 위한 접근성 규칙이다.
+## Elevation (light)
 
-**수치 강조:** 통계 수치(현재가, 수익률 등)는 stat-value(20px, 800)로
-본문과 명확히 구분한다. 초보자는 "숫자"를 먼저 보므로 수치의 위계를 높인다.
+라이트에서 위계는 명도가 아니라 **면과 그림자**로 표현한다.
+- **primary:** surface(흰색) + line-strong 테두리 + shadow-sm. 히어로·결론 카드.
+- **secondary:** surface + line 테두리. 차트·지표·신호. 기본값.
+- **tertiary:** inset(paper와 동일면) + 테두리 없음. 통계 셀·함몰 영역 — 카드가 아니다.
 
-## Layout
+## Icons & Emoji
 
-**패딩은 3단계로만 쓴다:**
-- **tight (12px):** 통계 그리드처럼 정보 밀도가 중요한 곳.
-- **base (16px):** 일반 카드 (기본값).
-- **emphasis (24px):** 결론 카드·모달처럼 강조가 필요한 곳.
+- **이모지 전면 금지.** 섹션 제목의 📋🔍📊💡⚠️🎯✅ 등은 AI 생성물의 지문이다. 삭제하되
+  아이콘으로 대체하지 않는다 — 제목 텍스트만 남긴다.
+- **아이콘은 동작을 대신할 때만.** 삭제=휴지통, 외부링크=화살표, 뒤로=화살표, 검색=돋보기,
+  알림=종, 아코디언=셰브런, 닫기=X, 새로고침=회전. 글자 옆 장식 아이콘(TrendingUp/Zap/
+  ShieldCheck/Sparkles 등) 금지.
+- **첫 글자 아바타 금지.** `유유제약 → (유)` 동그라미는 Slack/Notion 관습이다. 주식앱은
+  그 자리에 **종목코드**를 둔다.
+- **그라디언트 금지.** 단색으로.
 
-도미노 같은 앱이 한 화면에 9개 지표를 보여줄 때, 우리가 4개 카드를
-스크롤하게 만들면 초보자는 지친다. 통계는 tight 패딩의 3열 그리드로
-압축해 "한눈에" 보여준다.
+## Cards
 
-**반응형:** 모바일(<768px)은 단일 컬럼. 통계 그리드는 모바일 3열 유지
-(수치가 짧아 3열이 가능). 종목 상세의 우측 사이드바(포트폴리오 추가)는
-모바일에서 결론 카드 직후로 끌어올린다.
-
-## Elevation & Depth
-
-카드 위계는 **그림자가 아니라 배경 명도**로 표현한다. 다크 테마에서는
-명도 차이가 그림자보다 위계를 명확히 전달한다.
-
-- **primary (bg-card-raised, slate-800):** 결론 카드, 오늘의 액션 등
-  최우선 정보. 추가로 border-l-4 컬러바(의견에 따라 emerald/red/slate)로 강조.
-- **secondary (bg-card, slate-900):** 차트, 지표, 뉴스 등 일반 정보. 기본값.
-- **tertiary (bg-inset, slate-950):** 카드 내부 함몰 영역(통계 셀, 입력창).
-
-그림자(box-shadow)는 버튼 호버 등 인터랙션 피드백에만 최소한으로 쓴다.
+"실제로 묶여야 할 것만 카드." 목록은 구분선(divide-y divide-line), 표는 표 자체가 구조다.
+카드로 유지: 히어로, 결론 카드, 신호 요약, 차트. 카드 해체: 뉴스 목록, 재무 테이블,
+섹터 비교 테이블, 통계 셀(tertiary).
 
 ## Shapes
 
-라운딩은 sm(8px)·md(12px)·lg(16px) 3단계만 쓴다. rounded-3xl(24px)
-같은 과도한 라운딩은 카드가 차지하는 공간을 늘려 정보 밀도를 떨어뜨리므로
-지양한다. 뱃지는 sm, 카드는 md, 모달·강조 카드는 lg를 쓴다.
-
-## States
-
-인터랙티브 요소는 아래 상태를 반드시 시각화한다:
-- **hover:** accent → accent-hover, 또는 배경 명도 한 단계 상승.
-- **focus:** border-focus(blue-600) 링. 키보드 접근성 필수.
-- **disabled:** 불투명도 50%, 커서 not-allowed.
-- **active(선택됨):** accent 배경 + text-primary. 탭·프리셋 버튼 등.
-
-## Components
-
-- **card-primary:** 결론 카드, 오늘의 액션 — 최우선 정보.
-- **card-secondary:** 차트, 지표, 뉴스, 재무 — 일반 정보.
-- **card-tertiary:** 통계 셀, 입력창 배경 — 함몰 영역.
-- **button-primary:** 주요 액션(상세 분석, 포트폴리오 등록). accent 배경.
-- **button-secondary:** 보조 액션(관심 추가, 취소). 중립 배경.
-- **badge-*:** 시장 의견, 수익률 방향, 알림 타입. soft 배경 + 의미색 텍스트.
-
-모든 버튼·입력·탭은 최소 44x44px 터치 타겟을 지킨다.
+rounded sm(6)/md(10)/lg(14). 기존 8/12/16보다 한 단계씩 줄였다. rounded-3xl(24px) 금지 —
+과도한 라운딩은 카드 점유 공간을 늘려 정보 밀도를 떨어뜨린다.
 
 ## Do's and Don'ts
 
-- ✅ 의미색은 positive/negative/accent/caution 4개 이내로 제한
-- ✅ 정보 위계는 색이 아니라 slate 명도로 표현
-- ✅ 최소 폰트 body-sm(12px), 낮은 위계는 색상으로 보완
-- ✅ 결론·행동 가이드를 card-primary로 최상단 배치
-- ✅ 통계는 tight 패딩 3열 그리드로 압축
-- ✅ 모든 인터랙티브 요소 44x44px 터치 타겟 + focus 링
-- ✅ accent(blue)는 "누를 수 있는 것"에만 사용
-- ❌ text-[10px], text-[11px] 등 12px 미만 임의값 금지
-- ❌ rounded-3xl(24px) 남발 금지
-- ❌ 정보 표시에 accent(blue) 색상 사용 금지 (상호작용 전용)
-- ❌ 한 화면에 의미색 5개 이상 동시 사용 금지
-- ❌ 원색 배경(불투명 100%) 위에 텍스트 배치 금지 (soft 변형 사용)
-- ❌ 위계 표현에 box-shadow 의존 금지 (배경 명도로 표현)
+- ✅ 상승/수익 = 빨강(rise), 하락/손실 = 파랑(fall) — 한국 증시 관습
+- ✅ 방향 없는 경고 = caution, 중립·범주 = 무채색
+- ✅ 주요 버튼 = ink (accent 없음)
+- ✅ 금융 수치 = tabular-nums
+- ✅ 위계는 크기·면·그림자로 (명도 밴드 금지)
+- ✅ 카드는 묶일 것만, 목록/표는 구분선
+- ❌ emerald(초록) 사용 금지 (미국 관습)
+- ❌ 파란 버튼 금지 (fall과 충돌)
+- ❌ 이모지·장식 아이콘·첫글자 아바타·그라디언트 금지
+- ❌ text-[10/11px], rounded-3xl 금지
