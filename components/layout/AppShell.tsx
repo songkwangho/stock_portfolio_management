@@ -32,14 +32,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <HealthGate onReady={(ls) => { setLastSync(ls); setIsReady(true); }}>
-      <div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden font-sans">
+      <div className="flex h-screen bg-paper text-ink overflow-hidden font-sans">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full -mr-48 -mt-48 pointer-events-none"></div>
           <HeaderBar nickname={nickname} />
           {syncWarning && (
-            <div className="px-4 md:px-10 py-2 bg-amber-500/5 border-b border-amber-500/20">
-              <p className="text-xs text-amber-300/80 max-w-7xl mx-auto">ℹ️ {syncWarning}</p>
+            <div className="px-4 md:px-10 py-2 bg-caution/5 border-b border-caution/20">
+              <p className="text-xs text-caution max-w-7xl mx-auto">{syncWarning}</p>
             </div>
           )}
           <main className="flex-1 overflow-auto p-4 md:p-10 relative">

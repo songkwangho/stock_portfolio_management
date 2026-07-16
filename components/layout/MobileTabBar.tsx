@@ -18,7 +18,7 @@ export default function MobileTabBar() {
   const unreadCount = useAlertStore((s) => s.unreadCount);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/60 z-50">
+    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-surface border-t border-line z-50">
       <div className="flex items-center justify-around h-16">
         {TABS.map(({ path, label, icon: Icon, hasBadge }) => {
           const active = pathname === path;
@@ -27,12 +27,12 @@ export default function MobileTabBar() {
               key={path}
               onClick={() => router.push(path)}
               className={`flex flex-col items-center justify-center w-full h-full space-y-0.5 transition-colors relative ${
-                active ? 'text-blue-400' : 'text-slate-500'
+                active ? 'text-ink' : 'text-faint'
               }`}
             >
               <Icon size={20} />
               {hasBadge && unreadCount > 0 && (
-                <span className="absolute top-1 right-1/4 min-w-[16px] h-[16px] bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center px-0.5">
+                <span className="absolute top-1 right-1/4 min-w-[16px] h-[16px] bg-ink rounded-full text-surface text-xs font-bold flex items-center justify-center px-0.5">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}

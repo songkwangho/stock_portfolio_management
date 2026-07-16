@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, Star, Eye, Filter, Layers, Settings, Zap, Sparkles } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Star, Eye, Filter, Layers, Settings, Sparkles } from 'lucide-react';
 import NavButton from '@/components/ui/NavButton';
 
 const MENU = [
@@ -20,12 +20,9 @@ export default function Sidebar() {
   const router = useRouter();
 
   return (
-    <aside className="hidden md:flex w-68 border-r border-slate-800/60 flex-col bg-slate-950/50 backdrop-blur-xl">
+    <aside className="hidden md:flex w-68 border-r border-line flex-col bg-surface">
       <div className="p-8">
-        <h1 className="text-2xl font-extrabold tracking-tight flex items-center space-x-2">
-          <span className="bg-blue-600 p-1.5 rounded-lg"><Zap size={20} fill="white" color="white" /></span>
-          <span className="bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">StockAnalyzer</span>
-        </h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">StockAnalyzer</h1>
       </div>
 
       <nav className="flex-1 px-4 space-y-1.5">
