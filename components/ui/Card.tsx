@@ -1,14 +1,15 @@
 import { ReactNode } from 'react';
 
-// 카드 위계는 배경 명도로 표현한다 (DESIGN.md § Elevation).
-// - primary: card-raised (slate-800) — 결론·오늘의 액션 등 최우선 정보
-// - secondary: card (slate-900) — 차트·지표·뉴스 (기본값)
-// - tertiary: inset (slate-950) — 통계 셀·입력창 배경
+// 카드 위계는 면·그림자로 표현한다 (DESIGN.md § Elevation, 3.13 라이트).
+// - primary: surface + line-strong 테두리 + shadow-sm — 히어로·결론 카드
+// - secondary: surface + line 테두리 — 차트·지표·신호 (기본값)
+// - tertiary: inset(paper와 동일면) + 테두리 없음 — 통계 셀·함몰 영역
 type Variant = 'primary' | 'secondary' | 'tertiary';
 
 // DESIGN.md § Layout — padding 3단계로만.
 type Padding = 'tight' | 'base' | 'emphasis';
 
+// accentBar 값은 의미(긍정/부정/중립) 기준. 한국 증시 관습으로 긍정=rise(빨강)·부정=fall(파랑).
 type AccentBar = 'positive' | 'negative' | 'neutral';
 
 interface CardProps {
@@ -19,12 +20,10 @@ interface CardProps {
   children: ReactNode;
 }
 
-// DESIGN.md의 rounded.md(12px)는 Tailwind의 rounded-xl에, rounded.sm(8px)은 rounded-lg에
-// 매핑된다. --radius-* 토큰을 오버라이드하지 않는 대신 기본 Tailwind 클래스를 그대로 사용.
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-card-raised border-border-muted rounded-xl',
-  secondary: 'bg-card border-border-subtle rounded-xl',
-  tertiary: 'bg-inset border-border-subtle rounded-lg',
+  primary: 'bg-surface border border-line-strong shadow-sm rounded-xl',
+  secondary: 'bg-surface border border-line rounded-xl',
+  tertiary: 'bg-inset rounded-lg',
 };
 
 const PADDING: Record<Padding, string> = {
@@ -34,9 +33,9 @@ const PADDING: Record<Padding, string> = {
 };
 
 const ACCENT_BAR: Record<AccentBar, string> = {
-  positive: 'border-l-4 border-l-positive',
-  negative: 'border-l-4 border-l-negative',
-  neutral: 'border-l-4 border-l-slate-500',
+  positive: 'border-l-4 border-l-rise',
+  negative: 'border-l-4 border-l-fall',
+  neutral: 'border-l-4 border-l-line-strong',
 };
 
 export default function Card({
@@ -48,7 +47,7 @@ export default function Card({
 }: CardProps) {
   const accent = accentBar ? ACCENT_BAR[accentBar] : '';
   return (
-    <div className={`border ${VARIANT[variant]} ${PADDING[padding]} ${accent} ${className}`.trim()}>
+    <div className={`${VARIANT[variant]} ${PADDING[padding]} ${accent} ${className}`.trim()}>
       {children}
     </div>
   );

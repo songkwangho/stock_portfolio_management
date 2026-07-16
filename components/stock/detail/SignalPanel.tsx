@@ -28,8 +28,8 @@ export default function SignalPanel({ signals }: SignalPanelProps) {
   return (
     <Card variant="secondary" padding="base" className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-text-body">🔍 신호 요약</h3>
-        <span className="text-xs text-text-faint">{signals.asOf}</span>
+        <h3 className="text-sm font-bold text-ink">🔍 신호 요약</h3>
+        <span className="text-xs text-faint">{signals.asOf}</span>
       </div>
 
       {/* 합의 요약 — 긍정/주의 개수 + 서술 */}

@@ -29,7 +29,7 @@ export default function StatsGrid({ stockDetail }: StatsGridProps) {
 
   return (
     <Card variant="secondary" padding="base" className="mb-6">
-      <h3 className="text-sm font-bold text-text-body mb-3">📊 한눈에 보기</h3>
+      <h3 className="text-sm font-bold text-ink mb-3">📊 한눈에 보기</h3>
       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
         {[
           { label: '현재가',    value: stockDetail?.price ? `₩${stockDetail.price.toLocaleString()}` : '---' },
@@ -43,26 +43,26 @@ export default function StatsGrid({ stockDetail }: StatsGridProps) {
           { label: '목표가',    value: stockDetail?.targetPrice ? `₩${stockDetail.targetPrice.toLocaleString()}` : '---' },
         ].map(item => (
           <div key={item.label} className="min-w-0">
-            <p className="text-xs text-text-faint mb-0.5 truncate">{item.label}</p>
-            <p className="text-sm font-bold text-text-primary truncate">{item.value}</p>
+            <p className="text-xs text-faint mb-0.5 truncate">{item.label}</p>
+            <p className="text-sm font-bold text-ink truncate">{item.value}</p>
           </div>
         ))}
       </div>
 
       {/* 52주 범위 내 현재가 위치 게이지 — 저점/고점 근접 여부를 시각화 */}
       {high52w && low52w && stockDetail?.price && high52w > low52w && (
-        <div className="mt-4 pt-3 border-t border-border-subtle">
-          <div className="flex items-center justify-between text-xs text-text-faint mb-1.5">
+        <div className="mt-4 pt-3 border-t border-line">
+          <div className="flex items-center justify-between text-xs text-faint mb-1.5">
             <span>52주 최저</span>
             <span>52주 최고</span>
           </div>
           <div className="relative h-2 bg-slate-800 rounded-full">
             <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full border-2 border-slate-900"
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-ink rounded-full border-2 border-surface"
               style={{ left: `calc(${Math.min(100, Math.max(0, (stockDetail.price - low52w) / (high52w - low52w) * 100))}% - 6px)` }}
             />
           </div>
-          <p className="text-xs text-text-muted mt-1.5 text-center">
+          <p className="text-xs text-muted mt-1.5 text-center">
             {(() => {
               const pct = (stockDetail.price - low52w) / (high52w - low52w) * 100;
               if (pct >= 90) return '52주 최고가 근처예요. 단기 고점에 주의하세요';

@@ -1,9 +1,14 @@
 @import "tailwindcss";
 @import "./design-tokens.css";
-/* Pretendard — 한글 가독성 개선. 로드 실패 시 시스템 폰트 fallback (design-tokens.css의 --font-sans). */
+/* Pretendard — 한글 가독성. 로드 실패 시 시스템 폰트 fallback (design-tokens.css의 --font-sans). */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 html, body {
-  background-color: var(--color-deep);
-  color: var(--color-text-primary);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* 금융 수치는 tabular figures — 표·목록에서 자릿수 세로 정렬 (DESIGN.md § typography.numeric). */
+table, .tnum {
+  font-variant-numeric: tabular-nums;
 }

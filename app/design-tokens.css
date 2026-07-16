@@ -1,37 +1,39 @@
 /*
- * Design tokens — Tailwind v4 @theme block.
+ * Design tokens — Tailwind v4 @theme block. (3.13차 라이트 리디자인)
  * SSOT: docs/DESIGN.md. 값을 바꿀 땐 반드시 DESIGN.md를 먼저 갱신하고 이 파일로 반영.
  *
- * Rounded 토큰은 의도적으로 오버라이드하지 않는다 —
- *   DESIGN.md의 rounded.sm/md/lg (8/12/16px)는 이미 Tailwind 기본 rounded-lg/xl/2xl과 정렬됨.
- *   --radius-sm/md/lg 오버라이드는 기존 badge/button의 rounded-md, rounded-lg 사용처를
- *   전부 시각적으로 변형시키므로 위험이 크다.
+ * 한국 증시 색 관습: rise(빨강)=상승/수익, fall(파랑)=하락/손실.
+ * accent 없음 — 주요 버튼은 ink. 소프트 배경은 bg-rise/10 등 opacity modifier 사용.
+ * --radius는 오버라이드하지 않는다(기존 rounded-* 사용처 보호). Card는 rounded-xl 사용.
  */
 
 @theme {
-  /* ── Surfaces (배경 계층) ── */
-  --color-deep: #020617;         /* slate-950 — 페이지 최하단 */
-  --color-card: #0f172a;         /* slate-900 — 기본 카드 (secondary) */
-  --color-card-raised: #1e293b;  /* slate-800 — 강조 카드 (primary) */
-  --color-inset: #020617;        /* slate-950 — 카드 내부 함몰 (tertiary) */
+  /* ── 표면 (light) ── */
+  --color-paper: #FAFAF8;        /* 페이지 배경 */
+  --color-surface: #FFFFFF;      /* 카드 표면 */
+  --color-inset: #FAFAF8;        /* 함몰 영역 (카드 아님) */
 
-  /* ── Borders ── */
-  --color-border-subtle: #1e293b; /* slate-800 — 기본 테두리 */
-  --color-border-muted: #334155;  /* slate-700 — 강조 테두리 */
-  --color-border-focus: #2563eb;  /* blue-600 — 포커스 링 */
+  /* ── 잉크 / 텍스트 ── */
+  --color-ink: #17181C;          /* 본문 + 주요 버튼 */
+  --color-muted: #6E7076;        /* 보조 텍스트 */
+  --color-faint: #85878D;        /* 캡션·단위 (WCAG AA-large) */
 
-  /* ── Semantic (의미색 — 4개 이내 제한) ── */
-  --color-positive: #10b981;       /* emerald-500 */
-  --color-negative: #ef4444;       /* red-500 */
-  --color-accent: #2563eb;         /* blue-600 — 인터랙션 전용 */
-  --color-accent-hover: #3b82f6;   /* blue-500 */
-  --color-caution: #f59e0b;        /* amber-500 */
+  /* ── 의미색 (한국 증시 관습) ── */
+  --color-rise: #D91C1C;         /* 상승·수익·긍정·매수방향 (빨강) */
+  --color-fall: #1B5FD0;         /* 하락·손실·부정·매도방향 (파랑) */
+  --color-caution: #9A5B08;      /* 관망·미검증 — 비방향성 경고 */
 
-  /* ── Text (계층 — 크기 대신 명도로 위계 표현) ── */
-  --color-text-primary: #f8fafc;   /* slate-50 — 제목/핵심 수치 */
-  --color-text-body: #cbd5e1;      /* slate-300 — 본문 */
-  --color-text-muted: #94a3b8;     /* slate-400 — 보조 설명 */
-  --color-text-faint: #64748b;     /* slate-500 — 레이블/캡션 (최소 위계) */
+  /* ── 선 ── */
+  --color-line: #E7E7E3;         /* 기본 구분선·테두리 */
+  --color-line-strong: #D4D4CE;  /* 강조 구분선 */
+
+  /* ── 차트 팔레트 ── */
+  --color-chart-price: #17181C;       /* 종가선 = ink */
+  --color-chart-sma5: #D91C1C;        /* 5일 이평선 = rise 계열 */
+  --color-chart-sma20: #9A5B08;       /* 20일 이평선 = caution 계열 */
+  --color-chart-individual: #85878D;  /* 개인 = faint */
+  --color-chart-foreign: #17181C;     /* 외국인 = ink */
+  --color-chart-institution: #6E7076; /* 기관 = muted */
 
   /* ── Font ── */
   --font-sans: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
