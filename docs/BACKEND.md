@@ -157,7 +157,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | GET | `/api/stock/:code/indicators` | RSI, MACD, 볼린저 + `*_available` 플래그 |
-| GET | `/api/stock/:code/signals` | 3.11차 신설. 7종 관찰 신호(크로스/스퀴즈/RSI/MACD/OBV/거래량/수급) + 합의 요약 `{positive, caution, total, summary}` + `asOf`. 관찰형 서술만(명령형 금지). 10분 캐시. 실패 시 빈 배열 200 |
+| GET | `/api/stock/:code/signals` | 3.11차 신설. 7종 관찰 신호(크로스/스퀴즈/RSI/MACD/OBV/거래량/수급) + 합의 요약 `{positive, caution, total, summary}` + `asOf` + **`markers[]`**(3.12차 S5, 차트용 최근 20일 골든/데드크로스 `{date,type}`). 관찰형 서술만(명령형 금지). 10분 캐시. **stale 데이터(최신 history 10일 초과)** 시 신호 중단 + `stale:true` + 빈 `signals`. 실패 시 빈 배열 200 |
 | GET | `/api/stock/:code/volatility` | 변동성 |
 | GET | `/api/stock/:code/financials` | 분기 재무제표 |
 | GET | `/api/stock/:code/news` | 뉴스 10건 |

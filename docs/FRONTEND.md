@@ -165,34 +165,43 @@ interface ToastActions {
 - algorithm 추천: score=50 placeholder → score 뱃지 숨김
 - manual 추천 평균 점수만 통계 표시
 
-### /stock/[code] (ISR 24h + CSR 실시간)
+### /stock/[code] (CSR — 3.12차 리팩터링 구조)
 
-**렌더링**:
-```typescript
-// 기본 정보: ISR
-export const revalidate = 86400;
-const stock = await fetchStock(code); // Server에서
+전부 CSR(`'use client'`). `Suspense`(useSearchParams) + `use(params)`. ISR/lightweight-charts는 미적용(로드맵 상 후속).
 
-// 실시간 체결가: Client에서 별도 fetch
-// StockDetailClient 내부에서 stockApi.getCurrentPrice(code)
+**구조 (3.12차 — 1444줄 → 셸 254줄 + 컴포넌트 13 + lib 3)**:
+```
+app/stock/[code]/page.tsx          # 셸: fetch 오케스트레이션(Phase1 핵심→Phase2 지연) + 일봉 점수 파생 + 레이아웃 조립
+components/stock/detail/
+├── DetailHeader        # 카테고리/삭제/이름/테마태그/현재가·추세·수익률/보유수정폼 (지역: editMode/editForm)
+├── ConclusionCard      # 결론 카드 (generateStockSummary/generateActionGuide)
+├── StatsGrid           # "한눈에 보기" 9지표 + 52주 게이지 (stockDetail.history 자체 계산 — S0 결합 해소)
+├── SignalPanel         # 관찰형 신호 요약 + stale 경고(P2)
+├── ChartSection        # 주가 라인+SMA+크로스 마커 + 거래량 바 + 흐름 해석 (지역: chartTimeframe/extraChartData)
+├── MetricsGrid         # PER/PBR/ROE/목표가/PEG + 섹터 게이지 (onHelp 콜백)
+├── IndicatorPanel      # RSI/MACD/볼린저 + 변동성 (onHelp 콜백, 기본 펼침)
+├── InvestorChart       # 투자자 매매동향 (아코디언, 지역: showInvestor)
+├── FinancialsTable     # 분기 실적 (아코디언, 지역: showFinancials)
+├── SectorCompare       # 업종 비교 백분위+테이블 (아코디언, 지역: showSector + scroll ref)
+├── NewsList            # 최신 뉴스
+├── RightSidebar        # 종합의견/스코어링/적정가/신호점수/새로고침 + PortfolioAddForm 포함
+└── PortfolioAddForm    # 매수 폼 (지역: addForm/adding). ⚠️ id="portfolio-add-form" DOM 계약(모바일 스크롤 버튼)
+lib/stockDetail/{summary,format,helpTexts}.ts   # 순수 함수 + 정적 맵
 ```
 
-**핵심 UI**:
-- 라인/캔들 차트 (일봉/주봉/월봉)
-  - 라인: Recharts ComposedChart + SMA5(파란선) + SMA20(노란선)
-  - 캔들: `CandleChart` (lightweight-charts, dynamic ssr:false)
-- 거래량 BarChart
-- PER/PBR/ROE/목표가 카드
-  - PER: 섹터별 힌트 + **섹터 게이지 바** (3.7차) — `sectorData.medians.per` 대비 위치(에메랄드=저렴/앰버=높음)
-- 기술지표 종합 (RSI/MACD/볼린저 + `*_available` 폴백) — **기본 펼침**
-- 최신 뉴스 (Phase 2 지연 로딩) — **기본 펼침**
-- ScoringBreakdownPanel (임계값 미검증 amber 배너 포함)
-- **아코디언 (3.7차, 기본 접힘)** — 초보자 정보 과부하 완화:
-  - 투자자별 매매동향 BarChart
-  - 분기별 실적 (단위: 억 원, 1조 이상 "X조 Y억")
-  - 같은 업종 비교 (백분위 + 테이블)
-- 추가/수정 폼 (포트폴리오 등록)
-- 삭제 버튼: 보유 여부에 따라 `deleteHolding` 또는 `deleteStock` (store 액션) 호출
+**props 인터페이스 요약**:
+- `DetailHeader`: stock, stockDetail, isHolding, holdingMatch, stockThemes, trend, latestPrice, profitRate, onDeleteHolding, onDeleteStock, onUpdate, addToast, onBack
+- `ConclusionCard`: stockDetail, isHolding, holdingMatch
+- `StatsGrid`: stockDetail
+- `SignalPanel`: signals(SignalResult|null) — stale면 amber, 신호 있으면 패널, 아니면 null
+- `ChartSection`: code, stockDetail, signals(markers 렌더)
+- `MetricsGrid`: stockDetail, category, sectorData, onHelp
+- `IndicatorPanel`: indicators, volatility, onHelp
+- `InvestorChart`: stockDetail, onHelp / `FinancialsTable`: financials / `SectorCompare`: sectorData, currentCode / `NewsList`: news
+- `RightSidebar`: stock, stockDetail, isHolding, signalScore, refreshing, onRefresh, onAdd, holdingsEmpty, onAddSuccess
+- `PortfolioAddForm`: code, name, defaultAvgPrice, holdingsEmpty, onAdd, onSuccess
+
+**설계 원칙**: helpTerm은 셸 소유 + `onHelp(t)` 콜백(Context 미도입). refresh fetch는 셸 소유(setter 미하향). 헤더 가격/추세·사이드바 점수·StatsGrid는 일봉(stockDetail.history) 기준 계산(chartTimeframe 무관). 삭제는 보유 여부에 따라 `deleteHolding`/`deleteStock` store 액션.
 
 ### /stocks (ISR 24h)
 
@@ -333,6 +342,7 @@ interface StatCardProps {
 | getRecommendations() | GET /recommendations |
 | getVolatility(code) | GET /stock/{code}/volatility |
 | getIndicators(code) | GET /stock/{code}/indicators |
+| getSignals(code) | GET /stock/{code}/signals (3.11차 관찰 신호 + 3.12차 markers[]/stale) |
 | getChartData(code, tf) | GET /stock/{code}/chart/{tf} |
 | getFinancials(code) | GET /stock/{code}/financials |
 | getNews(code) | GET /stock/{code}/news |
@@ -347,7 +357,14 @@ interface StatCardProps {
 | getWatchlist() | GET /watchlist |
 | addToWatchlist(code) | POST /watchlist |
 | removeFromWatchlist(code) | DELETE /watchlist/{code} |
+| getThemes() | GET /themes (3.7차β) |
+| getThemeStocks(themeId) | GET /themes/{id}/stocks (3.7차β) |
+| getStockThemes(code) | GET /stock/{code}/themes (3.7차β) |
+| getFearGreed() | GET /market/fear-greed (3.8차 시장 온도) |
+| getPortfolioSharpe() | GET /holdings/sharpe (3.8차 위험대비수익) |
 | getHealth() | GET /health |
+
+> **⚠️ 알려진 이슈(3.12차 조사, 미수정)**: `usePortfolioStore.addHolding`은 `AddHoldingPayload {code, name, avgPrice, value, quantity}`를 받지만 `stockApi.addHolding` 호출 시 **`weight: 0`을 하드코딩하고 `stock.value`(사용자가 입력한 총자산 비중%)를 버린다**([stores/usePortfolioStore.ts](../stores/usePortfolioStore.ts) L49-55). `updateHolding`도 avgPrice+quantity만 전송하고 비중을 무시. → **매수 폼의 "총 자산의 몇 %" 입력값이 서버에 저장되지 않음**. 3.12 이전부터 있던 동작이며, 리팩터링(순수 이동) 범위 밖이라 이번엔 미수정. 별도 차수에서 (a) 폼 필드 제거 또는 (b) weight 실제 전송으로 정리 필요.
 
 ---
 

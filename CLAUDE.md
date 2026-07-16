@@ -432,7 +432,9 @@ PC (md: 이상):
 - [x] **[S5]** **ChartSection 통합 추출**(PriceChart/VolumeChart 분리안 폐기) + `detectCrossHistory` 신설 → `/signals` 응답 `markers[]`(최근 20일 크로스). 기존 "어제 1일" 마커의 노출 확률 ~4% → SIG-4 정상화. 헤더·사이드바 점수는 일봉 기준 계산으로 이동(S0와 동일 결합 해소)
 - [x] **[S6]** DetailHeader / RightSidebar / PortfolioAddForm — refresh는 셸 소유(콜백). `id="portfolio-add-form"` DOM 계약 보존
 - [x] **[S7]** 셸 **1444 → 254줄** (fetch 오케스트레이션 + 일봉 점수 + 레이아웃 조립만). `components/stock/detail/` 13개 + `lib/stockDetail/` 3개
-- 검증: 각 단계 tsc 0 error. 구조 스냅샷(`docs/refactor-baseline/`) 대비 차트 높이(288/96/264) + DOM id 보존 확인. 스크린샷은 로컬 dev(lightningcss) 불가로 구조 grep 대체
+- 검증: 각 단계 tsc 0 error. 구조 스냅샷(`docs/refactor-baseline/`) 대비 차트 높이(288/96/264) + DOM id 보존 확인. 스크린샷은 로컬 dev(lightningcss) 불가로 구조 grep 대체. S5 마커는 배포 API 30종목 샘플 중 22종목에서 markers[] 확인(창 20일 확대 실동작)
+- ⚠️ **[정정]** 리팩터링 동기였던 "1444줄 → 리뷰 stall 복구"는 **미달성**. 254줄 셸 + 13컴포넌트로 분해 후에도 동일 stall 재현(4개 중 3개 에이전트 무진전) → 원인은 파일 크기가 아님. 단, 워크플로 변수(병렬 에이전트 수·컨텍스트 주입 방식)를 통제하지 않은 관찰이므로 "인프라 문제" 단정도 근거 부족. **원인 미확정**으로 기록. 리팩터링의 독립적 가치(응집도·테스트 가능성·컴포넌트별 리뷰 용이성)는 유효
+- **[미수정 이슈]** 매수 폼 "총 자산 비중(%)" 입력이 store에서 `weight:0` 하드코딩으로 버려짐(3.12 이전부터) — `docs/FRONTEND.md` 참조. 리팩터링 범위 밖
 
 ---
 
