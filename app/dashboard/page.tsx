@@ -32,9 +32,9 @@ interface PortfolioHistoryEntry {
 }
 
 // 자산 배분 파이는 방향이 아니라 범주 → 무채색 계조 (DESIGN.md § chart 팔레트).
-// 집중도(>50%) 슬라이스만 caution으로 튀게 해서 "한 종목 몰빵" 경고 (3.13 TASK 6).
+// 집중도 경고는 큰 슬라이스를 칠하지 않고(배경처럼 묻힘) 범례에 작은 '집중' 태그로만 표시.
 const RAMP = ['#17181C', '#6E7076', '#9A9CA2', '#C9CAC8'];
-const CONCENTRATION_COLOR = '#9A5B08'; // caution — 50% 초과 슬라이스
+const CONCENTRATION_THRESHOLD = 50; // % 초과 시 '집중' 태그
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -123,7 +123,7 @@ export default function DashboardPage() {
     ? holdings.map((h, i) => ({
       name: h.name,
       value: h.value,
-      color: h.value > 50 ? CONCENTRATION_COLOR : RAMP[i % RAMP.length],
+      color: RAMP[i % RAMP.length],
     }))
     : [{ name: '보유 종목 없음', value: 100, color: '#D4D4CE' }];
 
@@ -203,12 +203,12 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* 액션 블록 — 확인이 필요한 종목·알림 (TASK 2/5). */}
-              <div>
+              {/* 액션 블록 — 확인이 필요한 종목·알림. 데스크톱에서 숫자 top에 맞춰 내려 좌우 무게 균형 (Fix 2). */}
+              <div className="lg:pt-6">
                 {(cautionCount > 0 || unreadCount > 0) ? (
                   <>
                     {cautionCount > 0 && (
-                      <p className="text-sm font-bold text-ink mb-3">확인이 필요한 종목 {cautionCount}개</p>
+                      <p className="text-base font-bold text-ink mb-3">확인이 필요한 종목 {cautionCount}개</p>
                     )}
                     <div className="space-y-2">
                       {cautionHoldings.map(h => (
@@ -331,6 +331,14 @@ export default function DashboardPage() {
                 const yMin = Math.min(...yVals);
                 const yMax = Math.max(...yVals);
                 const yPad = (yMax - yMin) * 0.1 || Math.max(yMax * 0.05, 1);
+                const yLo = yMin - yPad, yHi = yMax + yPad;
+                // 눈금은 딱 떨어지는 값으로 — domain은 데이터 기준, ticks만 nice 반올림 (Fix 3).
+                const rawStep = (yHi - yLo) / 5;
+                const stepMag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+                const stepNorm = rawStep / stepMag;
+                const niceStep = (stepNorm <= 1 ? 1 : stepNorm <= 2 ? 2 : stepNorm <= 2.5 ? 2.5 : stepNorm <= 5 ? 5 : 10) * stepMag;
+                const yTicks: number[] = [];
+                for (let t = Math.ceil(yLo / niceStep) * niceStep; t <= yHi; t += niceStep) yTicks.push(t);
                 return (
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData}>
@@ -342,7 +350,7 @@ export default function DashboardPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
                     <XAxis dataKey="date" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[yMin - yPad, yMax + yPad]} tickFormatter={(v) => formatKoreanWon(Number(v))} />
+                    <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[yLo, yHi]} ticks={yTicks} tickFormatter={(v) => formatKoreanWon(Number(v))} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }}
                       labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
@@ -470,7 +478,12 @@ export default function DashboardPage() {
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }}></span>
                       <span className="text-sm text-muted truncate">{item.name}</span>
                     </div>
-                    <span className="text-sm font-semibold text-ink tabular-nums shrink-0">{item.value}%</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {holdings.length >= 2 && item.value > CONCENTRATION_THRESHOLD && (
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution">집중</span>
+                      )}
+                      <span className="text-sm font-semibold text-ink tabular-nums">{item.value}%</span>
+                    </div>
                   </div>
                 ))}
               </div>
