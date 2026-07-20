@@ -32,7 +32,9 @@ interface PortfolioHistoryEntry {
 }
 
 // 자산 배분 파이는 방향이 아니라 범주 → 무채색 계조 (DESIGN.md § chart 팔레트).
-const COLORS = ['#17181C', '#4B4D52', '#6E7076', '#9A9CA2', '#C2C3C7', '#D4D4CE'];
+// 집중도(>50%) 슬라이스만 caution으로 튀게 해서 "한 종목 몰빵" 경고 (3.13 TASK 6).
+const RAMP = ['#17181C', '#6E7076', '#9A9CA2', '#C9CAC8'];
+const CONCENTRATION_COLOR = '#9A5B08'; // caution — 50% 초과 슬라이스
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -121,9 +123,9 @@ export default function DashboardPage() {
     ? holdings.map((h, i) => ({
       name: h.name,
       value: h.value,
-      color: COLORS[i % COLORS.length],
+      color: h.value > 50 ? CONCENTRATION_COLOR : RAMP[i % RAMP.length],
     }))
-    : [{ name: '보유 종목 없음', value: 100, color: '#1e293b' }];
+    : [{ name: '보유 종목 없음', value: 100, color: '#D4D4CE' }];
 
   const rawChartData = portfolioHistory.map(d => ({
     date: parseInt(d.date.slice(4, 6)) + '/' + parseInt(d.date.slice(6, 8)),
@@ -144,7 +146,7 @@ export default function DashboardPage() {
   const avgProfitRate = totalCost > 0 ? (totalPnL / totalCost * 100) : 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {holdings.length === 0 && (
         <Card variant="primary" padding="emphasis">
           <h2 className="text-xl font-bold mb-2 text-center text-ink">무엇부터 시작해 볼까요?</h2>
@@ -184,62 +186,75 @@ export default function DashboardPage() {
         const latestTs = dates.length ? Math.max(...dates.map(d => new Date(d).getTime())) : null;
         const stale = latestTs !== null && (Date.now() - latestTs) / 3600000 >= 24;
         return (
-          <Card variant="primary" padding="emphasis" accentBar={gain ? 'positive' : 'negative'}>
-            <p className="text-sm text-muted mb-1">내 포트폴리오</p>
-            <p className={`text-4xl font-black tabular-nums ${gain ? 'text-rise' : 'text-fall'}`}>
-              {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
-            </p>
-            <p className={`text-lg font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
-              {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
-            </p>
-            <p className="text-sm text-faint tabular-nums mt-1">
-              ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
-            </p>
+          <div>
+            {/* 히어로 — 카드 없이 페이지 위에 직접. 숫자 색이 방향을 말하므로 accentBar/상자 불필요 (TASK 1). */}
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_1fr] gap-x-16 gap-y-10">
+              {/* 상태 블록 — 이 페이지의 답. 큰 숫자가 화면을 지배한다 (TASK 3/4). */}
+              <div>
+                <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
+                <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
+                  {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
+                </p>
+                <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
+                  {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
+                </p>
+                <p className="text-[13px] text-muted tabular-nums mt-3">
+                  ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
+                </p>
+              </div>
 
-            {(cautionCount > 0 || unreadCount > 0) ? (
-              <div className="mt-5 pt-4 border-t border-line space-y-1">
-                {cautionCount > 0 && (
-                  <p className="text-sm font-bold text-ink mb-1">{cautionCount}개 종목을 확인해보세요</p>
-                )}
-                {cautionHoldings.map(h => (
-                  <button key={h.code} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
-                    className="w-full flex items-center justify-between py-2 px-2 text-left min-h-[44px] hover:bg-inset rounded-lg transition-colors">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-bold text-ink truncate">{h.name}</span>
-                      <span className="text-xs text-faint tabular-nums">{h.code}</span>
-                    </span>
-                    <span className={`text-xs font-bold px-2 py-1 rounded shrink-0 ml-2 ${h.holding_opinion === '매도' ? 'bg-fall/10 text-fall' : 'bg-caution/10 text-caution'}`}>{h.holding_opinion === '매도' ? '주의 필요' : '관망'}</span>
-                  </button>
-                ))}
-                {signalCautionHoldings.map(h => (
-                  <button key={`sig-${h.code}`} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
-                    className="w-full flex items-center justify-between py-2 px-2 text-left min-h-[44px] hover:bg-inset rounded-lg transition-colors">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-bold text-ink truncate">{h.name}</span>
-                      <span className="text-xs text-faint tabular-nums">{h.code}</span>
-                    </span>
-                    <span className="text-xs font-bold px-2 py-1 rounded shrink-0 ml-2 bg-fall/10 text-fall">주의 신호</span>
-                  </button>
-                ))}
-                {unreadCount > 0 && (
-                  <button onClick={() => router.push('/alerts')}
-                    className="w-full flex items-center justify-between py-2 px-2 text-left min-h-[44px] hover:bg-inset rounded-lg transition-colors">
-                    <span className="text-sm font-bold text-ink">읽지 않은 알림 {unreadCount}개</span>
-                    <span className="text-xs text-muted font-bold shrink-0 ml-2">확인 →</span>
-                  </button>
+              {/* 액션 블록 — 확인이 필요한 종목·알림 (TASK 2/5). */}
+              <div>
+                {(cautionCount > 0 || unreadCount > 0) ? (
+                  <>
+                    {cautionCount > 0 && (
+                      <p className="text-sm font-bold text-ink mb-3">확인이 필요한 종목 {cautionCount}개</p>
+                    )}
+                    <div className="space-y-2">
+                      {cautionHoldings.map(h => (
+                        <button key={h.code} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
+                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
+                          <span className="flex items-baseline gap-2 min-w-0">
+                            <span className="text-sm font-semibold text-ink truncate">{h.name}</span>
+                            <span className="text-[13px] text-muted tabular-nums shrink-0">{h.code}</span>
+                          </span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded shrink-0 ${h.holding_opinion === '매도' ? 'bg-fall/10 text-fall' : 'bg-caution/10 text-caution'}`}>{h.holding_opinion === '매도' ? '주의 필요' : '관망'}</span>
+                        </button>
+                      ))}
+                      {signalCautionHoldings.map(h => (
+                        <button key={`sig-${h.code}`} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
+                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
+                          <span className="flex items-baseline gap-2 min-w-0">
+                            <span className="text-sm font-semibold text-ink truncate">{h.name}</span>
+                            <span className="text-[13px] text-muted tabular-nums shrink-0">{h.code}</span>
+                          </span>
+                          <span className="text-xs font-bold px-2 py-1 rounded shrink-0 bg-fall/10 text-fall">주의 신호</span>
+                        </button>
+                      ))}
+                      {unreadCount > 0 && (
+                        <button onClick={() => router.push('/alerts')}
+                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
+                          <span className="text-sm font-semibold text-ink">읽지 않은 알림 {unreadCount}개</span>
+                          <span className="text-xs text-muted font-bold shrink-0">확인 →</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-ink">보유 종목 모두 양호해요</p>
+                    <p className="text-xs text-muted mt-0.5">특별히 확인이 필요한 종목이 없어요.</p>
+                  </>
                 )}
               </div>
-            ) : (
-              <div className="mt-5 pt-4 border-t border-line">
-                <p className="text-sm font-bold text-ink">보유 종목 모두 양호해요</p>
-                <p className="text-xs text-muted mt-0.5">특별히 확인이 필요한 종목이 없어요.</p>
-              </div>
-            )}
-            <p className="text-xs text-faint mt-4 leading-relaxed">
+            </div>
+
+            {/* 면책 — 히어로 내용과 구분선으로만 분리 (TASK 1). */}
+            <p className="text-xs text-faint mt-8 pt-4 border-t border-line leading-relaxed">
               ※ 위 정보는 알고리즘 분석이에요. 실제 투자 결정은 본인이 직접 해주세요.
               {stale && <span className="text-caution"> · 데이터가 오늘 갱신되지 않았어요</span>}
             </p>
-          </Card>
+          </div>
         );
       })()}
 
@@ -310,6 +325,12 @@ export default function DashboardPage() {
               ) : chartData.length > 0 ? (() => {
                 const isLoss = avgProfitRate < 0;
                 const lineColor = isLoss ? '#1B5FD0' : '#D91C1C'; // 손실=fall(파랑), 수익=rise(빨강)
+                // 평가금액·투자원금 두 라인이 모두 들어가는 범위로 Y축 자동 계산 (TASK 7).
+                // 0부터 시작하지 않음 — 금액 추이지 절대량 비교가 아님.
+                const yVals = chartData.flatMap(d => [d.value, d.cost]);
+                const yMin = Math.min(...yVals);
+                const yMax = Math.max(...yVals);
+                const yPad = (yMax - yMin) * 0.1 || Math.max(yMax * 0.05, 1);
                 return (
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData}>
@@ -321,7 +342,7 @@ export default function DashboardPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
                     <XAxis dataKey="date" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatKoreanWon(Number(v))} />
+                    <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[yMin - yPad, yMax + yPad]} tickFormatter={(v) => formatKoreanWon(Number(v))} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }}
                       labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
@@ -430,29 +451,30 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <>
-              <div className="h-64 w-full">
+            // 도넛 180px + 범례는 우측 세로 배치. 2~5조각에 400px는 과하다 (TASK 6).
+            <div className="flex items-center gap-6">
+              <div className="w-[180px] h-[180px] shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={3} dataKey="value">
+                    <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={54} outerRadius={90} paddingAngle={2} dataKey="value">
                       {portfolioData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-3">
+              <div className="flex-1 min-w-0 space-y-2">
                 {portfolioData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full" style={{ background: item.color }}></div>
-                      <span className="text-sm text-muted">{item.name}</span>
+                  <div key={item.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }}></span>
+                      <span className="text-sm text-muted truncate">{item.name}</span>
                     </div>
-                    <span className="text-sm font-medium text-ink tabular-nums">{item.value}%</span>
+                    <span className="text-sm font-semibold text-ink tabular-nums shrink-0">{item.value}%</span>
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
