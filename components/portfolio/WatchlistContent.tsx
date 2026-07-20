@@ -27,21 +27,21 @@ const WatchlistContent = ({ onDetailClick }: WatchlistContentProps) => {
       {items.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {items.map(item => (
-            <div key={item.code} className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 flex items-center justify-between group">
-              <div className="cursor-pointer" onClick={() => onDetailClick({ code: item.code, name: item.name, category: item.category })}>
-                <p className="font-bold group-hover:text-blue-400 transition-colors">{item.name}</p>
-                <p className="text-xs text-slate-500 font-mono">{item.code}</p>
-                <p className="text-sm font-bold mt-1">{item.price ? `₩${item.price.toLocaleString()}` : '---'}</p>
+            <div key={item.code} className="bg-surface border border-line rounded-xl p-5 flex items-center justify-between group">
+              <div className="cursor-pointer min-w-0" onClick={() => onDetailClick({ code: item.code, name: item.name, category: item.category })}>
+                <p className="font-bold text-ink transition-colors group-hover:underline truncate">{item.name}</p>
+                <p className="text-xs text-faint tabular-nums">{item.code}</p>
+                <p className="text-sm font-bold text-ink tabular-nums mt-1">{item.price ? `₩${item.price.toLocaleString()}` : '---'}</p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {item.market_opinion && (
                   <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
-                    item.market_opinion === '긍정적' ? 'bg-emerald-500/10 text-emerald-400' :
-                    item.market_opinion === '부정적' ? 'bg-red-500/10 text-red-400' : 'bg-slate-500/10 text-slate-400'
+                    item.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
+                    item.market_opinion === '부정적' ? 'bg-fall/10 text-fall' : 'bg-inset text-muted'
                   }`}>{item.market_opinion}</span>
                 )}
                 <button onClick={() => removeFromWatchlist(item.code)}
-                  className="p-2 text-red-400/60 hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  className="p-2 text-muted hover:text-ink min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="관심종목에서 삭제">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -49,10 +49,9 @@ const WatchlistContent = ({ onDetailClick }: WatchlistContentProps) => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
-          <p className="text-3xl mb-4">👀</p>
-          <p className="text-slate-300 font-bold text-lg mb-2">관심 종목이 없어요</p>
-          <p className="text-slate-500 text-sm">마음에 드는 종목을 추가하면 한 곳에서 볼 수 있어요</p>
+        <div className="text-center py-16 bg-inset border border-dashed border-line-strong rounded-xl">
+          <p className="text-ink font-bold text-lg mb-2">관심 종목이 없어요</p>
+          <p className="text-muted text-sm">마음에 드는 종목을 추가하면 한 곳에서 볼 수 있어요</p>
         </div>
       )}
     </div>

@@ -74,33 +74,33 @@ const StockSearchInput = ({ placeholder = '종목명을 입력하세요 (예: �
 
   return (
     <div ref={wrapperRef} className={`relative ${className || ''}`}>
-      <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 focus-within:border-blue-500 transition-colors">
-        <Search size={14} className="text-slate-600 mr-2 shrink-0" />
+      <div className="flex items-center bg-surface border border-line-strong rounded-xl px-3 py-2 focus-within:border-ink transition-colors">
+        <Search size={14} className="text-faint mr-2 shrink-0" />
         <input
           type="text"
           placeholder={placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowDropdown(true)}
-          className="bg-transparent border-none focus:outline-none text-sm w-full placeholder:text-slate-600"
+          className="bg-transparent border-none focus:outline-none text-sm w-full text-ink placeholder:text-faint"
         />
-        {isSearching && <RefreshCw size={12} className="animate-spin text-slate-500 ml-1 shrink-0" />}
+        {isSearching && <RefreshCw size={12} className="animate-spin text-faint ml-1 shrink-0" />}
       </div>
 
       {showDropdown && (
-        <div className="absolute top-full left-0 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-50 max-h-48 overflow-y-auto">
+        <div className="absolute top-full left-0 w-full mt-1 bg-surface border border-line rounded-xl shadow-lg overflow-hidden z-50 max-h-48 overflow-y-auto">
           {results.map(stock => (
             <button
               key={stock.code}
               onClick={() => handleSelect(stock)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800/50 last:border-0 text-left"
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-inset transition-colors border-b border-line last:border-0 text-left"
             >
               <div>
-                <p className="text-sm font-bold text-white">{stock.name}</p>
-                <p className="text-xs text-slate-500 font-mono">{stock.code}</p>
+                <p className="text-sm font-bold text-ink">{stock.name}</p>
+                <p className="text-xs text-faint tabular-nums">{stock.code}</p>
               </div>
               {stock.category && (
-                <span className="text-xs bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded font-bold shrink-0 ml-2">
+                <span className="text-xs bg-inset text-muted border border-line px-1.5 py-0.5 rounded font-bold shrink-0 ml-2">
                   {stock.category}
                 </span>
               )}
