@@ -11,6 +11,7 @@ import Card from '@/components/ui/Card';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { stockApi } from '@/lib/stockApi';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
+import { formatWeight } from '@/lib/stockDetail/format';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -119,13 +120,19 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings.length]);
 
-  const portfolioData = holdings.length > 0
-    ? holdings.map((h, i) => ({
-      name: h.name,
-      value: h.value,
-      color: RAMP[i % RAMP.length],
-    }))
-    : [{ name: '보유 종목 없음', value: 100, color: '#D4D4CE' }];
+  // 정밀 비중(pct) — 저장된 정수 weight(value)는 도넛 슬라이스 크기에만 쓰고(TASK 2 현행),
+  // 범례 라벨은 cost 기준 정밀 비중으로 계산해 1% 미만도 "<1%"로 표시 (TASK 1). recalcWeights 미변경.
+  const portfolioData = (() => {
+    const tc = holdings.reduce((a, h) => a + (h.avgPrice || 0) * (h.quantity || 0), 0);
+    return holdings.length > 0
+      ? holdings.map((h, i) => ({
+        name: h.name,
+        value: h.value,
+        pct: tc > 0 ? (h.avgPrice || 0) * (h.quantity || 0) / tc * 100 : 0,
+        color: RAMP[i % RAMP.length],
+      }))
+      : [{ name: '보유 종목 없음', value: 100, pct: 100, color: '#D4D4CE' }];
+  })();
 
   const rawChartData = portfolioHistory.map(d => ({
     date: parseInt(d.date.slice(4, 6)) + '/' + parseInt(d.date.slice(6, 8)),
@@ -144,6 +151,8 @@ export default function DashboardPage() {
   const totalCost = holdings.reduce((acc, cur) => acc + (cur.avgPrice * (cur.quantity || 0)), 0);
   const totalPnL = totalAsset - totalCost;
   const avgProfitRate = totalCost > 0 ? (totalPnL / totalCost * 100) : 0;
+  // 보유 목록 행 비중 표시용 정밀 비중 (TASK 1).
+  const weightPct = (avg?: number, qty?: number) => totalCost > 0 ? (avg || 0) * (qty || 0) / totalCost * 100 : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -396,7 +405,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <p className="text-sm font-bold text-ink">{stock.name}</p>
                       <p className="text-xs text-faint tabular-nums">{stock.code}</p>
-                      <p className="text-xs text-muted tabular-nums">{stock.value}%</p>
+                      <p className="text-xs text-muted tabular-nums">{formatWeight(weightPct(stock.avgPrice, stock.quantity))}</p>
                       {stock.sma_available === false ? (
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-inset border border-line text-muted">분석 중</span>
                       ) : stock.holding_opinion && (
@@ -482,7 +491,7 @@ export default function DashboardPage() {
                       {holdings.length >= 2 && item.value > CONCENTRATION_THRESHOLD && (
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution">집중</span>
                       )}
-                      <span className="text-sm font-semibold text-ink tabular-nums">{item.value}%</span>
+                      <span className="text-sm font-semibold text-ink tabular-nums">{formatWeight(item.pct)}</span>
                     </div>
                   </div>
                 ))}

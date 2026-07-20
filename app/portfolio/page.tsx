@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
+import { formatWeight } from '@/lib/stockDetail/format';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -255,7 +256,7 @@ function PortfolioContent() {
             <div key={stock.code} className={`bg-surface border ${concentrated ? 'border-caution/40' : 'border-line'} rounded-xl p-6 transition-colors group`}>
               {concentrated && (
                 <div className="mb-4 p-3 bg-caution/5 border border-caution/20 rounded-xl text-xs text-caution leading-relaxed">
-                  <span className="font-bold">{stock.name} 비중이 {weight}%예요.</span> 한 종목에 집중되면 이 종목 하락 시 손실이 커져요. 분산 투자를 검토해보세요.
+                  <span className="font-bold">{stock.name} 비중이 {formatWeight(weight)}예요.</span> 한 종목에 집중되면 이 종목 하락 시 손실이 커져요. 분산 투자를 검토해보세요.
                 </div>
               )}
               <div className="flex justify-between items-start mb-5">
@@ -341,7 +342,7 @@ function PortfolioContent() {
                         {cautionLike && <p className="mt-1 text-xs text-faint italic leading-relaxed">이 신호는 참고용이에요. 판단은 본인이 해주세요. 실제 거래는 증권사 앱에서 직접 진행해 주세요.</p>}
                         {/* 3.9차 — 매도/관망 상태에 행동 가이드 스텝 추가 */}
                         {stock.holding_opinion === '매도' && (
-                          <div className="mt-3 p-3 bg-inset border border-line rounded-xl">
+                          <div className="mt-4 pt-4 border-t border-line">
                             <p className="text-xs font-bold text-ink mb-2">지금 할 수 있는 것</p>
                             <div className="space-y-2">
                               <div className="flex items-start gap-2">
@@ -365,7 +366,7 @@ function PortfolioContent() {
                           </div>
                         )}
                         {stock.holding_opinion === '관망' && (
-                          <div className="mt-3 p-3 bg-inset border border-line rounded-xl">
+                          <div className="mt-4 pt-4 border-t border-line">
                             <p className="text-xs font-bold text-ink mb-2">지금 할 수 있는 것</p>
                             <div className="space-y-1.5">
                               <div className="flex items-start gap-2">
@@ -420,23 +421,17 @@ function PortfolioContent() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className="p-3 bg-inset rounded-lg">
-                    <p className="text-xs text-muted mb-1">평균 매수가 (1주당)</p>
-                    <p className="text-sm font-bold text-ink tabular-nums">₩{stock.avgPrice?.toLocaleString()}</p>
-                  </div>
-                  <div className="p-3 bg-inset rounded-lg">
-                    <p className="text-xs text-muted mb-1">현재가</p>
-                    <p className="text-sm font-bold text-ink tabular-nums">₩{stock.currentPrice != null ? stock.currentPrice.toLocaleString() : '---'}</p>
-                  </div>
-                  <div className="p-3 bg-inset rounded-lg">
-                    <p className="text-xs text-muted mb-1">수량</p>
-                    <p className="text-sm font-bold text-ink tabular-nums">{stock.quantity || 0}주</p>
-                  </div>
-                  <div className="p-3 bg-inset rounded-lg">
-                    <p className="text-xs text-muted mb-1">평가금액 (현재 가치)</p>
-                    <p className="text-sm font-bold text-ink tabular-nums">₩{evalAmount.toLocaleString()}</p>
-                  </div>
+                // 상자 4개 → 한 줄 텍스트 (대시보드 목록 포맷 재사용). 카드 높이 축소 (TASK 3).
+                <div className="mb-5 text-sm text-muted tabular-nums leading-relaxed">
+                  평단 <span className="text-ink font-semibold">₩{stock.avgPrice?.toLocaleString()}</span>
+                  <span className="text-faint mx-1">→</span>
+                  현재 <span className="text-ink font-semibold">₩{stock.currentPrice != null ? stock.currentPrice.toLocaleString() : '---'}</span>
+                  {(stock.quantity || 0) > 0 && (
+                    <>
+                      <span className="text-line-strong mx-1.5">·</span>{stock.quantity}주
+                      <span className="text-line-strong mx-1.5">·</span>평가 <span className="text-ink font-semibold">₩{evalAmount.toLocaleString()}</span>
+                    </>
+                  )}
                 </div>
               )}
 
