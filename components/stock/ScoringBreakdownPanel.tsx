@@ -86,7 +86,9 @@ const ScoringBreakdownPanel = ({ breakdown }: ScoringBreakdownPanelProps) => {
         {CATEGORY_LABELS.map(({ key, label, max, descFn }) => {
           const value = breakdown[key as keyof ScoringBreakdown] as number;
           const pct = Math.min(100, (value / max) * 100);
-          const barColor = pct >= 66 ? 'bg-rise' : pct >= 33 ? 'bg-muted' : 'bg-fall';
+          // 점수는 "방향"이 아니라 "범주" → 무채색 ramp (파이와 동일 원칙, 3.13 TASK 2).
+          // rise(빨강) 채움은 하락 종목에서도 "상승 중"으로 오독됨. 막대 길이가 크기를 표현.
+          const barColor = pct >= 66 ? 'bg-ink' : pct >= 33 ? 'bg-muted' : 'bg-faint';
 
           return (
             <div key={key}>

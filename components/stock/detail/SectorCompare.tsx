@@ -105,22 +105,12 @@ export default function SectorCompare({ sectorData, currentCode }: SectorCompare
                   </td>
                   <td className="text-right py-2 px-3">
                     <span className="text-ink tabular-nums">{s.per || '---'}</span>
-                    {s.perVsAvg !== null && (
-                      <span className={`text-xs ml-1 tabular-nums ${s.perVsAvg < 0 ? 'text-rise' : 'text-fall'}`}>
-                        ({s.perVsAvg > 0 ? '+' : ''}{s.perVsAvg}%)
-                      </span>
-                    )}
                   </td>
                   <td className="text-right py-2 px-3">
                     <span className="text-ink tabular-nums">{s.pbr || '---'}</span>
                   </td>
                   <td className="text-right py-2 px-3">
                     <span className="text-ink tabular-nums">{s.roe ? `${s.roe}%` : '---'}</span>
-                    {s.roeVsAvg !== null && (
-                      <span className={`text-xs ml-1 tabular-nums ${s.roeVsAvg > 0 ? 'text-rise' : 'text-fall'}`}>
-                        ({s.roeVsAvg > 0 ? '+' : ''}{s.roeVsAvg}%)
-                      </span>
-                    )}
                   </td>
                 </tr>
               );

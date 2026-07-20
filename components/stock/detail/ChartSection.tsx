@@ -68,6 +68,20 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
   const priceMin = Math.min(...allPrices) * 0.98;
   const priceMax = Math.max(...allPrices) * 1.02;
 
+  // 주가 Y축 — 값 크기별 포맷 + 딱 떨어지는 눈금 (3.13 종목상세 TASK 1).
+  // 대시보드 만원 축과 무관(별도 컴포넌트). 원 단위 종목이 ₩2k로 뭉개지던 회귀 수정.
+  const formatPrice = (v: number): string => {
+    if (v >= 100_000_000) return `₩${(v / 100_000_000).toFixed(1)}억`;
+    if (v >= 10_000) { const m = v / 10_000; return `₩${m % 1 === 0 ? m.toLocaleString() : m.toFixed(1)}만`; }
+    return `₩${Math.round(v).toLocaleString()}`;
+  };
+  const priceRawStep = (priceMax - priceMin) / 5;
+  const priceStepMag = Math.pow(10, Math.floor(Math.log10(priceRawStep || 1)));
+  const priceStepNorm = (priceRawStep || 1) / priceStepMag;
+  const priceNiceStep = (priceStepNorm <= 1 ? 1 : priceStepNorm <= 2 ? 2 : priceStepNorm <= 2.5 ? 2.5 : priceStepNorm <= 5 ? 5 : 10) * priceStepMag;
+  const priceTicks: number[] = [];
+  for (let t = Math.ceil(priceMin / priceNiceStep) * priceNiceStep; t <= priceMax; t += priceNiceStep) priceTicks.push(t);
+
   // 3.12차 S5 — 마커는 signals.markers(최근 20일 크로스 전체)로 렌더. 주봉/월봉에선 rawDate 불일치로 조용히 미표시.
   const visibleMarkers = (signals?.markers || []).filter(m => chartData.some(d => d.rawDate === m.date));
 
@@ -102,7 +116,7 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
           <ComposedChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
             <XAxis dataKey="name" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[priceMin, priceMax]} tickFormatter={(v) => `₩${(v / 1000).toFixed(0)}k`} />
+            <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[priceMin, priceMax]} ticks={priceTicks} tickFormatter={(v) => formatPrice(Number(v))} />
             <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px', fontSize: '12px' }}
               formatter={((value: unknown, name: unknown) => {
                 const labels: Record<string, string> = { price: '종가', open: '시가', high: '고가', low: '저가', sma5: '5일 평균', sma20: '20일 평균' };
