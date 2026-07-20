@@ -9,7 +9,7 @@ import type { StockDetail } from '@/types/stock';
 import type { HelpTermKey } from '@/components/ui/HelpBottomSheet';
 
 // 투자자별 매매동향 아코디언 (3.12차 S2 분리). 본문 이동만.
-// ⚠️ Recharts 높이 보존: h-64 w-full 래퍼 유지 (ResponsiveContainer 붕괴 방지).
+// [중요] Recharts 높이 보존: h-64 w-full 래퍼 유지 (ResponsiveContainer 붕괴 방지).
 interface InvestorChartProps {
   stockDetail: StockDetail;
   onHelp: (t: HelpTermKey) => void;
@@ -19,35 +19,35 @@ export default function InvestorChart({ stockDetail, onHelp }: InvestorChartProp
   const [showInvestor, setShowInvestor] = useState(false);
   if (!stockDetail.investorData || stockDetail.investorData.length === 0) return null;
   return (
-    <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800/50">
+    <div className="bg-surface p-6 rounded-xl border border-line">
       <button onClick={() => setShowInvestor(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
         <div className="flex items-center space-x-2">
-          <h3 className="text-lg font-semibold">투자자별 매매동향</h3>
-          <span onClick={(e) => { e.stopPropagation(); onHelp('supplyDemand'); }} className="text-slate-600 hover:text-blue-400 text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
+          <h3 className="text-lg font-semibold text-ink">투자자별 매매동향</h3>
+          <span onClick={(e) => { e.stopPropagation(); onHelp('supplyDemand'); }} className="text-faint hover:text-ink text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-500">{showInvestor ? '접기' : '펼치기'}</span>
-          <ChevronDown size={16} className={`text-slate-500 transition-transform ${showInvestor ? 'rotate-180' : ''}`} />
+          <span className="text-xs text-faint">{showInvestor ? '접기' : '펼치기'}</span>
+          <ChevronDown size={16} className={`text-faint transition-transform ${showInvestor ? 'rotate-180' : ''}`} />
         </div>
       </button>
       {showInvestor && (
         <div className="mt-4">
-          <p className="text-xs text-slate-500 mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
-          <p className="text-xs text-slate-600 mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
+          <p className="text-xs text-muted mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
+          <p className="text-xs text-faint mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stockDetail.investorData.slice(-10).map((d) => ({
                 ...d, name: d.date.slice(4, 6) + '/' + d.date.slice(6, 8),
               }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? '+' : ''}${Math.round(v / 1000)}k`} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
+                <XAxis dataKey="name" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? '+' : ''}${Math.round(v / 1000)}k`} />
+                <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
                 <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                <ReferenceLine y={0} stroke="#334155" />
-                <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#facc15" />
-                <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#ec4899" />
-                <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6366f1" />
+                <ReferenceLine y={0} stroke="#D4D4CE" />
+                <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#85878D" />
+                <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#17181C" />
+                <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6E7076" />
               </BarChart>
             </ResponsiveContainer>
           </div>

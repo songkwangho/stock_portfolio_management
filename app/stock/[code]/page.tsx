@@ -25,8 +25,8 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
   const { code } = use(params);
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
-        <div className="w-4 h-4 mr-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-64 text-muted text-sm">
+        <div className="w-4 h-4 mr-2 border-2 border-ink border-t-transparent rounded-full animate-spin" />
         종목 정보를 불러오는 중이에요...
       </div>
     }>
@@ -127,9 +127,9 @@ function StockDetailContent({ code }: { code: string }) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
-        <RefreshCw className="animate-spin mb-3 text-blue-400" size={24} />
-        <p className="text-sm text-slate-300 font-semibold mb-1">종목 정보를 불러오는 중이에요...</p>
-        <p className="text-xs text-slate-500">보통 3~5초 소요돼요</p>
+        <RefreshCw className="animate-spin mb-3 text-muted" size={24} />
+        <p className="text-sm text-ink font-semibold mb-1">종목 정보를 불러오는 중이에요...</p>
+        <p className="text-xs text-faint">보통 3~5초 소요돼요</p>
       </div>
     );
   }
@@ -164,12 +164,12 @@ function StockDetailContent({ code }: { code: string }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-8">
-      <button onClick={onBack} className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors mb-4 px-4 py-2.5 min-h-[44px]">
+      <button onClick={onBack} className="flex items-center space-x-2 text-muted hover:text-ink transition-colors mb-4 px-4 py-2.5 min-h-[44px]">
         <ArrowLeft size={20} />
         <span>돌아가기</span>
       </button>
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8">
+      <div className="bg-surface border border-line rounded-xl p-8">
         {/* 헤더 (3.12차 S6: DetailHeader 분리) */}
         <DetailHeader
           stock={stock}
@@ -202,7 +202,7 @@ function StockDetailContent({ code }: { code: string }) {
           <div className="lg:hidden mb-4">
             <button
               onClick={() => document.getElementById('portfolio-add-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="w-full py-3 min-h-[44px] bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 text-sm font-bold rounded-2xl transition-colors"
+              className="w-full py-3 min-h-[44px] bg-ink hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity"
             >
               + 포트폴리오에 추가하기 ↓
             </button>

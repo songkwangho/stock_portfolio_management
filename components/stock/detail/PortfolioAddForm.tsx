@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
 import type { AddHoldingPayload } from '@/types/stock';
 
 // 포트폴리오 추가 폼 (3.12차 S6 분리). addForm/adding state 지역화.
-// ⚠️ DOM 계약: 모바일 lg:hidden 스크롤 버튼이 id="portfolio-add-form"에 의존(getElementById). id·scroll-mt-20 보존 필수.
+// [중요] DOM 계약: 모바일 lg:hidden 스크롤 버튼이 id="portfolio-add-form"에 의존(getElementById). id·scroll-mt-20 보존 필수.
 interface PortfolioAddFormProps {
   code: string;
   name: string;                 // stockDetail?.name || stock.name
@@ -25,31 +24,28 @@ export default function PortfolioAddForm({ code, name, defaultAvgPrice, holdings
   }, [defaultAvgPrice]);
 
   return (
-    <div id="portfolio-add-form" className="bg-slate-950/50 border border-slate-800 rounded-2xl p-6 mb-6 scroll-mt-20">
-      <h4 className="text-sm font-bold mb-4 flex items-center space-x-2">
-        <Plus size={16} className="text-blue-400" />
-        <span>내 포트폴리오에 추가</span>
-      </h4>
+    <div id="portfolio-add-form" className="bg-surface border border-line rounded-xl p-6 mb-6 scroll-mt-20">
+      <h4 className="text-sm font-bold text-ink mb-4">내 포트폴리오에 추가</h4>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-slate-300 mb-1 block font-bold">평균 매수가 (₩)</label>
+            <label className="text-xs text-ink mb-1 block font-bold">평균 매수가 (₩)</label>
             <input type="number" title="여러 번 나눠 샀다면 평균을 입력해요" value={addForm.avgPrice}
               onChange={(e) => setAddForm({ ...addForm, avgPrice: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+              className="w-full bg-surface border border-line-strong rounded-xl px-3 py-2 text-sm text-ink tabular-nums focus:outline-none focus:border-ink" />
           </div>
           <div>
-            <label className="text-xs text-slate-300 mb-1 block font-bold">보유 수량 (주)</label>
+            <label className="text-xs text-ink mb-1 block font-bold">보유 수량 (주)</label>
             <input type="number" title="증권사 앱에서 확인할 수 있어요" value={addForm.quantity}
               onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+              className="w-full bg-surface border border-line-strong rounded-xl px-3 py-2 text-sm text-ink tabular-nums focus:outline-none focus:border-ink" />
           </div>
         </div>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          평균 매수가: 여러 번 나눠 샀다면 평균을 입력해요. 수량은 증권사 앱에서 확인 가능. <span className="text-slate-400">포트폴리오 비중(%)은 매수가·수량으로 자동 계산돼요.</span>
+        <p className="text-xs text-faint leading-relaxed">
+          평균 매수가: 여러 번 나눠 샀다면 평균을 입력해요. 수량은 증권사 앱에서 확인 가능. <span className="text-muted">포트폴리오 비중(%)은 매수가·수량으로 자동 계산돼요.</span>
         </p>
         {addForm.quantity !== '0' && addForm.avgPrice !== '0' && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint tabular-nums">
             총 투자금액: ₩{(parseInt(addForm.quantity || '0') * parseInt(addForm.avgPrice || '0')).toLocaleString()}
           </p>
         )}
@@ -65,7 +61,7 @@ export default function PortfolioAddForm({ code, name, defaultAvgPrice, holdings
             onSuccess(wasFirstStock);
           } catch (err) { console.error('Failed to add:', err); } finally { setAdding(false); }
         }} disabled={adding}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 min-h-[44px]">
+          className="w-full py-3 bg-ink hover:opacity-90 text-surface rounded-xl text-sm font-bold transition-opacity disabled:opacity-50 min-h-[44px]">
           {adding ? '추가 중...' : '포트폴리오 등록'}
         </button>
       </div>

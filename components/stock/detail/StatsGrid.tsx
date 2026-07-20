@@ -29,7 +29,7 @@ export default function StatsGrid({ stockDetail }: StatsGridProps) {
 
   return (
     <Card variant="secondary" padding="base" className="mb-6">
-      <h3 className="text-sm font-bold text-ink mb-3">📊 한눈에 보기</h3>
+      <h3 className="text-sm font-bold text-ink mb-3">한눈에 보기</h3>
       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
         {[
           { label: '현재가',    value: stockDetail?.price ? `₩${stockDetail.price.toLocaleString()}` : '---' },
@@ -44,7 +44,7 @@ export default function StatsGrid({ stockDetail }: StatsGridProps) {
         ].map(item => (
           <div key={item.label} className="min-w-0">
             <p className="text-xs text-faint mb-0.5 truncate">{item.label}</p>
-            <p className="text-sm font-bold text-ink truncate">{item.value}</p>
+            <p className="text-sm font-bold text-ink truncate tabular-nums">{item.value}</p>
           </div>
         ))}
       </div>
@@ -56,7 +56,7 @@ export default function StatsGrid({ stockDetail }: StatsGridProps) {
             <span>52주 최저</span>
             <span>52주 최고</span>
           </div>
-          <div className="relative h-2 bg-slate-800 rounded-full">
+          <div className="relative h-2 bg-line rounded-full">
             <div
               className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-ink rounded-full border-2 border-surface"
               style={{ left: `calc(${Math.min(100, Math.max(0, (stockDetail.price - low52w) / (high52w - low52w) * 100))}% - 6px)` }}
