@@ -228,12 +228,14 @@ function StockDetailContent({ code }: { code: string }) {
         <div className="space-y-4">
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
           {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {/* items-stretch: 좌우 컬럼 같은 높이. 우측 마지막 카드(Signal Score) flex-1로 슬랙 흡수 → 하단 정렬 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
             <OpinionScorePanel stockDetail={stockDetail} />
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <SignalPanel signals={signals} />
               {/* Signal Score — 가로 배치(높이 축소): 좌 라벨+숫자 / 우 설명. 경고는 설명에 흡수 (3.13 밀도 3차 TASK 2/3) */}
-              <div className="bg-surface border border-line rounded-xl p-4 flex items-center gap-4">
+              {/* flex-1: 우측 컬럼에서 남는 높이 흡수 → 좌측 종합점수 카드 바닥과 정렬. items-center로 내용은 세로 중앙 */}
+              <div className="bg-surface border border-line rounded-xl p-4 flex items-center gap-4 flex-1">
                 <div className="shrink-0">
                   <p className="text-xs text-faint">Signal Score</p>
                   <p className="tabular-nums leading-none mt-1">
