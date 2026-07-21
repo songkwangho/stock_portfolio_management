@@ -176,7 +176,7 @@ function StockDetailContent({ code }: { code: string }) {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-left-4 duration-500 max-w-4xl mx-auto">
+    <div className="animate-in fade-in slide-in-from-left-4 duration-500 max-w-6xl mx-auto">
       <button onClick={onBack} className="flex items-center space-x-2 text-muted hover:text-ink transition-colors mb-4 px-4 py-2.5 min-h-[44px] -ml-4">
         <ArrowLeft size={20} />
         <span>돌아가기</span>
@@ -224,13 +224,18 @@ function StockDetailContent({ code }: { code: string }) {
         </button>
       </div>
 
-      {/* ===== [요약] — 결론·의견·점수·신호·요약 + (미보유) 적정가·추가폼 ===== */}
+      {/* ===== [요약] — 결론(풀폭) + 점수/신호 2열 + (미보유) 적정가·추가폼(풀폭 하단) ===== */}
       {activeTab === 'summary' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
-          <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} signalScore={computeProbability()} />
-          <SignalPanel signals={signals} />
-          <AnalysisSummary stockDetail={stockDetail} />
+          {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} signalScore={computeProbability()} />
+            <div className="space-y-4">
+              <SignalPanel signals={signals} />
+              <AnalysisSummary stockDetail={stockDetail} />
+            </div>
+          </div>
           {!isHolding && stock.fairPrice && (
             <div className="flex justify-between items-center p-4 bg-inset rounded-xl border border-line">
               <div>

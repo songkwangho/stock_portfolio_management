@@ -15,20 +15,19 @@ export default function ConclusionCard({ stockDetail, isHolding, holdingMatch }:
   return (
     <Card
       variant="primary"
-      padding="emphasis"
+      padding="base"
       accentBar={
         stockDetail.market_opinion === '긍정적' ? 'positive' :
         stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
       }
-      className="mb-6"
     >
-      <p className="text-xs font-bold text-faint mb-3">
+      <p className="text-xs font-bold text-faint mb-1">
         이 종목 한 줄 요약
       </p>
-      <p className="text-base font-bold text-ink mb-3 leading-relaxed">
+      <p className="text-base font-bold text-ink mb-2 leading-relaxed">
         {generateStockSummary(stockDetail, isHolding, holdingMatch)}
       </p>
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-3">
         <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
           stockDetail.market_opinion === '긍정적'
             ? 'bg-rise/10 text-rise border-rise/20'

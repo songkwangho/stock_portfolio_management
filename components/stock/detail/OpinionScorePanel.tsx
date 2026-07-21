@@ -15,9 +15,9 @@ interface OpinionScorePanelProps {
 
 export default function OpinionScorePanel({ stock, stockDetail, isHolding, signalScore }: OpinionScorePanelProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* 종합 의견 */}
-      <div className="bg-surface border border-line rounded-xl p-6">
+      <div className="bg-surface border border-line rounded-xl p-4">
         <p className="text-xs text-faint mb-3 font-bold">종합 의견</p>
         <div className="flex items-center gap-3 flex-wrap gap-y-2">
           {/* Market Opinion (시장 기준) */}
@@ -58,7 +58,7 @@ export default function OpinionScorePanel({ stock, stockDetail, isHolding, signa
       )}
 
       {/* Signal Score (종합점수 옆) */}
-      <div className="bg-surface border border-line rounded-xl p-6">
+      <div className="bg-surface border border-line rounded-xl p-4">
         <p className="text-xs text-faint mb-1 text-center">Signal Score</p>
         <div className="text-3xl font-black text-center text-ink tabular-nums">{signalScore}</div>
         <p className="text-xs text-faint text-center mt-1">종합 신호 점수 (0~100)</p>

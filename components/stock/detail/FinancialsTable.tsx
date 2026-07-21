@@ -1,27 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import type { FinancialData } from '@/types/stock';
 
-// 분기별 실적 아코디언 (3.12차 S2 분리). 본문 이동만.
+// 분기별 실적 (3.12차 S2 분리 → 3.13 탭 재편 TASK 3: 아코디언 제거, 항상 펼침).
 interface FinancialsTableProps {
   financials: FinancialData | null;
 }
 
 export default function FinancialsTable({ financials }: FinancialsTableProps) {
-  const [showFinancials, setShowFinancials] = useState(false);
   if (!financials || financials.financials.length === 0) return null;
   return (
     <div className="bg-surface p-6 rounded-xl border border-line">
-      <button onClick={() => setShowFinancials(v => !v)} className="w-full flex items-center justify-between min-h-[44px]">
-        <h3 className="text-lg font-semibold text-ink">분기별 실적</h3>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-faint">{showFinancials ? '접기' : '펼치기'}</span>
-          <ChevronDown size={16} className={`text-faint transition-transform ${showFinancials ? 'rotate-180' : ''}`} />
-        </div>
-      </button>
-      {showFinancials && <div className="mt-4">
+      <h3 className="text-lg font-semibold text-ink mb-4">분기별 실적</h3>
       <p className="text-xs text-muted mb-1">최근 분기별 매출과 이익 추이예요. 꾸준히 늘어나면 좋은 신호예요.</p>
       <p className="text-xs text-faint mb-4">단위: 억 원 (네이버 증권 기준). 1조 = 10,000억</p>
       <div className="overflow-x-auto">
@@ -65,7 +55,6 @@ export default function FinancialsTable({ financials }: FinancialsTableProps) {
           </tbody>
         </table>
       </div>
-      </div>}
     </div>
   );
 }

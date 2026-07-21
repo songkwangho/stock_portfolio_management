@@ -82,7 +82,7 @@ const ScoringBreakdownPanel = ({ breakdown }: ScoringBreakdownPanelProps) => {
       </div>
 
       {/* Score Bars */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {CATEGORY_LABELS.map(({ key, label, max, descFn }) => {
           const value = breakdown[key as keyof ScoringBreakdown] as number;
           const pct = Math.min(100, (value / max) * 100);

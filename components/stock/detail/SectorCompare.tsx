@@ -1,25 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
 import type { SectorComparison } from '@/types/stock';
 
-// 같은 업종 비교 아코디언 (3.12차 S3 분리). scroll ref + effect 함께 이동. 본문 동일.
+// 같은 업종 비교 (3.12차 S3 분리 → 3.13 탭 재편 TASK 3: 아코디언 제거, 항상 펼침).
+// 스크롤-투-현재행 effect도 제거 — 탭 진입 시 항상 렌더돼 페이지가 점프하는 회귀 방지.
+// 현재 종목은 bg-inset 하이라이트 + "← 현재" 마커로 식별.
 interface SectorCompareProps {
   sectorData: SectorComparison | null;
   currentCode: string;
 }
 
 export default function SectorCompare({ sectorData, currentCode }: SectorCompareProps) {
-  const [showSector, setShowSector] = useState(false);
-  const currentSectorRowRef = useRef<HTMLTableRowElement | null>(null);
-
-  useEffect(() => {
-    if (sectorData && currentSectorRowRef.current) {
-      currentSectorRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  }, [sectorData]);
-
   if (!sectorData || sectorData.stocks.length <= 1) return null;
 
   // 현재 종목의 업종 내 백분위 계산 — "나는 어디 위치인가" 맥락 제공
@@ -45,14 +36,7 @@ export default function SectorCompare({ sectorData, currentCode }: SectorCompare
   };
   return (
     <div className="bg-surface border border-line rounded-xl p-6">
-      <button onClick={() => setShowSector(v => !v)} className="w-full flex items-center justify-between min-h-[44px] mb-2">
-        <h3 className="text-lg font-semibold text-ink">같은 업종 비교</h3>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-faint">{showSector ? '접기' : '펼치기'}</span>
-          <ChevronDown size={16} className={`text-faint transition-transform ${showSector ? 'rotate-180' : ''}`} />
-        </div>
-      </button>
-      {showSector && <>
+      <h3 className="text-lg font-semibold text-ink mb-2">같은 업종 비교</h3>
       <p className="text-xs text-muted mb-3">
         <span className="text-ink font-bold">{sectorData.category}</span> 업종 중앙값과 비교해요.
         PER이 중앙값보다 낮고 ROE가 높으면 좋아요!
@@ -96,7 +80,6 @@ export default function SectorCompare({ sectorData, currentCode }: SectorCompare
               return (
                 <tr
                   key={s.code}
-                  ref={isCurrent ? currentSectorRowRef : undefined}
                   className={`border-b border-line ${isCurrent ? 'bg-inset' : ''}`}
                 >
                   <td className="py-2 px-3">
@@ -118,7 +101,6 @@ export default function SectorCompare({ sectorData, currentCode }: SectorCompare
           </tbody>
         </table>
       </div>
-      </>}
     </div>
   );
 }
