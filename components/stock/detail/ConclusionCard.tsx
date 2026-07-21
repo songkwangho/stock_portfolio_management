@@ -21,40 +21,10 @@ export default function ConclusionCard({ stockDetail, isHolding, holdingMatch }:
         stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
       }
     >
-      <p className="text-xs font-bold text-faint mb-1">
-        이 종목 한 줄 요약
-      </p>
-      <p className="text-base font-bold text-ink mb-2 leading-relaxed">
+      {/* 라벨(자명)·의견 뱃지(종합점수와 중복) 제거 → 요약문 + 행동스텝 + 면책 3덩어리 (3.13 밀도 2차 TASK 1) */}
+      <p className="text-base font-bold text-ink mb-3 leading-relaxed">
         {generateStockSummary(stockDetail, isHolding, holdingMatch)}
       </p>
-      <div className="flex flex-wrap gap-2 mb-3">
-        <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-          stockDetail.market_opinion === '긍정적'
-            ? 'bg-rise/10 text-rise border-rise/20'
-            : stockDetail.market_opinion === '부정적'
-            ? 'bg-fall/10 text-fall border-fall/20'
-            : 'bg-inset text-muted border-line'
-        }`}>
-          시장 분석: {stockDetail.market_opinion || '분석 중'}
-        </span>
-        {isHolding && stockDetail.holding_opinion && (
-          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-            stockDetail.holding_opinion === '매도'
-              ? 'bg-fall/10 text-fall border-fall/20'
-              : stockDetail.holding_opinion === '관망'
-              ? 'bg-caution/10 text-caution border-caution/20'
-              : stockDetail.holding_opinion === '추가매수'
-              ? 'bg-rise/10 text-rise border-rise/20'
-              : 'bg-inset text-muted border-line'
-          }`}>
-            내 종목 상태: {
-              stockDetail.holding_opinion === '매도' ? '주의 필요' :
-              stockDetail.holding_opinion === '추가매수' ? '추가 검토' :
-              stockDetail.holding_opinion
-            }
-          </span>
-        )}
-      </div>
       <div className="border-t border-line pt-3">
         <p className="text-xs font-bold text-muted mb-2">지금 할 수 있는 것</p>
         <div className="space-y-1.5">

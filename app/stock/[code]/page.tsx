@@ -18,7 +18,6 @@ import IndicatorPanel from '@/components/stock/detail/IndicatorPanel';
 import ChartSection from '@/components/stock/detail/ChartSection';
 import DetailHeader from '@/components/stock/detail/DetailHeader';
 import OpinionScorePanel from '@/components/stock/detail/OpinionScorePanel';
-import AnalysisSummary from '@/components/stock/detail/AnalysisSummary';
 import AnalysisDetail from '@/components/stock/detail/AnalysisDetail';
 import PortfolioAddForm from '@/components/stock/detail/PortfolioAddForm';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
@@ -230,10 +229,21 @@ function StockDetailContent({ code }: { code: string }) {
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
           {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} signalScore={computeProbability()} />
+            <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} />
             <div className="space-y-4">
               <SignalPanel signals={signals} />
-              <AnalysisSummary stockDetail={stockDetail} />
+              {/* Signal Score — 우측 컬럼으로 이동(좌우 높이 균형, 3.13 밀도 2차 TASK 3) */}
+              <div className="bg-surface border border-line rounded-xl p-4">
+                <p className="text-xs text-faint mb-1 text-center">Signal Score</p>
+                <div className="text-3xl font-black text-center text-ink tabular-nums">{computeProbability()}</div>
+                <p className="text-xs text-faint text-center mt-1">종합 신호 점수 (0~100)</p>
+                <p className="text-xs text-muted text-center mt-2 leading-relaxed max-w-md mx-auto">
+                  위 시장 분석 10점 점수에 목표가 괴리·이평선·변동성을 더해 0~100으로 환산한 보조 지표예요.
+                </p>
+                <p className="text-xs text-caution text-center mt-1 leading-relaxed">
+                  실제 상승 확률이 아니에요.
+                </p>
+              </div>
             </div>
           </div>
           {!isHolding && stock.fairPrice && (

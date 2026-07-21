@@ -3,6 +3,7 @@ import type { ScoringBreakdown } from '@/types/stock';
 
 interface ScoringBreakdownPanelProps {
   breakdown: ScoringBreakdown;
+  bare?: boolean; // true면 카드 래퍼 없이 렌더 — 상위 카드에 병합 (3.13 밀도 2차)
 }
 
 // 해석 기준: 영역 점수 / 만점 비율 (80%↑ 매우 좋음, 60%↑ 적정, 25%↑ 약함, 그 외 부정)
@@ -52,14 +53,14 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
   },
 ];
 
-const ScoringBreakdownPanel = ({ breakdown }: ScoringBreakdownPanelProps) => {
+const ScoringBreakdownPanel = ({ breakdown, bare = false }: ScoringBreakdownPanelProps) => {
   const { total, per_negative, low_confidence } = breakdown;
 
   const scoreColor = total >= 7 ? 'text-rise' : total >= 4 ? 'text-ink' : 'text-fall';
   const scoreLabel = total >= 7 ? '긍정적' : total >= 4 ? '중립적' : '부정적';
 
   return (
-    <div className="bg-surface p-4 rounded-xl border border-line">
+    <div className={bare ? undefined : 'bg-surface p-4 rounded-xl border border-line'}>
       <div className="flex items-center justify-between mb-1">
         <p className="text-xs text-muted font-bold">종합점수</p>
         <div className="flex items-center space-x-2">
