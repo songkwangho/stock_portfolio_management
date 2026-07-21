@@ -229,7 +229,7 @@ function StockDetailContent({ code }: { code: string }) {
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
           {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} />
+            <OpinionScorePanel stockDetail={stockDetail} />
             <div className="space-y-4">
               <SignalPanel signals={signals} />
               {/* Signal Score — 우측 컬럼으로 이동(좌우 높이 균형, 3.13 밀도 2차 TASK 3) */}
