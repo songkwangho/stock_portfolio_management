@@ -33,19 +33,19 @@ export default function ConclusionCard({ stockDetail, isHolding, holdingMatch }:
             stockDetail.market_opinion === '부정적' ? 'bg-fall/10 text-fall border-fall/20' :
             'bg-inset text-muted border-line'
           }`}>{stockDetail.market_opinion || '분석 중'}</span>
-          {/* 내 종목 상태 (보유 시에만) */}
-          {isHolding && stockDetail.holding_opinion && (
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-              stockDetail.holding_opinion === '매도' ? 'bg-fall/10 text-fall border-fall/20' :
-              stockDetail.holding_opinion === '관망' ? 'bg-caution/10 text-caution border-caution/20' :
-              stockDetail.holding_opinion === '추가매수' ? 'bg-rise/10 text-rise border-rise/20' :
-              'bg-inset text-muted border-line'
-            }`}>{
-              stockDetail.holding_opinion === '매도' ? '주의 필요' :
-              stockDetail.holding_opinion === '추가매수' ? '추가 검토' :
-              stockDetail.holding_opinion
-            }</span>
-          )}
+          {/* 내 종목 상태 (보유 시). holding_opinion 없으면 '보유' 기본값 — 분석 대기 중에도 뱃지 노출 (버그 수정) */}
+          {isHolding && (() => {
+            const ho = stockDetail.holding_opinion || '보유';
+            const display = ho === '매도' ? '주의 필요' : ho === '추가매수' ? '추가 검토' : ho;
+            return (
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                ho === '매도' ? 'bg-fall/10 text-fall border-fall/20' :
+                ho === '관망' ? 'bg-caution/10 text-caution border-caution/20' :
+                ho === '추가매수' ? 'bg-rise/10 text-rise border-rise/20' :
+                'bg-inset text-muted border-line'
+              }`}>{display}</span>
+            );
+          })()}
         </div>
       </div>
       <div className="border-t border-line pt-3">

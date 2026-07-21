@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import type { ScoringBreakdown } from '@/types/stock';
 
 interface ScoringBreakdownPanelProps {
@@ -55,6 +56,7 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
 
 const ScoringBreakdownPanel = ({ breakdown, bare = false }: ScoringBreakdownPanelProps) => {
   const { total, per_negative, low_confidence } = breakdown;
+  const [showTempNote, setShowTempNote] = useState(false);
 
   const scoreColor = total >= 7 ? 'text-rise' : total >= 4 ? 'text-ink' : 'text-fall';
   const scoreLabel = total >= 7 ? '긍정적' : total >= 4 ? '중립적' : '부정적';
@@ -62,7 +64,10 @@ const ScoringBreakdownPanel = ({ breakdown, bare = false }: ScoringBreakdownPane
   return (
     <div className={bare ? undefined : 'bg-surface p-4 rounded-xl border border-line'}>
       <div className="flex items-center justify-between mb-1">
-        <p className="text-xs text-muted font-bold">종합점수</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs text-muted font-bold">종합점수</p>
+          <button onClick={() => setShowTempNote(v => !v)} className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution" aria-label="점수 기준 안내">임시 기준</button>
+        </div>
         <div className="flex items-center space-x-2">
           <span className={`text-2xl font-black tabular-nums ${scoreColor}`}>{total}</span>
           <span className="text-sm text-faint tabular-nums">/10</span>
@@ -75,12 +80,12 @@ const ScoringBreakdownPanel = ({ breakdown, bare = false }: ScoringBreakdownPane
       </div>
       <p className="text-xs text-muted mb-3 leading-relaxed">10점에 가까울수록 긍정적인 신호예요. 높은 점수가 수익을 보장하지는 않아요.</p>
 
-      {/* 17차 P4-보완: 7/4점 임계값은 백테스팅 검증 전 임시값 — 사용자에게 고지 (CLAUDE.md Phase 4-1) */}
-      <div className="mb-4 p-2.5 bg-caution/5 border border-caution/20 rounded-lg">
-        <p className="text-xs text-caution leading-relaxed">
+      {/* 17차 P4-보완: 임계값 임시값 고지 — 큰 amber 박스 → '임시 기준' 뱃지 클릭 시 전문 (3.13 밀도 3차 TASK 3, 고지 텍스트 보존) */}
+      {showTempNote && (
+        <p className="text-xs text-caution mb-3 leading-relaxed">
           <span className="font-bold">이 점수 기준은 실증 검증 전이에요.</span> 과거 데이터로 최적화하기 전 임시 기준이니 참고용으로만 봐주세요.
         </p>
-      </div>
+      )}
 
       {/* Score Bars */}
       <div className="space-y-2">
