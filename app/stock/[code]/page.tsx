@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, StockDetail, Holding, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, StockThemeTag, SignalResult } from '@/types/stock';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
@@ -17,9 +17,20 @@ import MetricsGrid from '@/components/stock/detail/MetricsGrid';
 import IndicatorPanel from '@/components/stock/detail/IndicatorPanel';
 import ChartSection from '@/components/stock/detail/ChartSection';
 import DetailHeader from '@/components/stock/detail/DetailHeader';
-import RightSidebar from '@/components/stock/detail/RightSidebar';
+import OpinionScorePanel from '@/components/stock/detail/OpinionScorePanel';
+import AnalysisSummary from '@/components/stock/detail/AnalysisSummary';
+import AnalysisDetail from '@/components/stock/detail/AnalysisDetail';
+import PortfolioAddForm from '@/components/stock/detail/PortfolioAddForm';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useToastStore } from '@/stores/useToastStore';
+
+// 3.13 탭 재편 — 종목상세 3탭. 사이드바 폐지 후 단일 컬럼 풀폭.
+type TabKey = 'summary' | 'chart' | 'company';
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'summary', label: '요약' },
+  { key: 'chart', label: '차트·지표' },
+  { key: 'company', label: '기업' },
+];
 
 export default function StockDetailPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -76,6 +87,8 @@ function StockDetailContent({ code }: { code: string }) {
   const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
   // 3.11차 — 관찰형 매수/매도 신호 (지연 로딩)
   const [signals, setSignals] = useState<SignalResult | null>(null);
+  // 3.13 탭 재편 — [요약] 기본 활성. 데이터는 셸 1회 fetch, 탭 전환 시 재요청 없음.
+  const [activeTab, setActiveTab] = useState<TabKey>('summary');
 
   // 종목 진입 시 스크롤 최상단으로 강제 — 이전 페이지 스크롤 위치 잔재 방지
   useEffect(() => {
@@ -113,7 +126,7 @@ function StockDetailContent({ code }: { code: string }) {
     fetchDetail();
   }, [stock.code]);
 
-  // 데이터 새로 고침 — 셸이 fetch 소유(setter를 자식에 내리지 않음, 리스크 #5). RightSidebar가 호출.
+  // 데이터 새로 고침 — 셸이 fetch 소유(setter를 자식에 내리지 않음). 탭 바의 새로고침 버튼이 호출.
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -163,91 +176,113 @@ function StockDetailContent({ code }: { code: string }) {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-8">
-      <button onClick={onBack} className="flex items-center space-x-2 text-muted hover:text-ink transition-colors mb-4 px-4 py-2.5 min-h-[44px]">
+    <div className="animate-in fade-in slide-in-from-left-4 duration-500 max-w-4xl mx-auto">
+      <button onClick={onBack} className="flex items-center space-x-2 text-muted hover:text-ink transition-colors mb-4 px-4 py-2.5 min-h-[44px] -ml-4">
         <ArrowLeft size={20} />
         <span>돌아가기</span>
       </button>
 
-      <div className="bg-surface border border-line rounded-xl p-8">
-        {/* 헤더 (3.12차 S6: DetailHeader 분리) */}
-        <DetailHeader
-          stock={stock}
-          stockDetail={stockDetail}
-          isHolding={isHolding}
-          holdingMatch={holdingMatch}
-          stockThemes={stockThemes}
-          trend={trend}
-          latestPrice={latestPrice}
-          profitRate={profitRate}
-          onDeleteHolding={onDeleteHolding}
-          onDeleteStock={onDeleteStock}
-          onUpdate={onUpdate}
-          addToast={addToast}
-          onBack={onBack}
-        />
+      {/* 헤더 — 탭 위 고정(항상 표시). 종목명/코드/테마/현재가/수익률/보유수정 (3.12차 S6: DetailHeader) */}
+      <DetailHeader
+        stock={stock}
+        stockDetail={stockDetail}
+        isHolding={isHolding}
+        holdingMatch={holdingMatch}
+        stockThemes={stockThemes}
+        trend={trend}
+        latestPrice={latestPrice}
+        profitRate={profitRate}
+        onDeleteHolding={onDeleteHolding}
+        onDeleteStock={onDeleteStock}
+        onUpdate={onUpdate}
+        addToast={addToast}
+        onBack={onBack}
+      />
 
-        {/* 결론 카드 (3.12차 S3: ConclusionCard 분리) */}
-        {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
-
-        {/* "한눈에 보기" 9지표 + 52주 게이지 (3.12차 S3: StatsGrid 분리) */}
-        {stockDetail && <StatsGrid stockDetail={stockDetail} />}
-
-        {/* 관찰형 신호 요약 + stale 경고 (3.12차 S3: SignalPanel 분리) */}
-        <SignalPanel signals={signals} />
-
-        {/* 3.9차β — 모바일 전용 빠른 진입: 긍정적 미보유 종목에 한해 포트폴리오 추가 폼으로 스크롤.
-            PC는 우측 사이드바에 폼이 즉시 보이므로 lg 이상에서 숨김. */}
-        {!isHolding && stockDetail?.market_opinion === '긍정적' && (
-          <div className="lg:hidden mb-4">
+      {/* 탭 바 + 새로고침(모든 탭 접근). 탭은 네비게이션 → 방향색(rise/fall) 미사용 */}
+      <div className="flex items-center justify-between border-b border-line mb-6">
+        <div className="flex overflow-x-auto">
+          {TABS.map(t => (
             <button
-              onClick={() => document.getElementById('portfolio-add-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="w-full py-3 min-h-[44px] bg-ink hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity"
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-3 min-h-[44px] text-sm font-bold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                activeTab === t.key ? 'text-ink border-ink' : 'text-muted border-transparent hover:text-ink'
+              }`}
             >
-              + 포트폴리오에 추가하기 ↓
+              {t.label}
             </button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* 주가·거래량 차트 (3.12차 S5: ChartSection 통합 추출 + 마커 창 20일 확대) */}
-            {stockDetail && <ChartSection code={stock.code} stockDetail={stockDetail} signals={signals} />}
-
-            {/* Metrics Grid (3.12차 S4: MetricsGrid 분리) */}
-            {stockDetail && <MetricsGrid stockDetail={stockDetail} category={stock.category} sectorData={sectorData} onHelp={setHelpTerm} />}
-
-            {/* 기술적 지표 종합 (3.12차 S4: IndicatorPanel 분리) */}
-            <IndicatorPanel indicators={indicators} volatility={volatility} onHelp={setHelpTerm} />
-
-            {/* Investor Trading Trends — 아코디언 (3.12차 S2: InvestorChart 분리) */}
-            {stockDetail && <InvestorChart stockDetail={stockDetail} onHelp={setHelpTerm} />}
-
-            {/* Financial Statements — 아코디언 (3.12차 S2: FinancialsTable 분리) */}
-            <FinancialsTable financials={financials} />
-
-            {/* 같은 업종 비교 (3.12차 S3: SectorCompare 분리) */}
-            <SectorCompare sectorData={sectorData} currentCode={stock.code} />
-
-            {/* News (Phase 2 지연 로딩) — 3.12차 S2: NewsList 분리 */}
-            <NewsList news={news} />
-          </div>
-
-          {/* 우측 사이드바 (3.12차 S6: RightSidebar 분리) */}
-          <RightSidebar
-            stock={stock}
-            stockDetail={stockDetail}
-            isHolding={isHolding}
-            signalScore={computeProbability()}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            onAdd={onAdd}
-            holdingsEmpty={holdings.length === 0}
-            onAddSuccess={(wasFirstStock) => { if (wasFirstStock) router.push('/portfolio?focus=first-stock-guide'); else onBack(); }}
-          />
+          ))}
         </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-muted hover:text-ink px-3 py-2 min-h-[44px] transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden sm:inline">{refreshing ? '업데이트 중...' : '새로 고침'}</span>
+        </button>
       </div>
+
+      {/* ===== [요약] — 결론·의견·점수·신호·요약 + (미보유) 적정가·추가폼 ===== */}
+      {activeTab === 'summary' && (
+        <div className="space-y-6">
+          {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
+          <OpinionScorePanel stock={stock} stockDetail={stockDetail} isHolding={isHolding} signalScore={computeProbability()} />
+          <SignalPanel signals={signals} />
+          <AnalysisSummary stockDetail={stockDetail} />
+          {!isHolding && stock.fairPrice && (
+            <div className="flex justify-between items-center p-4 bg-inset rounded-xl border border-line">
+              <div>
+                <p className="text-xs text-muted mb-0.5">AI 추천 매수 적정가</p>
+                <p className="text-xl font-black text-ink tabular-nums">₩{stock.fairPrice.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+          {!isHolding && (
+            <PortfolioAddForm
+              code={stock.code}
+              name={stockDetail?.name || stock.name}
+              defaultAvgPrice={stockDetail?.price}
+              holdingsEmpty={holdings.length === 0}
+              onAdd={onAdd}
+              onSuccess={(wasFirstStock) => { if (wasFirstStock) router.push('/portfolio?focus=first-stock-guide'); else onBack(); }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* ===== [차트·지표] — 차트 → 지표 → 한눈에 → 밸류 → 수급 → 상세분석 ===== */}
+      {activeTab === 'chart' && (
+        <div className="space-y-6">
+          {stockDetail && <ChartSection code={stock.code} stockDetail={stockDetail} signals={signals} />}
+          <IndicatorPanel indicators={indicators} volatility={volatility} onHelp={setHelpTerm} />
+          {stockDetail && <StatsGrid stockDetail={stockDetail} />}
+          {stockDetail && <MetricsGrid stockDetail={stockDetail} category={stock.category} sectorData={sectorData} onHelp={setHelpTerm} />}
+          {stockDetail && <InvestorChart stockDetail={stockDetail} onHelp={setHelpTerm} />}
+          <AnalysisDetail stockDetail={stockDetail} name={stock.name} />
+        </div>
+      )}
+
+      {/* ===== [기업] — 업종비교 → 실적 → 뉴스 → 토스링크(외부, 마지막) ===== */}
+      {activeTab === 'company' && (
+        <div className="space-y-6">
+          <SectorCompare sectorData={sectorData} currentCode={stock.code} />
+          <FinancialsTable financials={financials} />
+          <NewsList news={news} />
+          {stockDetail?.tossUrl && (
+            <a href={stockDetail.tossUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-between p-4 bg-inset border border-line rounded-xl transition-colors group hover:border-ink">
+              <div>
+                <p className="text-xs font-bold text-ink">토스증권 차트 보기</p>
+                <p className="text-xs text-muted">실시간 차트와 커뮤니티 반응 확인</p>
+              </div>
+              <ArrowUpRight size={16} className="text-muted group-hover:text-ink transition-colors" />
+            </a>
+          )}
+        </div>
+      )}
+
       <HelpBottomSheet termKey={helpTerm} onClose={() => setHelpTerm(null)} />
     </div>
   );
