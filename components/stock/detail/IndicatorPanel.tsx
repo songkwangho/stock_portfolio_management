@@ -18,8 +18,8 @@ export default function IndicatorPanel({ indicators, volatility, onHelp }: Indic
     <div className="bg-surface p-6 rounded-xl border border-line">
       <h3 className="text-lg font-semibold text-ink mb-4">기술적 지표 종합 분석</h3>
 
-      {/* 종합 신호 - 큰 카드 */}
-      <div className={`p-5 rounded-xl mb-6 border ${
+      {/* 종합 신호 - 큰 카드 (패딩 base, 여백 축소) */}
+      <div className={`p-4 rounded-xl mb-4 border ${
         indicators.summary.signal === '긍정적' ? 'bg-rise/5 border-rise/20' :
         indicators.summary.signal === '주의' ? 'bg-caution/5 border-caution/20' :
         'bg-inset border-line'
@@ -51,16 +51,15 @@ export default function IndicatorPanel({ indicators, volatility, onHelp }: Indic
               detail.color === 'red' ? 'text-fall' : 'text-ink'
             }`}>{detail.signal}</p>
             <p className="text-xs text-muted leading-relaxed">{detail.description}</p>
-            <div className="mt-3 pt-3 border-t border-line text-xs text-muted leading-relaxed">
+            <div className="mt-2 pt-2 border-t border-line text-xs text-muted leading-relaxed">
               {helpTexts[detail.indicator === 'RSI' ? 'rsi' : detail.indicator === 'MACD' ? 'macd' : 'bollinger']}
             </div>
-            {/* Numeric values */}
+            {/* Numeric values — 게이지 채움은 무채색(방향은 위 라벨 색으로) (3.13 rule 2) */}
             <div className="mt-2 pt-2 border-t border-line">
               {detail.indicator === 'RSI' && indicators.rsi !== null && (
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 h-2 bg-line rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${indicators.rsi > 70 ? 'bg-caution' : indicators.rsi < 30 ? 'bg-caution' : 'bg-muted'}`}
-                      style={{ width: `${indicators.rsi}%` }} />
+                    <div className="h-full rounded-full bg-muted" style={{ width: `${indicators.rsi}%` }} />
                   </div>
                   <span className="text-xs font-bold text-muted tabular-nums">{indicators.rsi}</span>
                 </div>
@@ -71,8 +70,7 @@ export default function IndicatorPanel({ indicators, volatility, onHelp }: Indic
               {detail.indicator === '볼린저밴드' && indicators.bollinger && (
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 h-2 bg-line rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${indicators.bollinger.percentB > 80 ? 'bg-caution' : indicators.bollinger.percentB < 20 ? 'bg-caution' : 'bg-muted'}`}
-                      style={{ width: `${Math.max(2, Math.min(100, indicators.bollinger.percentB))}%` }} />
+                    <div className="h-full rounded-full bg-muted" style={{ width: `${Math.max(2, Math.min(100, indicators.bollinger.percentB))}%` }} />
                   </div>
                   <span className="text-xs font-bold text-muted tabular-nums">{indicators.bollinger.percentB}%</span>
                 </div>

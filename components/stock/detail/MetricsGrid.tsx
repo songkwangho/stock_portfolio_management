@@ -34,25 +34,16 @@ export default function MetricsGrid({ stockDetail, category, sectorData, onHelp 
             ? '적정 수준이에요'
             : stockDetail?.per ? '고평가 구간이에요' : '데이터 없음'}
         </p>
-        {/* 업종별 PER 맥락 안내 — 초보자가 단순 숫자만 보고 판단하지 않도록 */}
+        {/* 업종별 PER 맥락 — 카드 높이 균일 위해 한 줄로 압축(구분선 제거) (3.13 PART 1-1) */}
         {(() => {
           const cat = stockDetail?.category || category;
           let hint = '';
-          if (cat?.includes('기술') || cat?.includes('IT')) {
-            hint = 'IT 기업은 PER 20~40배도 정상이에요. 성장성을 함께 봐야 해요.';
-          } else if (cat?.includes('금융') || cat?.includes('지주')) {
-            hint = '금융 기업은 PER 5~15배가 일반적이에요. 단순히 낮다고 저평가는 아니에요.';
-          } else if (cat?.includes('바이오') || cat?.includes('헬스')) {
-            hint = '바이오 기업은 R&D 투자로 일시 적자가 많아요. 부실로 단정하지 마세요.';
-          } else if (cat?.includes('에너지') || cat?.includes('소재')) {
-            hint = '에너지·소재는 원자재 가격에 따라 PER이 출렁여요.';
-          }
+          if (cat?.includes('기술') || cat?.includes('IT')) hint = 'IT는 PER 20~40배도 정상';
+          else if (cat?.includes('금융') || cat?.includes('지주')) hint = '금융은 PER 5~15배가 일반적';
+          else if (cat?.includes('바이오') || cat?.includes('헬스')) hint = '바이오는 R&D로 일시 적자 잦음';
+          else if (cat?.includes('에너지') || cat?.includes('소재')) hint = '에너지·소재는 원자재 영향 큼';
           if (!hint) return null;
-          return (
-            <p className="text-xs text-muted mt-2 leading-relaxed border-t border-line pt-2">
-              {hint}
-            </p>
-          );
+          return <p className="text-xs text-faint mt-1 leading-relaxed">{hint}</p>;
         })()}
         {/* 섹터 대비 PER 게이지 — 업종 중앙값 대비 현재가 위치 (6-2) */}
         {sectorData && stockDetail?.per !== null && stockDetail?.per !== undefined && stockDetail.per > 0 && sectorData.medians.per && (
@@ -61,11 +52,11 @@ export default function MetricsGrid({ stockDetail, category, sectorData, onHelp 
             <div className="flex items-center space-x-2">
               <div className="flex-1 h-1.5 bg-line rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${stockDetail.per < sectorData.medians.per ? 'bg-rise' : 'bg-caution'}`}
+                  className="h-full rounded-full bg-muted"
                   style={{ width: `${Math.min(100, (stockDetail.per / (sectorData.medians.per * 2)) * 100)}%` }}
                 />
               </div>
-              <span className={`text-xs font-bold ${stockDetail.per < sectorData.medians.per ? 'text-rise' : 'text-caution'}`}>
+              <span className="text-xs font-bold text-muted">
                 {stockDetail.per < sectorData.medians.per ? '업종 평균보다 저렴' : '업종 평균보다 높음'}
               </span>
             </div>
