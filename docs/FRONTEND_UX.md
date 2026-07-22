@@ -48,20 +48,27 @@
 
 ## UI 디자인 시스템
 
-### SSOT (2026-05-13 — DESIGN.md 채택, 3.10차)
+### SSOT (2026-07-22 — 3.13차 라이트 + 한국 증시 색)
 
-디자인 토큰의 단일 진실 공급원은 프로젝트 루트 [docs/DESIGN.md](../docs/DESIGN.md).
-Tailwind v4 `@theme` 블록은 [app/design-tokens.css](../app/design-tokens.css)에 정의되어 있고
-[app/globals.css](../app/globals.css)에서 import된다.
+디자인 토큰 단일 진실 공급원은 [DESIGN.md](./DESIGN.md).
+Tailwind v4 `@theme` 블록: [app/design-tokens.css](../app/design-tokens.css) → [app/globals.css](../app/globals.css) import.
+**토큰 수정**: DESIGN.md 편집 → `design-tokens.css @theme` 동기화(수동).
 
-- **카드 위계**: [components/ui/Card.tsx](../components/ui/Card.tsx) — `primary` / `secondary` / `tertiary` variant. 배경 명도로 위계 표현 (그림자 금지)
-- **색상**: 의미색 4개(positive/negative/accent/caution) + slate 그레이스케일
-- **타이포**: 최소 12px(body-sm), `text-[10px]`/`text-[11px]` 임의값 금지
-- **폰트**: Pretendard (CDN 로드, 실패 시 시스템 폰트 fallback)
-- **라운딩**: `rounded-lg`(8px, 뱃지) / `rounded-xl`(12px, 카드) / `rounded-2xl`(16px, 강조·모달). `rounded-3xl` 사용 금지
+### 확정 12규칙 (전 페이지 공통 — 3.13차)
+1. **라이트**: `paper`(페이지)/`surface`(카드)/`inset`(함몰). 다크 slate 전량 제거
+2. **한국 증시 색**: 상승·수익·긍정 = `rise`(#D91C1C 빨강) / 하락·손실·부정 = `fall`(#1B5FD0 파랑). 서구와 반대 — 기계적 치환 금지, 용례마다 판단
+3. **게이지/바 채움 = 무채색**(ink~muted~faint). 방향색은 뱃지·수익률·의견·숫자에만
+4. **accent 폐지**: blue는 `fall` 전용. 장식/정보 blue → ink/중립. 주요 버튼 = `bg-ink text-surface`
+5. **의견 매핑**: market 긍정→rise/부정→fall/중립→중립. holding 매도→fall/관망→caution/추가매수→rise/보유→중립
+6. **시스템 위험색 ≠ 방향색**: 에러·삭제 = `caution` 또는 muted. rise/fall·raw red-500 금지(rise=수익과 충돌)
+7. **이모지 0**, 장식 아이콘 0 — 동작 아이콘만(삭제/외부링크/새로고침/닫기/검색/알림/관심Heart/네비/체크)
+8. **첫글자 아바타 → 종목코드**(tabular-nums) 또는 제거
+9. **카드 = 실제로 묶일 것만**. 목록 = 구분선 행, 표 = 표 구조
+10. **밀도**: 카드 패딩 base(p-4), 요소 간격 tight(8~12), 블록 사이 여백 큼(리듬)
+11. **라운딩**: `rounded-lg`/`rounded-xl`/`rounded-2xl`(강조·모달). `rounded-3xl` 금지
+12. **금융 수치 `tabular-nums`**, 터치 타겟 44px, 경고/면책은 각주(text-xs faint) 또는 [?] 토글 — 정보보다 크면 안 됨
 
-**토큰 수정 절차**: DESIGN.md 편집 → `app/design-tokens.css`의 `@theme` 블록 동기화.
-DESIGN.md → CSS 자동 변환 CLI(`@google/design.md`)는 아직 프로젝트에 도입되지 않았으므로 수동.
+**카드 위계**: [components/ui/Card.tsx](../components/ui/Card.tsx) — `primary`(surface+line-strong+shadow-sm) / `secondary`(surface+line) / `tertiary`(inset). **폰트**: Pretendard(CDN, 실패 시 시스템 폰트).
 
 ### 접근성 원칙 (필수)
 1. 최소 폰트: `text-xs`(12px) 이상 — 3.10차부터 강제
@@ -74,73 +81,65 @@ DESIGN.md → CSS 자동 변환 CLI(`@google/design.md`)는 아직 프로젝트�
 
 ### Opinion 뱃지 스타일
 
-**MarketOpinion**:
+**MarketOpinion** (한국 색):
 ```
-긍정적: bg-emerald-500/10 text-emerald-400 border-emerald-500/20
-중립적: bg-slate-500/10 text-slate-400 border-slate-500/20
-부정적: bg-red-500/10 text-red-400 border-red-500/20
+긍정적: bg-rise/10 text-rise    중립적: bg-inset text-muted    부정적: bg-fall/10 text-fall
 ```
 
 **HoldingOpinion** (표시 라벨 소프트화, 내부 값 유지):
 ```
-보유      → "[보유]"       bg-blue-500/10 text-blue-400
-추가매수  → "[추가 검토]"  bg-emerald-500/10 text-emerald-400
-관망      → "[관망]"       bg-yellow-500/10 text-yellow-400
-매도      → "[주의 필요]"  bg-red-500/10 text-red-400
+보유      → "[보유]"       bg-inset text-muted
+추가매수  → "[추가 검토]"  bg-rise/10 text-rise
+관망      → "[관망]"       bg-caution/10 text-caution
+매도      → "[주의 필요]"  bg-fall/10 text-fall
 ```
 "[주의 필요]" / "[추가 검토]" 뱃지 아래: italic 면책 문구 별도 줄
 
-**분석 중** (`sma_available === false`):
+**분석 중** (`sma_available === false`): `bg-inset text-muted` — "이평선 데이터를 수집 중이에요."
+
+**알림 출처 뱃지** (범주 → 무채색, 방향색 아님):
 ```
-"분석 중" bg-slate-500/10 text-slate-400
-이유: "이평선 데이터를 수집 중이에요."
+'holding'   → [보유 중]    bg-inset text-muted
+'watchlist' → [관심 종목]  bg-inset text-muted
+undefined   → [알림]       bg-inset text-muted  (레거시 폴백)
 ```
 
-**알림 출처 뱃지**:
+**알림 타입 레이블** (이모지 제거, 색은 타입별 판단):
 ```
-'holding'   → [보유 중]    bg-blue-500/10 text-blue-300
-'watchlist' → [관심 종목]  bg-purple-500/10 text-purple-300
-undefined   → [알림]       bg-slate-500/10 text-slate-400  (레거시 폴백)
-```
-
-**알림 타입 레이블**:
-```
-sell_signal  → 🔴 가격 하락 경고
-sma5_break   → 📉 단기 하락 알림
-sma5_touch   → 💡 가격 지지 알림
-target_near  → 🎯 목표가 근접 알림
-undervalued  → 💎 저평가 분석 결과
+sell_signal → 가격 하락 경고 (fall)     sma5_break  → 단기 하락 알림 (fall)
+sma5_touch  → 가격 지지 알림 (caution)  target_near → 목표가 근접 알림 (caution)
+undervalued → 저평가 분석 결과 (중립)
 ```
 
-### 컬러 팔레트 (다크 테마, 3.10차 DESIGN.md 토큰)
+### 컬러 팔레트 (라이트, 3.13차 DESIGN.md 토큰)
 
-| 용도 | 토큰 클래스 | 값 (slate 참조) |
-|------|-------------|------------------|
-| 배경 (deep) | `bg-deep` | `#020617` (slate-950) |
-| 배경 (카드) | `bg-card` | `#0f172a` (slate-900) |
-| 배경 (강조 카드) | `bg-card-raised` | `#1e293b` (slate-800) |
-| 배경 (함몰) | `bg-inset` | `#020617` (slate-950) |
-| 테두리 (기본) | `border-border-subtle` | slate-800 |
-| 테두리 (강조) | `border-border-muted` | slate-700 |
-| 인터랙션 (blue — 버튼/링크 전용) | `bg-accent`, `text-accent`, `hover:bg-accent-hover` | blue-600 / blue-500 |
-| 상승/긍정 | `text-positive`, `bg-positive` | emerald-500 |
-| 하락/부정 | `text-negative`, `bg-negative` | red-500 |
-| 관망/미검증 | `text-caution`, `bg-caution` | amber-500 |
-| 텍스트 계층 | `text-text-primary` > `text-text-body` > `text-text-muted` > `text-text-faint` | slate-50 > slate-300 > slate-400 > slate-500 |
+| 용도 | 토큰 클래스 | 값 |
+|------|-------------|-----|
+| 페이지 배경 | `bg-paper` | #FAFAF8 |
+| 카드 | `bg-surface` | #FFFFFF |
+| 함몰/셀 | `bg-inset` | #FAFAF8 |
+| 테두리 (기본/강조) | `border-line` / `border-line-strong` | #E7E7E3 / #D4D4CE |
+| 상승·수익·긍정 | `text-rise` / `bg-rise` | #D91C1C (빨강) |
+| 하락·손실·부정 | `text-fall` / `bg-fall` | #1B5FD0 (파랑) |
+| 주의·관망·경고·시스템위험 | `text-caution` / `bg-caution` | #9A5B08 (amber) |
+| 텍스트 계층 | `text-ink` > `text-muted` > `text-faint` | #17181C > #6E7076 > #85878D |
 
-### 공통 패턴 (3.10차 갱신)
+**차트**: 가격=ink, SMA5=rise, SMA20=caution, 그리드=#E7E7E3, 축=#85878D. 투자자 3주체(외국인/기관/개인)=무채색(범주). 파이=무채색 ramp + 집중(>50%) caution 태그.
+
+### 공통 패턴 (라이트, 3.13차)
 
 ```
-카드 (일반):  <Card variant="secondary" padding="base">     — bg-card + rounded-xl(12px) + p-4
-카드 (결론):  <Card variant="primary" padding="emphasis" accentBar="positive">
-              — bg-card-raised + rounded-xl + p-6 + border-l-4
-카드 (함몰):  <Card variant="tertiary" padding="tight">     — bg-inset + rounded-lg(8px) + p-3
-버튼:         bg-accent hover:bg-accent-hover text-white rounded-xl min-h-[44px] px-4 py-3 text-sm font-bold
-인풋:         bg-inset border-border-subtle rounded-xl px-4 py-3 text-sm focus:border-accent
-뱃지:         text-xs font-bold px-2.5 py-1 rounded-lg bg-{semantic}-500/10 text-{semantic}-500
+카드(일반):  bg-surface border border-line rounded-xl p-4
+카드(결론):  <Card variant="primary" padding="base" accentBar={opinion}>  — surface + line-strong + shadow-sm + 좌 4px accentBar
+카드(함몰):  bg-inset rounded-lg
+버튼(주):    bg-ink text-surface rounded-xl min-h-[44px] px-4 py-3 hover:opacity-90
+버튼(보조):  bg-surface border border-line-strong text-ink hover:bg-inset
+인풋:        bg-surface border border-line-strong rounded-xl px-4 py-3 focus:border-ink placeholder:text-faint
+게이지:      트랙 bg-line, 채움 bg-ink/bg-muted/bg-faint (무채색)
+목록:        divide-y divide-line 또는 border-b border-line 행 (카드 아님)
 ```
 
-DEPRECATED (사용 금지): `rounded-3xl`, `text-[10px]`, `text-[11px]`. 3.10차에서 전량 제거됨.
+DEPRECATED (사용 금지): `rounded-3xl`, `text-[10/11px]`, `uppercase tracking-widest`, 다크 slate/emerald/blue-accent, 이모지, 첫글자 아바타, 큰 경고 박스. 3.13차 전량 제거.
 
 ---
 
