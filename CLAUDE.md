@@ -417,6 +417,23 @@ PC (md: 이상):
 
 ---
 
+**3.14차 — 벤치마크·상관관계 + 테마 배너 정리 (2026-07-22)**
+
+출처: Vibe-Trading(HKUDS)의 벤치마크 패널·상관관계 히트맵 참고. **AI 없이 기존 데이터(stock_history)만으로 순수 계산**. 포트폴리오 관리의 두 핵심 질문 — "시장 대비 잘하고 있나", "진짜 분산됐나" — 에 답하는 지표 추가.
+
+- [x] **[BM-DATA]** KOSPI 지수 히스토리 **전용 테이블** `market_index_history(symbol, date, close NUMERIC(12,2))` 신설 (운영자 결정 — stock_history 의사코드 대신 전용 테이블로 INTEGER 반올림 손실·집계쿼리 오염 회피). 적재는 `scripts/sync-index-history.js` (네이버 `siseJson?symbol=KOSPI/KOSDAQ`, backfill 패턴 재사용, ON CONFLICT 멱등). **실행은 운영자 수동** — `DATABASE_URL=... node scripts/sync-index-history.js`. 일 1회 자동 스케줄링은 Phase 6 이월
+- [x] **[BM-1]** `GET /api/holdings/benchmark` — KOSPI 대비 초과수익 + 정보비율(IR). 현재 보유 구성을 과거 시세로 역산한 일별 가치(= `/holdings/history` 동일 시계열)로 포트 일수익률 → 같은 날짜 KOSPI 종가 변화율과 비교. `excessReturn = portfolioReturn - benchmarkReturn`, `IR = mean(초과수익)/std × √252`, `trackingError = std × √252`. KOSPI 히스토리 없거나 정렬 날짜 부족 시 `{available:false}` 폴백 (엔드포인트·UI는 스크립트 미실행 상태에서도 정상)
+- [x] **[BM-2]** 대시보드 요약 라인에 "KOSPI 대비 N%p" + `?` 툴팁(포트 vs KOSPI 수익률 + 정보비율 초보자 설명). 방향색: 초과수익 양수=rise(빨강)/음수=fall(파랑). `available:false`면 이 항목만 미표시
+- [x] **[CORR-1]** `GET /api/holdings/correlation` — 보유 종목 간 상관관계(최근 60거래일 일별 수익률, 피어슨). 보유 2종목 이상만(`single`/`empty`/`insufficient` reason), 20일 미만 종목 제외, 상위 3쌍(상관 내림차순) + max/avg. 종목별 history는 **한 쿼리로 묶어 조회**(Neon 풀 max=5)
+- [x] **[CORR-2]** 포트폴리오 "분산 상태 점검" 블록 — 기존 비중 경고(weight>50)와 **별개**. 최고 상관 ≥0.7 caution 경고 / 0.4~0.7 정보성(중립) / <0.4 "잘 분산돼 있어요"(중립). **상관계수는 방향 아닌 관계 강도 → rise/fall 색 금지, caution/muted만** (3.13 색 규칙 준수)
+- [x] **[UI]** 테마 배너 중복 정리 — 추천 페이지 배너에 `md:hidden`. 사이드바(`md:flex`의 "테마 탐색")가 나타나는 md+ 에선 중복이라 숨기고, 사이드바 접근 경로가 없는 모바일(md 미만)에선 `/themes` 진입로로 유지. *(스펙의 `lg:hidden` → 실제 사이드바 breakpoint가 `md:`라 `md:hidden`으로 조정)*
+- [x] **[LIB]** `stockApi.getBenchmark`/`getCorrelation` + silent 목록에 `/holdings/benchmark`·`/holdings/correlation` 추가. `types/stock.ts` `BenchmarkResult`/`CorrelationResult`
+- 검증: tsc 0 · next build ✓ · npm test 16 · node --check (schema/router/script)
+- **판단 보류**: [CORR-2-3] 자산 배분 도넛 범례에 상관쌍 표시(선택) — 도넛에 이미 `집중` 태그가 있어 과밀 우려로 생략
+- ⚠️ **운영 대기**: `sync-index-history.js` 미실행 상태에선 벤치마크가 `available:false`로 폴백(요약 라인에 "KOSPI 대비" 미표시). 스크립트 1회 실행 후 노출됨
+
+---
+
 **3.13차 — 비주얼 리디자인 (2026-07-22 완료)**
 
 다크 slate+blue(AI 기본값) → 라이트 + 한국 증시 색. "색만 바뀐 느낌" 지적 후 밀도·정보위계·중복제거까지 포함. 규칙 12개는 `docs/FRONTEND_UX.md` 명문화, 토큰은 `docs/DESIGN.md` SSOT.

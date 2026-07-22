@@ -68,7 +68,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## DB 스키마 (12개 테이블)
+## DB 스키마 (13개 테이블)
 
 | 테이블 | PK | 주요 컬럼 | 비고 |
 |--------|-----|----------|------|
@@ -78,6 +78,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | stock_analysis | code | analysis, advice, opinion (MarketOpinion), toss_url, **ai_report, ai_report_date** | ai_report* 는 Phase 5 Claude Haiku용 선행 컬럼 (3.7차). ON DELETE CASCADE |
 | recommended_stocks | code | reason, fair_price, score, source (manual/algorithm) | ON DELETE CASCADE |
 | investor_history | code+date | institution, foreign_net, individual (모두 BIGINT) | FK 없음 |
+| **market_index_history** | symbol+date | close (NUMERIC 12,2) | 3.14차 신설. KOSPI/KOSDAQ 지수 일봉(벤치마크 초과수익 계산용). `stocks`와 FK 없음. stock_history 오염 회피 위해 전용 테이블 + close NUMERIC(지수 소수점 보존). 적재는 `scripts/sync-index-history.js`(운영자 수동). 자동 스케줄링 Phase 6 이월 |
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
 | **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market. 서버 시작 시 데이터 0건이면 1회 자동 동기화. KRX 응답 4중 가드(HTTP 200 / 본문 1,000B+ / HTML 에러 페이지 차단 / 최소 행 수) |
@@ -118,7 +119,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (30개)
+## API 엔드포인트 (32개)
 
 ### 종목 (stock — 8개)
 
@@ -138,7 +139,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 **미이관 항목(DIR-5)**: `POST /api/stocks` body에 `q`(name 또는 code) 필드 허용 — Phase 6 본작업으로 이월. 현재는 프론트(`/settings`)가 디렉토리에서 선택된 `code`를 직접 보내므로 백엔드는 code 경로만 유지.
 
-### 포트폴리오 (portfolio — 5개, `router.use(requireDeviceIdMiddleware)` 적용)
+### 포트폴리오 (portfolio — 8개, `router.use(requireDeviceIdMiddleware)` 적용)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -148,6 +149,8 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | DELETE | `/api/holdings/:code` | 삭제 |
 | GET | `/api/holdings/history` | 포트폴리오 가치 히스토리 (20일) |
 | **GET** | **`/api/holdings/sharpe`** | 3.8차 — 가중 평균 샤프 지수. 종목별 20일 일간 수익률 stddev → 252일 환산. 무위험금리 3.5%. 5일 미만 히스토리 제외 |
+| **GET** | **`/api/holdings/benchmark`** | 3.14차 — KOSPI 대비 초과수익 + 정보비율(IR). 보유 구성 역산 일별 가치(= `/history`) vs `market_index_history` KOSPI 종가. `{available, period, portfolioReturn, benchmarkReturn, excessReturn, informationRatio, trackingError}`. KOSPI 히스토리 없거나 정렬 날짜 부족 시 `{available:false}` |
+| **GET** | **`/api/holdings/correlation`** | 3.14차 — 보유 종목 간 상관관계(60거래일 일별 수익률, 피어슨). 2종목 이상만, 20일 미만 제외, 상위 3쌍 + max/avg. `{available, reason?, pairs, maxCorrelation, avgCorrelation}`. history는 한 쿼리로 묶어 조회(풀 max=5) |
 
 > **`sma_available` 규칙**: false이면 `holding_opinion`은 항상 '보유'로 반환되지만 신뢰 불가.
 > 프론트는 `sma_available=false`일 때 반드시 "분석 중" 뱃지를 표시해야 한다.
@@ -305,5 +308,6 @@ app.listen(PORT);
 | `scripts/backfill-history.js` | 등록 종목의 3년치 일봉 히스토리 적재 (배치 3, ~6시간) |
 | `scripts/sync-directory.js` | KRX 상장법인목록 → `stocks_directory` 수동 동기화 |
 | `scripts/expand-stocks.js` | 3.7차 감마 — TARGET_CODES(~86) 중 미등록 코드만 네이버 크롤링으로 `stocks`에 추가 (배치 3 × 3초 간격). 테마 매핑은 다음 서버 재시작 시 `CATEGORY_TO_THEMES` 폴백으로 자동 처리 |
+| `scripts/sync-index-history.js` | 3.14차 — KOSPI/KOSDAQ 지수 일봉 → `market_index_history` 적재 (네이버 siseJson, ON CONFLICT 멱등). 벤치마크(초과수익·IR) 데이터 공급. 미실행 시 `/holdings/benchmark`는 `available:false` |
 
 실행 공통: `DATABASE_URL=postgres://... node scripts/<name>.js`
