@@ -82,8 +82,10 @@ export default function RecommendationsPage() {
         </p>
       </div>
 
-      {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구) */}
-      <div className="bg-surface border border-line-strong rounded-xl p-4 flex items-center justify-between gap-3">
+      {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구).
+          3.14차: md:hidden — 사이드바(md:flex "테마 탐색")가 나타나는 데스크톱/태블릿에선 중복이라 숨긴다.
+          모바일(md 미만)은 사이드바 접근 경로가 없어 이 배너가 /themes 진입로라 유지. */}
+      <div className="md:hidden bg-surface border border-line-strong rounded-xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1 mr-3">
           <p className="text-sm font-bold text-ink">테마로 종목 찾기</p>
           <p className="text-xs text-muted mt-0.5 leading-relaxed">
