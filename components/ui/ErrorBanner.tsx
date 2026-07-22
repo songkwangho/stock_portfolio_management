@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface ErrorBannerProps {
   // 페이지/위젯에서 발생한 에러. null이면 렌더링하지 않음
@@ -34,19 +34,18 @@ const ErrorBanner = ({ error, kind = 'unknown', onRetry, autoRetryMs }: ErrorBan
     : kind === 'server' ? '서버에서 데이터를 불러오지 못했어요'
     : '데이터를 불러오지 못했어요';
   return (
-    <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 flex items-start space-x-3">
-      <AlertTriangle size={18} className="text-red-400 mt-0.5 shrink-0" />
+    <div className="bg-caution/5 border border-caution/20 rounded-xl p-4 flex items-start gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-red-300">⚠️ {headline}</p>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{error}</p>
+        <p className="text-sm font-bold text-caution">{headline}</p>
+        <p className="text-xs text-muted mt-1 leading-relaxed">{error}</p>
         {autoRetryMs && onRetry && (
-          <p className="text-xs text-slate-500 mt-1">잠시 후 자동으로 다시 시도해요...</p>
+          <p className="text-xs text-faint mt-1">잠시 후 자동으로 다시 시도해요...</p>
         )}
       </div>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="shrink-0 flex items-center space-x-1.5 px-3 py-2 min-h-[44px] bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-bold rounded-lg transition-colors"
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-caution/10 hover:bg-caution/20 text-caution text-xs font-bold rounded-lg transition-colors"
         >
           <RefreshCw size={12} />
           <span>다시 시도</span>

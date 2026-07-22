@@ -128,41 +128,41 @@ const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
   const content = HELP_CONTENTS[termKey];
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[200] flex items-end md:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-[200] flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-t-2xl md:rounded-2xl p-6 max-w-md w-full space-y-4 animate-in slide-in-from-bottom-4 duration-200"
+        className="bg-surface border border-line rounded-t-xl md:rounded-xl p-6 max-w-md w-full space-y-4 shadow-lg animate-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-bold text-white">{content.title}</h3>
-            <p className="text-xs text-blue-400 mt-1">{content.short}</p>
+            <h3 className="text-lg font-bold text-ink">{content.title}</h3>
+            <p className="text-xs text-muted mt-1">{content.short}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-500 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <button onClick={onClose} className="p-2 text-faint hover:text-ink min-w-[44px] min-h-[44px] flex items-center justify-center">
             <X size={20} />
           </button>
         </div>
         <div className="space-y-2">
           {content.body.map((line, i) => (
-            <p key={i} className="text-sm text-slate-400 leading-relaxed">{line}</p>
+            <p key={i} className="text-sm text-muted leading-relaxed">{line}</p>
           ))}
         </div>
-        <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 space-y-1.5">
-          <p className="text-xs font-bold text-blue-400">이 앱에서는?</p>
-          <p className="text-sm text-blue-200/90 leading-relaxed">{content.inApp}</p>
+        <div className="bg-inset border border-line rounded-lg p-3 space-y-1.5">
+          <p className="text-xs font-bold text-ink">이 앱에서는?</p>
+          <p className="text-sm text-muted leading-relaxed">{content.inApp}</p>
         </div>
         {content.implication && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 space-y-1.5">
-            <p className="text-xs font-bold text-slate-300">그래서 어떻게 보면 되나요?</p>
-            <p className="text-sm text-slate-400 leading-relaxed">{content.implication}</p>
+          <div className="bg-inset border border-line rounded-lg p-3 space-y-1.5">
+            <p className="text-xs font-bold text-ink">그래서 어떻게 보면 되나요?</p>
+            <p className="text-sm text-muted leading-relaxed">{content.implication}</p>
           </div>
         )}
         {content.example && (
-          <p className="text-xs text-slate-600 italic">{content.example}</p>
+          <p className="text-xs text-faint italic">{content.example}</p>
         )}
         <button
           onClick={onClose}
-          className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-xl transition-colors"
+          className="w-full py-3 bg-ink hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity"
         >
           닫기
         </button>
