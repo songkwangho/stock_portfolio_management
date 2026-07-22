@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Zap, RefreshCw, TrendingUp, Layers } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import RecommendedStockCard from '@/components/stock/RecommendedStockCard';
 import type { Recommendation, StockSummary } from '@/types/stock';
@@ -38,7 +38,7 @@ export default function RecommendationsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
+      <div className="flex items-center justify-center h-64 text-muted">
         <RefreshCw className="animate-spin mr-2" size={20} />
         <span>유망 종목 분석 중...</span>
       </div>
@@ -49,9 +49,9 @@ export default function RecommendationsPage() {
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold mb-2">오늘의 유망 종목</h2>
-          <p className="text-slate-500 text-sm">시장 데이터를 분석해 적정가 대비 저평가된 종목을 선별했어요.</p>
-          <p className="text-xs text-yellow-500/80 mt-1">아래 종목들은 알고리즘이 분석한 참고 정보예요. 투자 결정은 항상 본인이 직접 판단해주세요.</p>
+          <h2 className="text-2xl font-bold text-ink mb-2">오늘의 유망 종목</h2>
+          <p className="text-muted text-sm">시장 데이터를 분석해 적정가 대비 저평가된 종목을 선별했어요.</p>
+          <p className="text-xs text-faint mt-1">아래 종목들은 알고리즘이 분석한 참고 정보예요. 투자 결정은 항상 본인이 직접 판단해주세요.</p>
         </div>
         <button
           onClick={() => {
@@ -64,35 +64,35 @@ export default function RecommendationsPage() {
               setLoading(false);
             });
           }}
-          className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-500 transition-colors flex items-center space-x-2 shrink-0"
+          className="px-4 py-2.5 min-h-[44px] bg-ink text-surface rounded-xl text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-2 shrink-0"
         >
-          <Zap size={14} />
+          <RefreshCw size={14} />
           <span>업데이트</span>
         </button>
       </div>
 
       {/* 3.9차 — 이 종목들이 왜 추천됐는지 결론형 안내 */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
-        <p className="text-sm font-bold text-white mb-1">📌 이 종목들은 왜 추천됐나요?</p>
-        <p className="text-xs text-slate-400 leading-relaxed">
+      <div className="bg-surface border border-line rounded-xl p-4">
+        <p className="text-sm font-bold text-ink mb-1">이 종목들은 왜 추천됐나요?</p>
+        <p className="text-xs text-muted leading-relaxed">
           지표상 저평가됐거나 상승 신호가 나타난 종목이에요.
-          <span className="text-blue-400"> 관심 있는 종목을 클릭해서 상세 분석을 확인해보세요.</span>
+          <span className="text-ink font-medium"> 관심 있는 종목을 클릭해서 상세 분석을 확인해보세요.</span>
           <br />
-          마음에 드는 종목은 ♡로 관심 종목에 추가하거나 포트폴리오에 등록할 수 있어요.
+          마음에 드는 종목은 관심 종목에 추가하거나 포트폴리오에 등록할 수 있어요.
         </p>
       </div>
 
       {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구) */}
-      <div className="bg-blue-500/5 border border-blue-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div className="bg-surface border border-line-strong rounded-xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1 mr-3">
-          <p className="text-sm font-bold text-blue-300">🎯 테마로 종목 찾기</p>
-          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+          <p className="text-sm font-bold text-ink">테마로 종목 찾기</p>
+          <p className="text-xs text-muted mt-0.5 leading-relaxed">
             2차전지·AI·방산 등 관심 테마 종목 모아보기
           </p>
         </div>
         <button
           onClick={() => router.push('/themes')}
-          className="shrink-0 px-4 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
+          className="shrink-0 px-4 py-3 min-h-[44px] bg-ink hover:opacity-90 text-surface text-xs font-bold rounded-xl transition-opacity whitespace-nowrap"
         >
           테마 보기 →
         </button>
@@ -100,13 +100,13 @@ export default function RecommendationsPage() {
 
       {recommendations.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-black text-blue-400">{recommendations.length}</p>
-            <p className="text-xs text-slate-500 mt-1">추천 종목 수</p>
+          <div className="bg-inset rounded-lg p-4 text-center">
+            <p className="text-2xl font-black text-ink tabular-nums">{recommendations.length}</p>
+            <p className="text-xs text-muted mt-1">추천 종목 수</p>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-black text-emerald-400">{categories.length}</p>
-            <p className="text-xs text-slate-500 mt-1">업종 분야</p>
+          <div className="bg-inset rounded-lg p-4 text-center">
+            <p className="text-2xl font-black text-ink tabular-nums">{categories.length}</p>
+            <p className="text-xs text-muted mt-1">업종 분야</p>
           </div>
           {(() => {
             const manual = recommendations.filter(r => r.source === 'manual');
@@ -114,11 +114,11 @@ export default function RecommendationsPage() {
               ? Math.round(manual.reduce((a, r) => a + r.score, 0) / manual.length)
               : null;
             return (
-              <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-center">
-                <p className="text-2xl font-black text-yellow-400">
+              <div className="bg-inset rounded-lg p-4 text-center">
+                <p className="text-2xl font-black text-ink tabular-nums">
                   {avg !== null ? avg : '—'}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">전문가 선정 평균 점수</p>
+                <p className="text-xs text-muted mt-1">전문가 선정 평균 점수</p>
               </div>
             );
           })()}
@@ -129,10 +129,10 @@ export default function RecommendationsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-bold transition-colors ${
               activeCategory === null
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                ? 'bg-ink text-surface'
+                : 'bg-surface border border-line text-muted hover:text-ink hover:border-line-strong'
             }`}
           >
             전체 ({recommendations.length})
@@ -143,10 +143,10 @@ export default function RecommendationsPage() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
-                className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                className={`px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-bold transition-colors ${
                   activeCategory === cat
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    ? 'bg-ink text-surface'
+                    : 'bg-surface border border-line text-muted hover:text-ink hover:border-line-strong'
                 }`}
               >
                 {cat} ({count})
@@ -178,26 +178,22 @@ export default function RecommendationsPage() {
             body = '전체 종목 분석이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
         }
         return (
-          <div className="text-center py-16 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl px-6">
-            <TrendingUp size={40} className="mx-auto text-slate-700 mb-4" />
-            <p className="text-slate-300 font-bold mb-2">{headline}</p>
-            <p className="text-slate-500 text-sm leading-relaxed">{body}</p>
+          <div className="text-center py-16 bg-inset border border-dashed border-line-strong rounded-xl px-6">
+            <p className="text-ink font-bold mb-2">{headline}</p>
+            <p className="text-muted text-sm leading-relaxed">{body}</p>
           </div>
         );
       })()}
 
       <button
         onClick={() => router.push('/stocks')}
-        className="md:hidden w-full p-4 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between transition-colors"
+        className="md:hidden w-full p-4 bg-surface hover:bg-inset border border-line rounded-xl flex items-center justify-between transition-colors text-left"
       >
-        <div className="flex items-center space-x-3">
-          <Layers size={20} className="text-blue-400" />
-          <div className="text-left">
-            <p className="text-sm font-bold">전체 종목 보기</p>
-            <p className="text-xs text-slate-500">업종별 주요 종목 한눈에</p>
-          </div>
+        <div>
+          <p className="text-sm font-bold text-ink">전체 종목 보기</p>
+          <p className="text-xs text-muted mt-0.5">업종별 주요 종목 한눈에</p>
         </div>
-        <span className="text-blue-400">→</span>
+        <span className="text-ink">→</span>
       </button>
     </div>
   );
