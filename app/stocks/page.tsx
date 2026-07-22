@@ -103,7 +103,7 @@ export default function MajorStocksPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500">
+      <div className="flex items-center justify-center h-64 text-muted">
         <RefreshCw className="animate-spin mr-2" size={20} />
         <span>전체 종목 현황 로드 중...</span>
       </div>
@@ -111,52 +111,52 @@ export default function MajorStocksPage() {
   }
 
   return (
-    <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h2 className="text-2xl font-bold mb-2">주요 종목 현황</h2>
-        <p className="text-slate-500 text-sm">업종별 주요 종목의 실시간 시세와 추세를 한눈에 확인하세요.</p>
+        <h2 className="text-2xl font-bold text-ink mb-2">주요 종목 현황</h2>
+        <p className="text-muted text-sm">업종별 주요 종목의 실시간 시세와 추세를 한눈에 확인하세요.</p>
         {stocks.length > 0 && (
-          <p className="text-slate-400 text-sm font-bold mt-2">
+          <p className="text-muted text-sm font-bold mt-2 tabular-nums">
             {stocks.length}개 종목 · {new Set(stocks.map(s => s.category)).size}개 섹터
           </p>
         )}
-        <p className="text-slate-600 text-xs mt-2">※ ▲/▼ 등락률은 <span className="text-slate-400 font-bold">전일 종가 대비</span> 변동분이에요.</p>
+        <p className="text-faint text-xs mt-2">※ ▲/▼ 등락률은 <span className="text-muted font-bold">전일 종가 대비</span> 변동분이에요.</p>
       </div>
 
       {/* 3.9차 — 학습 모드 기초 가이드 배너 */}
       {isLearnMode && (
-        <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+        <div className="bg-surface border border-line-strong shadow-sm rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-bold text-blue-300">
-              📚 주식 기초 가이드 ({learnStep + 1}/{LEARN_TIPS.length})
+            <p className="text-sm font-bold text-ink">
+              주식 기초 가이드 ({learnStep + 1}/{LEARN_TIPS.length})
             </p>
             <button
               onClick={closeLearnMode}
-              className="text-xs text-slate-500 hover:text-white min-h-[44px] px-3"
+              className="text-xs text-muted hover:text-ink min-h-[44px] px-3"
             >
               닫기
             </button>
           </div>
-          <h3 className="text-base font-bold text-white mb-2">{LEARN_TIPS[learnStep].title}</h3>
-          <p className="text-sm text-slate-300 leading-relaxed mb-4">{LEARN_TIPS[learnStep].desc}</p>
+          <h3 className="text-base font-bold text-ink mb-2">{LEARN_TIPS[learnStep].title}</h3>
+          <p className="text-sm text-muted leading-relaxed mb-4">{LEARN_TIPS[learnStep].desc}</p>
           <div className="flex gap-2">
             <button
               onClick={() => router.push(LEARN_TIPS[learnStep].href)}
-              className="flex-1 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl"
+              className="flex-1 py-3 min-h-[44px] bg-ink hover:opacity-90 text-surface text-xs font-bold rounded-xl transition-opacity"
             >
               {LEARN_TIPS[learnStep].action}
             </button>
             {learnStep < LEARN_TIPS.length - 1 ? (
               <button
                 onClick={() => setLearnStep(s => s + 1)}
-                className="py-3 px-4 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl"
+                className="py-3 px-4 min-h-[44px] bg-surface border border-line-strong hover:bg-inset text-ink text-xs font-bold rounded-xl transition-colors"
               >
                 다음 팁 →
               </button>
             ) : (
               <button
                 onClick={closeLearnMode}
-                className="py-3 px-4 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl"
+                className="py-3 px-4 min-h-[44px] bg-surface border border-line-strong hover:bg-inset text-ink text-xs font-bold rounded-xl transition-colors"
               >
                 완료
               </button>
@@ -168,30 +168,30 @@ export default function MajorStocksPage() {
       <ErrorBanner error={error} kind="server" onRetry={fetchStocks} />
 
       {pendingDelete && (
-        <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full space-y-4">
+        <div className="fixed inset-0 bg-black/40 z-[200] flex items-center justify-center p-4">
+          <div className="bg-surface border border-line rounded-xl p-6 max-w-md w-full space-y-4 shadow-lg">
             <div className="flex items-start justify-between">
-              <h3 className="text-lg font-bold text-white">{pendingDelete.name}을(를) 삭제할까요?</h3>
-              <button onClick={() => setPendingDelete(null)} className="text-slate-500 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="닫기">
+              <h3 className="text-lg font-bold text-ink">{pendingDelete.name}을(를) 삭제할까요?</h3>
+              <button onClick={() => setPendingDelete(null)} className="text-muted hover:text-ink p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="닫기">
                 <X size={18} />
               </button>
             </div>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              이 종목에 연결된 <span className="text-red-300 font-bold">보유 내역, 관심 종목, 알림</span>이 모두 사라져요.
+            <p className="text-sm text-muted leading-relaxed">
+              이 종목에 연결된 <span className="text-caution font-bold">보유 내역, 관심 종목, 알림</span>이 모두 사라져요.
               이 작업은 되돌릴 수 없어요.
             </p>
             <div className="flex space-x-3 pt-2">
               <button
                 onClick={() => setPendingDelete(null)}
                 disabled={deleting}
-                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
+                className="flex-1 py-3 bg-surface border border-line-strong hover:bg-inset text-ink text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
               >
                 취소
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
+                className="flex-1 py-3 bg-caution hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity disabled:opacity-50"
               >
                 {deleting ? '삭제 중...' : '삭제할게요'}
               </button>
@@ -200,57 +200,54 @@ export default function MajorStocksPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-12">
+      <div className="space-y-10">
         {CATEGORY_ORDER.map(category => {
           const categoryStocks = stocks.filter(s => s.category === category);
           if (categoryStocks.length === 0) return null;
 
           return (
-            <div key={category} className="space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span className="w-1.5 h-6 bg-blue-600 rounded-full"></span>
-                <span>{category}</span>
-                <span className="text-xs font-normal text-slate-500 ml-2">({categoryStocks.length}종목)</span>
+            <div key={category} className="space-y-3">
+              <h3 className="text-lg font-bold text-ink">
+                {category}
+                <span className="text-xs font-normal text-faint ml-2 tabular-nums">({categoryStocks.length}종목)</span>
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="divide-y divide-line border-t border-line">
                 {categoryStocks.map(stock => (
                   <div
                     key={stock.code}
                     onClick={() => onDetailClick(stock)}
-                    className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 hover:bg-slate-900 hover:border-blue-500/30 transition-all cursor-pointer group relative"
+                    className="group flex items-center justify-between gap-3 py-3 px-1 min-h-[44px] hover:bg-surface cursor-pointer transition-colors"
                   >
-                    <button
-                      onClick={(e) => requestDelete(e, stock)}
-                      className="absolute top-2 right-2 p-2 min-w-[32px] min-h-[32px] text-slate-500 hover:text-red-500 transition-all z-10"
-                      title="종목 삭제"
-                      aria-label={`${stock.name} 삭제`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-sm font-bold group-hover:text-blue-400 transition-colors pr-6">{stock.name}</p>
-                      <span className="text-xs text-slate-500 font-mono">{stock.code}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-ink truncate">{stock.name}</p>
+                      <p className="text-xs text-faint tabular-nums">{stock.code}</p>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <div>
-                        <p className="text-lg font-black">{stock.price?.toLocaleString()}원</p>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-ink tabular-nums">{stock.price?.toLocaleString()}원</p>
                         {stock.change_rate && !['0', '0.00', '+0.00', '-0.00'].includes(stock.change_rate) && (() => {
                           const rate = parseFloat(stock.change_rate);
                           const up = rate > 0;
                           return (
-                            <p className={`text-xs font-bold mt-0.5 ${up ? 'text-emerald-500' : rate < 0 ? 'text-red-500' : 'text-slate-500'}`}>
+                            <p className={`text-xs font-bold tabular-nums ${up ? 'text-rise' : rate < 0 ? 'text-fall' : 'text-muted'}`}>
                               {up ? '▲' : rate < 0 ? '▼' : ''} {stock.change_rate}%
                             </p>
                           );
                         })()}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${stock.market_opinion === '긍정적' ? 'bg-emerald-500/10 text-emerald-500' :
-                          stock.market_opinion === '부정적' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-400'
-                          }`}>
-                          {stock.market_opinion || '중립적'}
-                        </span>
-                      </div>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
+                        stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' : 'bg-inset border border-line text-muted'
+                        }`}>
+                        {stock.market_opinion || '중립적'}
+                      </span>
+                      <button
+                        onClick={(e) => requestDelete(e, stock)}
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted hover:text-ink transition-colors"
+                        title="종목 삭제"
+                        aria-label={`${stock.name} 삭제`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 ))}
