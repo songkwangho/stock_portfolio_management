@@ -47,6 +47,19 @@ export async function initSchema(pool) {
         )
     `);
 
+    // 3.14차 — 벤치마크(KOSPI 대비 초과수익·정보비율)용 지수 일봉.
+    // stocks와 FK 없음(지수는 종목이 아님). stock_history 오염을 피하려 전용 테이블로 분리.
+    // close는 NUMERIC — 지수는 소수점 값이라 INTEGER 반올림 손실을 막는다.
+    // 적재는 scripts/sync-index-history.js (운영자 수동). 자동 스케줄링은 Phase 6 이월.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS market_index_history (
+            symbol TEXT NOT NULL,
+            date   TEXT NOT NULL,
+            close  NUMERIC(12, 2),
+            PRIMARY KEY (symbol, date)
+        )
+    `);
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS recommended_stocks (
             code       TEXT PRIMARY KEY REFERENCES stocks (code) ON DELETE CASCADE,

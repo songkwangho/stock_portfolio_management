@@ -15,7 +15,7 @@ import { formatWeight } from '@/lib/stockDetail/format';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
-import type { StockSummary, SignalResult } from '@/types/stock';
+import type { StockSummary, SignalResult, BenchmarkResult } from '@/types/stock';
 
 // 한국식 금액 단위 포매터 — Y축/툴팁 공용 (16차 5-2).
 // `₩35000k` 같은 영문 k 단위는 초보자가 직관적으로 이해하기 어려움.
@@ -55,6 +55,9 @@ export default function DashboardPage() {
   const [showFGHelp, setShowFGHelp] = useState(false);
   const [sharpe, setSharpe] = useState<number | null>(null);
   const [showSharpeHelp, setShowSharpeHelp] = useState(false);
+  // 3.14차 — KOSPI 대비 초과수익(벤치마크). 데이터 부족 시 null 유지(항목 미표시).
+  const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
+  const [showBenchmarkHelp, setShowBenchmarkHelp] = useState(false);
 
   // 3.11차 — 보유 종목별 관찰 신호 (보유 5개 이하만 조회, N 병렬 호출 부담 제한)
   const [holdingSignals, setHoldingSignals] = useState<Record<string, SignalResult>>({});
@@ -73,12 +76,15 @@ export default function DashboardPage() {
     stockApi.getFearGreed().then(d => setFearGreed({ score: d.score, label: d.label })).catch(() => {});
   }, [fetchHoldings, fetchMarketIndices, fetchUnreadCount]);
 
-  // 보유 종목 변동 시 샤프 재계산. 보유 0개일 땐 호출 자체 skip.
+  // 보유 종목 변동 시 샤프·벤치마크 재계산. 보유 0개일 땐 호출 자체 skip.
   useEffect(() => {
-    if (holdings.length === 0) { setSharpe(null); return; }
+    if (holdings.length === 0) { setSharpe(null); setBenchmark(null); return; }
     stockApi.getPortfolioSharpe()
       .then(d => setSharpe(d.sharpe))
       .catch(() => setSharpe(null));
+    stockApi.getBenchmark()
+      .then(d => setBenchmark(d.available ? d : null))
+      .catch(() => setBenchmark(null));
   }, [holdings.length]);
 
   // 보유 종목별 신호 조회 — 보유 1~5개일 때만. 그 이상은 호출 부담으로 생략.
@@ -281,6 +287,10 @@ export default function DashboardPage() {
             <span className="text-line-strong">·</span>
             <button onClick={() => setShowSharpeHelp(v => !v)} className="hover:text-ink">샤프 <span className={sharpe > 0 ? 'text-rise font-bold' : 'text-fall font-bold'}>{sharpe.toFixed(2)}</span> <span className="text-faint">?</span></button>
           </>)}
+          {benchmark?.available && benchmark.excessReturn !== undefined && (<>
+            <span className="text-line-strong">·</span>
+            <button onClick={() => setShowBenchmarkHelp(v => !v)} className="hover:text-ink">KOSPI 대비 <span className={benchmark.excessReturn >= 0 ? 'text-rise font-bold' : 'text-fall font-bold'}>{benchmark.excessReturn >= 0 ? '+' : ''}{benchmark.excessReturn.toFixed(1)}%p</span> <span className="text-faint">?</span></button>
+          </>)}
         </div>
       )}
       {holdings.length > 0 && showFGHelp && fearGreed && (
@@ -295,6 +305,17 @@ export default function DashboardPage() {
           <p className="font-bold text-ink mb-1 text-sm">샤프 지수란?</p>
           <p className="text-xs text-muted leading-relaxed">(연환산 수익률 - 무위험금리 3.5%) ÷ 변동성. 보유 종목별 20일 일간 수익률에서 계산해 비중으로 가중평균해요. 1 이상이면 우수한 편이에요.</p>
           <p className="text-xs text-faint mt-1">※ 5일 미만 히스토리는 계산에서 제외돼요.</p>
+        </Card>
+      )}
+      {holdings.length > 0 && showBenchmarkHelp && benchmark?.available && (
+        <Card variant="secondary" padding="base">
+          <p className="font-bold text-ink mb-1 text-sm">KOSPI 대비 성과란?</p>
+          <p className="text-xs text-muted leading-relaxed tabular-nums">
+            같은 기간 KOSPI는 {benchmark.benchmarkReturn! >= 0 ? '+' : ''}{benchmark.benchmarkReturn!.toFixed(1)}%인데 내 포트폴리오는 {benchmark.portfolioReturn! >= 0 ? '+' : ''}{benchmark.portfolioReturn!.toFixed(1)}%예요.
+            시장보다 {Math.abs(benchmark.excessReturn!).toFixed(1)}%포인트 {benchmark.excessReturn! >= 0 ? '높은' : '낮은'} 성과예요.
+          </p>
+          <p className="text-xs text-muted leading-relaxed mt-1 tabular-nums">정보비율 {benchmark.informationRatio!.toFixed(2)} — 시장 대비 초과수익의 일관성 지표예요. (높을수록 꾸준히 앞섰다는 뜻)</p>
+          <p className="text-xs text-faint mt-1">※ 최근 {benchmark.period} 거래일 기준, 참고용이에요.</p>
         </Card>
       )}
 

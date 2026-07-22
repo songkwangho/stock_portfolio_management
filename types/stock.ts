@@ -271,3 +271,14 @@ export interface SectorComparison {
     roeVsAvg: number | null;
   })[];
 }
+
+// 3.14차 — KOSPI 대비 초과수익 + 정보비율. 데이터 부족(스크립트 미실행 등) 시 available:false.
+export interface BenchmarkResult {
+  available: boolean;
+  period?: string;          // 예: '20d'
+  portfolioReturn?: number; // 기간 포트폴리오 수익률 %
+  benchmarkReturn?: number; // 같은 기간 KOSPI 수익률 %
+  excessReturn?: number;    // 초과수익 (포트 - 벤치마크) %p
+  informationRatio?: number;
+  trackingError?: number;   // 초과수익 표준편차(연환산)
+}

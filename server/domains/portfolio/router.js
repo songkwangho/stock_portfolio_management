@@ -137,6 +137,72 @@ router.get('/history', async (req, res) => {
     }
 });
 
+// GET /api/holdings/benchmark - KOSPI 대비 초과수익 + 정보비율(IR).
+// 현재 보유 구성을 과거 시세로 역산한 일별 가치(= /holdings/history와 동일 시계열)로 포트폴리오
+// 일별 수익률을 구하고, 같은 날짜의 KOSPI 종가 변화율과 비교한다. market_index_history에 KOSPI
+// 히스토리가 없거나(스크립트 미실행) 정렬 가능한 날짜가 부족하면 available:false로 폴백.
+router.get('/benchmark', async (req, res) => {
+    const deviceId = req.deviceId;
+    const BENCH = 'KOSPI';
+    try {
+        const { rows } = await query(`
+            WITH last_dates AS (
+                SELECT DISTINCT date FROM stock_history ORDER BY date DESC LIMIT 20
+            ),
+            port AS (
+                SELECT sh.date, SUM(sh.price * h.quantity)::bigint AS value
+                FROM stock_history sh
+                JOIN holding_stocks h ON sh.code = h.code
+                WHERE h.device_id = $1 AND sh.date IN (SELECT date FROM last_dates)
+                GROUP BY sh.date
+            )
+            SELECT p.date, p.value, m.close
+            FROM port p
+            JOIN market_index_history m ON m.date = p.date AND m.symbol = $2
+            ORDER BY p.date
+        `, [deviceId, BENCH]);
+
+        if (rows.length < 5) return res.json({ available: false });
+
+        const values = rows.map(r => Number(r.value));
+        const closes = rows.map(r => Number(r.close));
+
+        // 일별 초과수익(%) 시계열 = 포트 일수익률 - KOSPI 일수익률.
+        const excess = [];
+        for (let i = 1; i < rows.length; i++) {
+            if (values[i - 1] <= 0 || closes[i - 1] <= 0) continue;
+            const pr = (values[i] - values[i - 1]) / values[i - 1] * 100;
+            const br = (closes[i] - closes[i - 1]) / closes[i - 1] * 100;
+            excess.push(pr - br);
+        }
+        if (excess.length < 4) return res.json({ available: false });
+
+        const last = rows.length - 1;
+        const portfolioReturn = values[0] > 0 ? (values[last] - values[0]) / values[0] * 100 : 0;
+        const benchmarkReturn = closes[0] > 0 ? (closes[last] - closes[0]) / closes[0] * 100 : 0;
+        const excessReturn = portfolioReturn - benchmarkReturn;
+
+        const mean = excess.reduce((a, b) => a + b, 0) / excess.length;
+        const variance = excess.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / excess.length;
+        const std = Math.sqrt(variance);
+        const trackingError = std * Math.sqrt(252);           // 초과수익 표준편차(연환산)
+        const informationRatio = std > 0 ? (mean / std) * Math.sqrt(252) : 0;
+
+        res.json({
+            available: true,
+            period: `${rows.length}d`,
+            portfolioReturn: +portfolioReturn.toFixed(2),
+            benchmarkReturn: +benchmarkReturn.toFixed(2),
+            excessReturn: +excessReturn.toFixed(2),
+            informationRatio: +informationRatio.toFixed(2),
+            trackingError: +trackingError.toFixed(2),
+        });
+    } catch (error) {
+        console.error('Benchmark Error:', error.message);
+        res.json({ available: false });
+    }
+});
+
 // POST /api/holdings - upsert holding (creates master stock if needed)
 router.post('/', async (req, res) => {
     const deviceId = req.deviceId;
