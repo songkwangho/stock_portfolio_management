@@ -10,6 +10,21 @@ import { getStockData } from '../stock/service.js';
 const router = express.Router();
 router.use(requireDeviceIdMiddleware);
 
+// 피어슨 상관계수 — 정렬된 두 수익률 배열(같은 날짜 인덱스). 분산 0이면 정의 불가 → null.
+function pearson(x, y) {
+    const n = x.length;
+    if (n < 2) return null;
+    const mx = x.reduce((a, b) => a + b, 0) / n;
+    const my = y.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < n; i++) {
+        const dx = x[i] - mx, dy = y[i] - my;
+        sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+    }
+    if (sxx <= 0 || syy <= 0) return null;
+    return sxy / Math.sqrt(sxx * syy);
+}
+
 // GET /api/holdings - list holdings with runtime holding_opinion
 router.get('/', async (req, res) => {
     const deviceId = req.deviceId;
@@ -200,6 +215,83 @@ router.get('/benchmark', async (req, res) => {
     } catch (error) {
         console.error('Benchmark Error:', error.message);
         res.json({ available: false });
+    }
+});
+
+// GET /api/holdings/correlation - 보유 종목 간 상관관계(최근 60거래일 일별 수익률, 피어슨).
+// "비중은 나눴어도 같이 움직이면 분산이 아니다"에 답하는 지표. 보유 2종목 이상만.
+// 종목별 history는 한 쿼리로 묶어 조회(Neon 풀 max=5 고려). 20일 미만 데이터 종목은 제외.
+// 상위 3쌍(상관 내림차순) + max/avg 반환. 상관계수는 방향이 아닌 관계 강도 → 프론트에서 방향색 미사용.
+router.get('/correlation', async (req, res) => {
+    const deviceId = req.deviceId;
+    try {
+        const { rows: holdings } = await query(
+            `SELECT h.code, s.name FROM holding_stocks h JOIN stocks s ON s.code = h.code WHERE h.device_id = $1`,
+            [deviceId]
+        );
+        if (holdings.length === 0) return res.json({ available: false, reason: 'empty' });
+        if (holdings.length === 1) return res.json({ available: false, reason: 'single' });
+
+        const codes = holdings.map(h => h.code);
+        const nameByCode = Object.fromEntries(holdings.map(h => [h.code, h.name]));
+
+        // 최근 61거래일(→ 60 수익률)을 전 보유 종목에 대해 한 번에 조회.
+        const { rows: hist } = await query(`
+            SELECT code, date, price
+            FROM stock_history
+            WHERE code = ANY($1) AND date IN (
+                SELECT DISTINCT date FROM stock_history ORDER BY date DESC LIMIT 61
+            )
+            ORDER BY code, date
+        `, [codes]);
+
+        const pricesByCode = {};
+        for (const r of hist) {
+            (pricesByCode[r.code] ||= []).push({ date: r.date, price: Number(r.price) });
+        }
+
+        // code → { date: 일별수익률 }. 20일 미만이면 제외.
+        const returnsByCode = {};
+        for (const code of codes) {
+            const arr = pricesByCode[code] || [];
+            if (arr.length < 21) continue;
+            const map = {};
+            for (let i = 1; i < arr.length; i++) {
+                if (arr[i - 1].price <= 0) continue;
+                map[arr[i].date] = (arr[i].price - arr[i - 1].price) / arr[i - 1].price;
+            }
+            if (Object.keys(map).length >= 20) returnsByCode[code] = map;
+        }
+
+        const valid = Object.keys(returnsByCode);
+        if (valid.length < 2) return res.json({ available: false, reason: 'insufficient' });
+
+        const pairs = [];
+        for (let i = 0; i < valid.length; i++) {
+            for (let j = i + 1; j < valid.length; j++) {
+                const a = returnsByCode[valid[i]], b = returnsByCode[valid[j]];
+                const common = Object.keys(a).filter(d => d in b);
+                if (common.length < 20) continue;
+                const r = pearson(common.map(d => a[d]), common.map(d => b[d]));
+                if (r === null) continue;
+                pairs.push({
+                    codeA: valid[i], nameA: nameByCode[valid[i]],
+                    codeB: valid[j], nameB: nameByCode[valid[j]],
+                    correlation: +r.toFixed(2),
+                });
+            }
+        }
+        if (pairs.length === 0) return res.json({ available: false, reason: 'insufficient' });
+
+        pairs.sort((p, q) => q.correlation - p.correlation);
+        const corrs = pairs.map(p => p.correlation);
+        const maxCorrelation = Math.max(...corrs);
+        const avgCorrelation = +(corrs.reduce((a, b) => a + b, 0) / corrs.length).toFixed(2);
+
+        res.json({ available: true, pairs: pairs.slice(0, 3), maxCorrelation, avgCorrelation });
+    } catch (error) {
+        console.error('Correlation Error:', error.message);
+        res.json({ available: false, reason: 'error' });
     }
 });
 

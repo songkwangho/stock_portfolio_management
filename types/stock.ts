@@ -282,3 +282,19 @@ export interface BenchmarkResult {
   informationRatio?: number;
   trackingError?: number;   // 초과수익 표준편차(연환산)
 }
+
+// 3.14차 — 보유 종목 간 상관관계(60거래일). 상관계수는 방향 아닌 관계 강도.
+export interface CorrelationPair {
+  codeA: string;
+  nameA: string;
+  codeB: string;
+  nameB: string;
+  correlation: number;
+}
+export interface CorrelationResult {
+  available: boolean;
+  reason?: 'empty' | 'single' | 'insufficient' | 'error';
+  pairs?: CorrelationPair[];
+  maxCorrelation?: number;
+  avgCorrelation?: number;
+}

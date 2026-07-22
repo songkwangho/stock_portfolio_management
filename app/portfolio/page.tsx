@@ -7,9 +7,10 @@ import StockSearchInput from '@/components/stock/StockSearchInput';
 import { formatWeight } from '@/lib/stockDetail/format';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
+import { stockApi } from '@/lib/stockApi';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useToastStore } from '@/stores/useToastStore';
-import type { Holding, StockSummary } from '@/types/stock';
+import type { Holding, StockSummary, CorrelationResult } from '@/types/stock';
 
 interface EditState {
   avgPrice: string;
@@ -50,6 +51,8 @@ function PortfolioContent() {
   const [firstStockGuide, setFirstStockGuide] = useState<{ code: string; name: string } | null>(null);
   const [profitHelpCode, setProfitHelpCode] = useState<string | null>(null);
   const profitHelpRef = useRef<HTMLDivElement>(null);
+  // 3.14차 — 보유 종목 상관관계. 2종목 이상·available일 때만 분산 점검 블록 노출.
+  const [correlation, setCorrelation] = useState<CorrelationResult | null>(null);
 
   useEffect(() => {
     if (!profitHelpCode) return;
@@ -65,6 +68,14 @@ function PortfolioContent() {
   useEffect(() => {
     refetchHoldings();
   }, [refetchHoldings]);
+
+  // 보유 2종목 이상일 때만 상관관계 조회(보조 지표라 실패 시 silent → null).
+  useEffect(() => {
+    if (holdings.length < 2) { setCorrelation(null); return; }
+    stockApi.getCorrelation()
+      .then(d => setCorrelation(d.available ? d : null))
+      .catch(() => setCorrelation(null));
+  }, [holdings.length]);
 
   // H1: 첫 종목 가이드 처리 (add-holding focus는 폼 상시 노출 변경으로 무의미)
   useEffect(() => {
@@ -181,6 +192,33 @@ function PortfolioContent() {
           </p>
         </div>
       )}
+
+      {/* 분산 상태 점검 (3.14차) — 비중 경고와 별개로 "같이 움직이는가"를 본다.
+          상관계수는 가격 방향이 아닌 관계 강도 → rise/fall 금지, caution/muted만 사용. */}
+      {holdings.length >= 2 && correlation?.available && correlation.maxCorrelation !== undefined && (() => {
+        const max = correlation.maxCorrelation;
+        const top = correlation.pairs?.[0];
+        const high = max >= 0.7;   // caution 경고
+        const mid = max >= 0.4;    // 정보성(중립)
+        return (
+          <div className={`rounded-xl p-6 border ${high ? 'bg-caution/5 border-caution/20' : 'bg-surface border-line'}`}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className={`text-sm font-bold ${high ? 'text-caution' : 'text-ink'}`}>분산 상태 점검</h3>
+              <span className="text-xs text-faint tabular-nums">최고 상관 {max.toFixed(2)}</span>
+            </div>
+            {!mid ? (
+              <p className="text-xs text-muted leading-relaxed break-keep">보유 종목들이 서로 다르게 움직이는 편이에요. 잘 분산돼 있어요.</p>
+            ) : top ? (
+              <p className="text-xs text-muted leading-relaxed break-keep">
+                <span className={`font-bold ${high ? 'text-caution' : 'text-ink'}`}>{top.nameA}</span>와(과) <span className={`font-bold ${high ? 'text-caution' : 'text-ink'}`}>{top.nameB}</span>가 함께 움직이는 편이에요 (상관 {top.correlation.toFixed(2)}).
+                {high
+                  ? ' 비중을 나눴어도 한쪽이 내리면 다른 쪽도 내릴 가능성이 높아요.'
+                  : ' 완전히 독립적으로 움직이진 않아요.'}
+              </p>
+            ) : null}
+          </div>
+        );
+      })()}
 
       {/* 새 종목 추가 — 폼은 실제로 묶이는 그룹이므로 카드 유지. */}
       <div className="bg-surface border border-line rounded-xl p-6">
