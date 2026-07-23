@@ -51,6 +51,11 @@ export async function runMigrations(pool) {
     await addColumnIfNotExists(pool, 'stock_analysis', 'ai_report', 'TEXT');
     await addColumnIfNotExists(pool, 'stock_analysis', 'ai_report_date', 'DATE');
 
+    // 4.5a차 — dart_disclosures.rm(비고: 정정/철회) / corp_cls(시장구분) 컬럼 보강 (기존 DB 호환).
+    // 첫 배포 때 CREATE된 테이블에는 없으므로 ALTER로 추가(신규 DB는 schema.js가 이미 생성 → no-op).
+    await addColumnIfNotExists(pool, 'dart_disclosures', 'rm', 'TEXT');
+    await addColumnIfNotExists(pool, 'dart_disclosures', 'corp_cls', 'TEXT');
+
     console.log('PostgreSQL migration checks complete.');
 }
 

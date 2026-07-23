@@ -13,6 +13,8 @@ const RULES = [
     { category: 'treasury',         label: '자사주', keywords: ['자기주식', '자사주'] },
     { category: 'earnings',         label: '실적', keywords: ['사업보고서', '분기보고서', '반기보고서', '결산실적', '잠정실적', '영업실적'] },
     { category: 'merger',           label: '구조변경', keywords: ['합병', '분할', '영업양수', '영업양도'] },
+    // 주가 급변 시 자주 나오는 유형 — 별도 카테고리로 초보자에게 맥락 제공(과분류 아님, 빈발·의미 명확).
+    { category: 'clarification',    label: '해명', keywords: ['풍문', '조회공시'] },
     { category: 'major',            label: '주요사항', keywords: ['주요사항보고서'] },
 ];
 
@@ -24,13 +26,15 @@ const HINTS = {
     dividend: '배당 관련 결정이에요.',
     treasury: '회사가 자기 주식을 사거나 파는 결정이에요.',
     merger: '사업 구조가 바뀌는 결정이에요 (합병·분할 등).',
+    clarification: '회사가 소문·보도에 대해 입장을 밝힌 공시예요.',
     major: '회사의 중요한 변동을 알리는 보고서예요.',
     other: '그 밖의 공시예요.',
 };
 
 // report_nm → { category, label }. 매칭 없으면 other.
+// report_nm에 꼬리 공백이 흔해(예: "...해명(미확정)        ") 매칭 전 trim.
 export function categorizeDisclosure(reportNm) {
-    const name = typeof reportNm === 'string' ? reportNm : '';
+    const name = (typeof reportNm === 'string' ? reportNm : '').trim();
     for (const rule of RULES) {
         if (rule.keywords.some(kw => name.includes(kw))) {
             return { category: rule.category, label: rule.label };

@@ -207,6 +207,8 @@ export async function initSchema(pool) {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_dart_fin_code ON dart_financials(code, year DESC)');
 
     // category: 규칙 기반 분류(표시용, 신호 아님). 원문 링크는 rcept_no로 구성.
+    // rm: 비고(정=정정공시, 철=철회, 연=연결 등) — 정정/철회 공시 UI 안전장치.
+    // corp_cls: 시장구분(Y=유가/K=코스닥/N=코넥스/E=기타) — 저장만, UI 미사용.
     await pool.query(`
         CREATE TABLE IF NOT EXISTS dart_disclosures (
             rcept_no   TEXT PRIMARY KEY,
@@ -216,6 +218,8 @@ export async function initSchema(pool) {
             rcept_dt   TEXT NOT NULL,
             flr_nm     TEXT,
             category   TEXT,
+            rm         TEXT,
+            corp_cls   TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
     `);

@@ -139,29 +139,26 @@ export async function fetchFinancials(corpCode, year, reprtCode, fsDiv) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. 공시 검색 (list.json) — 기간 내 전체 페이지 수집(최대 상한).
-//    반환: [{ rcept_no, report_nm, rcept_dt, flr_nm, corp_name, stock_code, ... }] | null
-//    013(공시 없음)은 정상 → [] 반환. 에러/무키 → null.
+// 3. 공시 검색 (list.json) — 단일 종목 최근 기간.
+//    반환: [{ rcept_no, report_nm, rcept_dt, flr_nm, corp_name, stock_code, corp_cls, rm, ... }] | null
+//    013(공시 없음)은 정상 → [] 반환. 에러/무키/corp_code 누락 → null.
+//
+//    corp_code 없이 호출하면 전 시장 공시가 와서 할당량 낭비·오적재를 유발하므로 반드시 가드한다
+//    (부트 샘플에서 500건이 관측된 원인 대비). 종목당 최근 3개월이면 1페이지(100건)로 충분해
+//    페이지네이션은 쓰지 않는다 — 초보자 UI에 100건 이상은 무의미.
 // ─────────────────────────────────────────────────────────────
 export async function fetchDisclosures(corpCode, bgnDe, endDe) {
-    const PAGE_COUNT = 100;
-    const MAX_PAGES = 5; // 3개월 단일사 공시 상한 방어(최대 500건)
-    const items = [];
-    for (let page = 1; page <= MAX_PAGES; page++) {
-        const r = await dartGet('list.json', {
-            corp_code: corpCode, bgn_de: bgnDe, end_de: endDe,
-            page_no: String(page), page_count: String(PAGE_COUNT),
-        });
-        if (!r.ok) return page === 1 ? null : items;
-        const data = parseJsonSafe(r.data);
-        if (!data || typeof data.status !== 'string') return page === 1 ? null : items;
-        const state = interpretStatus(data.status, 'list');
-        if (state === 'no_data') return items;              // 공시 없음 = 정상 빈 배열
-        if (state !== 'ok') return page === 1 ? null : items;
-        const list = Array.isArray(data.list) ? data.list : [];
-        for (const it of list) if (it && it.rcept_no) items.push(it);
-        const totalPage = Number(data.total_page) || 1;
-        if (page >= totalPage) break;
-    }
-    return items;
+    if (!corpCode) { console.error('[dart] disclosures: corp_code 누락 — 전 시장 조회 방지 위해 중단'); return null; }
+    const r = await dartGet('list.json', {
+        corp_code: corpCode, bgn_de: bgnDe, end_de: endDe,
+        page_no: '1', page_count: '100',
+    });
+    if (!r.ok) return null;
+    const data = parseJsonSafe(r.data);
+    if (!data || typeof data.status !== 'string') return null;
+    const state = interpretStatus(data.status, 'list');
+    if (state === 'no_data') return [];                     // 공시 없음 = 정상 빈 배열
+    if (state !== 'ok') return null;
+    const list = Array.isArray(data.list) ? data.list : [];
+    return list.filter(it => it && it.rcept_no);
 }

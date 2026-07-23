@@ -71,19 +71,24 @@ async function main() {
             try {
                 await withTransaction(async (client) => {
                     for (const it of items) {
-                        const { category } = categorizeDisclosure(it.report_nm);
+                        const reportNm = String(it.report_nm || '').trim();   // 꼬리 공백 정리(문제 4)
+                        const { category } = categorizeDisclosure(reportNm);
                         await client.query(`
-                            INSERT INTO dart_disclosures (rcept_no, code, corp_name, report_nm, rcept_dt, flr_nm, category, created_at)
-                            VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+                            INSERT INTO dart_disclosures (rcept_no, code, corp_name, report_nm, rcept_dt, flr_nm, category, rm, corp_cls, created_at)
+                            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
                             ON CONFLICT (rcept_no) DO UPDATE SET
                                 report_nm = EXCLUDED.report_nm,
                                 rcept_dt = EXCLUDED.rcept_dt,
                                 flr_nm = EXCLUDED.flr_nm,
-                                category = EXCLUDED.category
+                                category = EXCLUDED.category,
+                                rm = EXCLUDED.rm,
+                                corp_cls = EXCLUDED.corp_cls
                         `, [
                             String(it.rcept_no), t.code, it.corp_name || t.name,
-                            String(it.report_nm || '').trim(), String(it.rcept_dt || '').trim(),
+                            reportNm, String(it.rcept_dt || '').trim(),
                             it.flr_nm || null, category,
+                            (it.rm ? String(it.rm).trim() : null),
+                            (it.corp_cls ? String(it.corp_cls).trim() : null),
                         ]);
                     }
                 });
