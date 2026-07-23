@@ -11,9 +11,12 @@
 // 합계로 오인하므로 금지 — 합계의 이름 변형(예: '영업이익(손실)')을 명시 나열한다.
 export const TARGET_ACCOUNTS = [
     // section: 'income' | 'balance' | 'cashflow'
-    { id: 'revenue',          section: 'income',   label: '매출액',          sjDiv: ['IS', 'CIS'], stdIds: ['ifrs-full_Revenue', 'ifrs_Revenue'], nameKeys: ['매출액', '수익(매출액)', '영업수익'] },
-    { id: 'operating_income', section: 'income',   label: '영업이익',        sjDiv: ['IS', 'CIS'], stdIds: ['dart_OperatingIncomeLoss', 'ifrs-full_ProfitLossFromOperatingActivities'], nameKeys: ['영업이익', '영업이익(손실)'] },
-    { id: 'net_income',       section: 'income',   label: '당기순이익',      sjDiv: ['IS', 'CIS'], stdIds: ['ifrs-full_ProfitLoss'], nameKeys: ['당기순이익', '당기순이익(손실)', '분기순이익', '분기순이익(손실)', '반기순이익', '반기순이익(손실)'] },
+    // 손익 계정은 IS(손익계산서)만 — 포괄손익계산서(CIS)에도 순이익이 실려 이중 매칭·PK 충돌을
+    // 유발했다(부트 샘플: net_income 10건 매칭 → unique 9). CIS 순이익은 IS와 동일 값이거나
+    // 포괄손익 조정이 섞여 초보자에게 혼란이라 제외한다(문제 2, 권장 A).
+    { id: 'revenue',          section: 'income',   label: '매출액',          sjDiv: ['IS'], stdIds: ['ifrs-full_Revenue', 'ifrs_Revenue'], nameKeys: ['매출액', '수익(매출액)', '영업수익'] },
+    { id: 'operating_income', section: 'income',   label: '영업이익',        sjDiv: ['IS'], stdIds: ['dart_OperatingIncomeLoss', 'ifrs-full_ProfitLossFromOperatingActivities'], nameKeys: ['영업이익', '영업이익(손실)'] },
+    { id: 'net_income',       section: 'income',   label: '당기순이익',      sjDiv: ['IS'], stdIds: ['ifrs-full_ProfitLoss'], nameKeys: ['당기순이익', '당기순이익(손실)', '분기순이익', '분기순이익(손실)', '반기순이익', '반기순이익(손실)'] },
     { id: 'assets',           section: 'balance',  label: '자산총계',        sjDiv: ['BS'], stdIds: ['ifrs-full_Assets'], nameKeys: ['자산총계'] },
     { id: 'liabilities',      section: 'balance',  label: '부채총계',        sjDiv: ['BS'], stdIds: ['ifrs-full_Liabilities'], nameKeys: ['부채총계'] },
     { id: 'equity',           section: 'balance',  label: '자본총계',        sjDiv: ['BS'], stdIds: ['ifrs-full_Equity'], nameKeys: ['자본총계'] },
