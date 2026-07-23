@@ -14,4 +14,6 @@ next-env.d.ts
 
 # scripts 실행 부산물 — backfill/expand 진행 상태 등
 scripts/.backfill-state.json
+# DART 응답 원본 샘플 (구조 대조용, 커밋 금지 — 습관적 안전장치)
+scripts/.dart-sample.json
 
