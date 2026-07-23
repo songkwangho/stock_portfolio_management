@@ -16,6 +16,9 @@ export async function runMigrations(pool) {
         { table: 'stock_themes',       columns: ['theme_id', 'theme_name', 'code'] },
         { table: 'users',              columns: ['provider', 'provider_id', 'email'] },
         { table: 'user_subscriptions', columns: ['user_id', 'status', 'payment_id'] },
+        { table: 'dart_corp_codes',    columns: ['corp_code', 'stock_code', 'corp_name'] },
+        { table: 'dart_financials',    columns: ['code', 'year', 'quarter', 'fs_div', 'account_id'] },
+        { table: 'dart_disclosures',   columns: ['rcept_no', 'code', 'report_nm', 'rcept_dt', 'category'] },
     ];
 
     for (const { table, columns } of expectations) {

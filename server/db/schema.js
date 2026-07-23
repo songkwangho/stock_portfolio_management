@@ -173,6 +173,54 @@ export async function initSchema(pool) {
         )
     `);
 
+    // 4.5a차 — DART OpenAPI 연동. 종목상세 [기업] 탭용 재무제표 원문 + 공시.
+    // corp_code(DART 8자리)는 stock_code(6자리)와 별개라 매핑 테이블 선행 필요.
+    // 세 테이블 모두 stocks와 FK 없음 — DART는 전 상장사 대상이고, 적재 실패가
+    // stocks cascade에 영향을 주면 안 되기 때문(재무/공시는 부가 정보).
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS dart_corp_codes (
+            corp_code   TEXT PRIMARY KEY,
+            stock_code  TEXT,
+            corp_name   TEXT NOT NULL,
+            modify_date TEXT,
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_dart_corp_stock ON dart_corp_codes(stock_code)');
+
+    // fs_div: 'CFS'(연결) | 'OFS'(별도). quarter: '1Q'~'4Q'. amount는 NUMERIC(20,0)
+    // (재무제표 금액은 원 단위 정수, 수조 원까지 커버).
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS dart_financials (
+            code        TEXT NOT NULL,
+            year        INTEGER NOT NULL,
+            quarter     TEXT NOT NULL,
+            fs_div      TEXT NOT NULL,
+            account_id  TEXT NOT NULL,
+            account_nm  TEXT,
+            amount      NUMERIC(20,0),
+            prev_amount NUMERIC(20,0),
+            updated_at  TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (code, year, quarter, fs_div, account_id)
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_dart_fin_code ON dart_financials(code, year DESC)');
+
+    // category: 규칙 기반 분류(표시용, 신호 아님). 원문 링크는 rcept_no로 구성.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS dart_disclosures (
+            rcept_no   TEXT PRIMARY KEY,
+            code       TEXT NOT NULL,
+            corp_name  TEXT,
+            report_nm  TEXT NOT NULL,
+            rcept_dt   TEXT NOT NULL,
+            flr_nm     TEXT,
+            category   TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_dart_disc_code_dt ON dart_disclosures(code, rcept_dt DESC)');
+
     // Indices
     await pool.query('CREATE INDEX IF NOT EXISTS idx_investor_history_code_date ON investor_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_history_code_date ON stock_history(code, date)');
