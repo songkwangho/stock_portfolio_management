@@ -62,7 +62,11 @@ export async function sampleDartOnce() {
         const matched = [];
         for (const it of list) {
             const m = matchAccount(it);
-            if (m) matched.push({ id: m.id, from: it.account_nm, sj: it.sj_div, amt_mask: maskAmt(it.thstrm_amount) });
+            if (m) {
+                // 매칭 경로 확인(문제 3): account_id가 표준코드면 1차(id), 아니면 2차(nm).
+                const via = (m.stdIds || []).includes(String(it.account_id || '').trim()) ? 'id' : 'nm';
+                matched.push({ id: m.id, via, from: it.account_nm, sj: it.sj_div, amt_mask: maskAmt(it.thstrm_amount) });
+            }
         }
         console.log(`[dart-sample] matched ${matched.length}건 (canonical id ↔ 실제 account_nm):`);
         matched.forEach(m => console.log('   ', JSON.stringify(m)));
