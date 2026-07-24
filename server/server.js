@@ -21,8 +21,6 @@ import portfolioRouter from './domains/portfolio/router.js';
 import analysisRouter from './domains/analysis/router.js';
 import stockRouter from './domains/stock/router.js';
 import systemRouter from './domains/system/router.js';
-// [임시] DART 파서 검증용 부트 샘플 — 검증 완료 후 이 import + 아래 호출부 + dartSample.js 제거.
-import { sampleDartOnce } from './scrapers/dartSample.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,13 +112,4 @@ app.use('/api', stockRouter);    // owns /stock/:code, /stocks, /search, /recomm
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`🌐 CORS origin: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-
-    // [임시] DART 파서 검증 부트 샘플 — 플래그(DART_SAMPLE_ON_BOOT=1)가 있을 때만 1회 실행.
-    // 15초 지연: 기동 직후 syncAllStocks와 겹치지 않게. 실패해도 서버 기동에 영향 없음.
-    // 검증 완료 후 이 블록 + import + server/scrapers/dartSample.js 를 제거하는 후속 커밋 예정.
-    if (process.env.DART_API_KEY && process.env.DART_SAMPLE_ON_BOOT === '1') {
-        setTimeout(() => {
-            sampleDartOnce().catch(e => console.error('[dart-sample] failed:', e.message));
-        }, 15000);
-    }
 });
