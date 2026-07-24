@@ -8,7 +8,8 @@
 // - 플래그(DART_SAMPLE_ON_BOOT=1) 없으면 절대 실행 안 됨(server.js에서 가드).
 // - 키·URL·금액 실값을 로그에 남기지 않는다. 금액은 자릿수를 '9'로 마스킹해 포맷만 노출.
 // - 어떤 실패도 throw하지 않는다(server.js에서 catch로 한 번 더 감쌈).
-import { fetchFinancials, fetchDisclosures } from './dart.js';
+import axios from 'axios';
+import { fetchFinancials } from './dart.js';
 import { matchAccount } from '../helpers/dartAccounts.js';
 import { categorizeDisclosure } from '../helpers/dartCategory.js';
 import { query } from '../db/connection.js';
@@ -74,28 +75,41 @@ export async function sampleDartOnce() {
         console.log('[dart-sample] unique canonical ids:', uniqueIds);
     }
 
-    // ── 2. 공시 구조 (최근 1개월, 1건만) ──
+    // ── 2. 공시 필터 진단(TASK 1) — corp_code가 실제로 필터링하는지 원인 규명 ──
+    //    원시 axios로 응답 메타(total_count) + unique stock_codes 확인. 키는 마스킹.
     try {
+        const key = process.env.DART_API_KEY;
         const end = new Date();
         const bgn = new Date(); bgn.setMonth(bgn.getMonth() - 1);
         const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-        const items = await fetchDisclosures(corp, ymd(bgn), ymd(end));
-        if (!items) {
-            console.log('[dart-sample] disclosures: 응답 없음(에러/무키)');
-        } else if (items.length === 0) {
-            console.log('[dart-sample] disclosures: 최근 1개월 0건');
-        } else {
-            console.log(`[dart-sample] disclosures list.length=${items.length}`);
-            console.log('[dart-sample] item keys:', Object.keys(items[0] || {}));
-            const it = items[0];
+        const params = { crtfc_key: key, corp_code: corp, bgn_de: ymd(bgn), end_de: ymd(end), page_no: '1', page_count: '100' };
+        // 파라미터명·값 확인(키만 마스킹) — corp_code가 실제로 실려 나가는지, 오타 없는지.
+        console.log('[dart-sample] list.json params (key masked):', JSON.stringify({ ...params, crtfc_key: '***' }));
+        const res = await axios.get('https://opendart.fss.or.kr/api/list.json', {
+            params, responseType: 'text', timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        const json = JSON.parse(res.data);
+        console.log('[dart-sample] meta:', JSON.stringify({
+            status: json.status, message: json.message,
+            total_count: json.total_count, total_page: json.total_page,
+            page_no: json.page_no, page_count: json.page_count,
+        }));
+        const list = Array.isArray(json.list) ? json.list : [];
+        const codes = [...new Set(list.map(i => String(i.stock_code || '').trim()))];
+        console.log(`[dart-sample] list.length=${list.length} unique stock_codes=${codes.length}:`, codes.slice(0, 10));
+        console.log('[dart-sample] 판정:',
+            codes.filter(Boolean).length <= 1 ? 'corp_code 필터 정상(단일 종목)' : '전 시장 조회 의심(여러 종목 혼입)');
+        if (list[0]) {
+            console.log('[dart-sample] disclosure item keys:', Object.keys(list[0]));
+            const it = list[0];
             console.log('[dart-sample] first item:', JSON.stringify({
-                rcept_no: it.rcept_no, report_nm: it.report_nm, rcept_dt: it.rcept_dt,
-                flr_nm: it.flr_nm, corp_name: it.corp_name, stock_code: it.stock_code,
+                stock_code: it.stock_code, corp_cls: it.corp_cls, rm: it.rm,
+                report_nm: it.report_nm, rcept_dt: it.rcept_dt, flr_nm: it.flr_nm,
                 categorized: categorizeDisclosure(it.report_nm),
             }));
         }
     } catch (e) {
-        console.error('[dart-sample] disclosures sample failed:', e.message);
+        console.error('[dart-sample] disclosure diagnose failed:', e.message);
     }
 
     console.log('[dart-sample] ===== 부트 샘플 종료 (검증 후 DART_SAMPLE_ON_BOOT 제거) =====');
