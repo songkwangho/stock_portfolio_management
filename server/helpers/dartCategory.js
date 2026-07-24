@@ -53,3 +53,21 @@ export function categoryLabel(category) {
     const found = RULES.find(r => r.category === category);
     return found ? found.label : '기타';
 }
+
+// ─────────────────────────────────────────────────────────────
+// 4.5a차 — 초보자에게 노이즈인 공시 제외(블랙리스트).
+// 삼성전자는 월 778건 공시 중 대부분이 임원·주요주주 소유상황보고서라 초보자에게 무의미.
+// ⚠️ other 전체를 버리지 않는다 — 분류 못 한 신규 유형이 섞일 수 있으므로, **명시 패턴만** 제외.
+// 중간점(ㆍ/·) 변형에 견디도록 점 없는 핵심 부분문자열로 매칭한다(공백 제거 후 includes).
+// ─────────────────────────────────────────────────────────────
+export const NOISE_PATTERNS = [
+    '특정증권등소유상황보고서',   // 임원ㆍ주요주주 소유상황 (가장 다발)
+    '대량보유상황보고서',          // 주식등의 대량보유(5%) 보고
+    '의결권대리행사권유',          // 위임장 권유 참고서류
+];
+
+// report_nm이 노이즈 패턴에 걸리면 true(=미저장). 그 외(분류 안 된 other 포함)는 false(=저장).
+export function isNoise(reportNm) {
+    const name = (typeof reportNm === 'string' ? reportNm : '').replace(/\s/g, '');
+    return NOISE_PATTERNS.some(p => name.includes(p.replace(/\s/g, '')));
+}

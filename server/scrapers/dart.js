@@ -11,6 +11,7 @@
 // scripts/sync-dart-financials.js --dry-run --save-sample 로 운영자가 원본을 확보해 대조·보정한다.
 import axios from 'axios';
 import AdmZip from 'adm-zip';
+import { isNoise } from '../helpers/dartCategory.js';
 
 const BASE = 'https://opendart.fss.or.kr/api';
 const TIMEOUT = 10000;
@@ -23,6 +24,7 @@ async function throttle() {
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     lastCall = Date.now();
 }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export function dartEnabled() {
     return !!process.env.DART_API_KEY;
@@ -139,28 +141,25 @@ export async function fetchFinancials(corpCode, year, reprtCode, fsDiv) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. 공시 검색 (list.json) — 단일 종목 최근 기간.
-//    반환: [{ rcept_no, report_nm, rcept_dt, flr_nm, corp_name, stock_code, corp_cls, rm, ... }] | null
-//    013(공시 없음)은 정상 → [] 반환. 에러/무키/corp_code 누락 → null.
-//
-//    corp_code 없이 호출하면 전 시장 공시가 와서 할당량 낭비·오적재를 유발하므로 반드시 가드한다
-//    (부트 샘플에서 500건이 관측된 원인 대비). 종목당 최근 3개월이면 1페이지(100건)로 충분해
-//    페이지네이션은 쓰지 않는다 — 초보자 UI에 100건 이상은 무의미.
+// 3a. 공시 단일 페이지 (list.json) — per-page 프리미티브.
+//     반환: { status, list, totalPage } | null  (013=공시 없음 → status '013', list []).
+//     list는 rcept_no 있는 항목만 + (expectedStockCode 주어지면) stock_code 방어 필터 적용.
+//     corp_code 없이 호출하면 전 시장이 오므로 가드(진단 결과 필터 정상이지만 안전장치 유지).
 // ─────────────────────────────────────────────────────────────
-export async function fetchDisclosures(corpCode, bgnDe, endDe, expectedStockCode = null) {
+export async function fetchDisclosurePage(corpCode, bgnDe, endDe, pageNo, pageCount, expectedStockCode = null) {
     if (!corpCode) { console.error('[dart] disclosures: corp_code 누락 — 전 시장 조회 방지 위해 중단'); return null; }
     const r = await dartGet('list.json', {
         corp_code: corpCode, bgn_de: bgnDe, end_de: endDe,
-        page_no: '1', page_count: '100',
+        page_no: String(pageNo), page_count: String(pageCount),
     });
     if (!r.ok) return null;
     const data = parseJsonSafe(r.data);
     if (!data || typeof data.status !== 'string') return null;
     const state = interpretStatus(data.status, 'list');
-    if (state === 'no_data') return [];                     // 공시 없음 = 정상 빈 배열
+    if (state === 'no_data') return { status: '013', list: [], totalPage: 0 };
     if (state !== 'ok') return null;
     let list = (Array.isArray(data.list) ? data.list : []).filter(it => it && it.rcept_no);
-    // 방어(TASK 3): corp_code 필터가 안 먹어 타 종목이 섞여 와도 오적재 차단.
+    // 방어: corp_code 필터가 안 먹어 타 종목이 섞여 와도 오적재 차단.
     // 응답 stock_code로 재확인 — 빈 값은 corp_code를 신뢰해 유지, 명시적으로 다른 종목만 제외.
     if (expectedStockCode) {
         const before = list.length;
@@ -172,5 +171,35 @@ export async function fetchDisclosures(corpCode, bgnDe, endDe, expectedStockCode
             console.warn(`[dart] ${expectedStockCode}: ${before - list.length}/${before}건 타 종목 응답 제외 — corp_code 필터 파라미터 점검 필요`);
         }
     }
-    return list;
+    return { status: data.status, list, totalPage: Number(data.total_page) || 1 };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3b. 적응형 공시 수집 — 저장 대상(비노이즈)이 targetCount에 도달할 때까지 페이지를 늘린다.
+//     삼성전자처럼 소유상황보고서가 도배된 종목만 2~3페이지까지 가고, 대부분은 1페이지에서 끝.
+//     반환: { items, noiseExcluded, pagesQueried } | null   (items = 비노이즈, 최대 targetCount)
+//     노이즈 제외는 블랙리스트(isNoise) — 분류 못 한 other는 저장 대상으로 유지.
+// ─────────────────────────────────────────────────────────────
+export async function fetchSignificantDisclosures(corpCode, stockCode, bgnDe, endDe, {
+    targetCount = 20,   // 목표 저장 건수
+    maxPages = 3,       // 안전 상한 (요청 폭주·한도 방지). 186 × 3 = 558, 한도의 2.8%
+    pageCount = 100,
+} = {}) {
+    if (!corpCode) { console.error('[dart] disclosures: corp_code 누락 — 중단'); return null; }
+    const collected = [];
+    let noiseExcluded = 0;
+    let pagesQueried = 0;
+    for (let page = 1; page <= maxPages; page++) {
+        const res = await fetchDisclosurePage(corpCode, bgnDe, endDe, page, pageCount, stockCode);
+        if (!res) return page === 1 ? null : { items: collected.slice(0, targetCount), noiseExcluded, pagesQueried };
+        pagesQueried = page;
+        for (const it of res.list) {
+            if (isNoise(it.report_nm)) { noiseExcluded++; continue; }
+            collected.push(it);
+        }
+        if (collected.length >= targetCount) break;
+        if (page >= (res.totalPage || 1)) break;   // 더 없음
+        await sleep(300);                           // rate limit
+    }
+    return { items: collected.slice(0, targetCount), noiseExcluded, pagesQueried };
 }

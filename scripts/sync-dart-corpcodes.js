@@ -6,6 +6,7 @@
  *
  * 사용:
  *   DART_API_KEY=... DATABASE_URL=postgres://... node scripts/sync-dart-corpcodes.js
+ *   ... --dry-run   # 다운로드·파싱만 하고 건수 보고, DB 미기록
  *
  * 주의: ESM. dotenv import 금지(이전 이슈) — 환경변수는 쉘에서 export.
  */
@@ -13,6 +14,7 @@ import pool, { withTransaction } from '../server/db/connection.js';
 import { fetchCorpCodes, dartEnabled } from '../server/scrapers/dart.js';
 
 async function main() {
+    const dryRun = process.argv.includes('--dry-run');
     if (!dartEnabled()) {
         console.error('DART_API_KEY 미설정 — 중단 (쉘에서 export 후 재실행)');
         process.exit(1);
@@ -25,7 +27,12 @@ async function main() {
         process.exit(1);
     }
     const listed = list.filter(c => c.stock_code).length;
-    console.log(`파싱 완료: 전체 ${list.length}건 (상장 ${listed}건). 적재 시작...`);
+    console.log(`파싱 완료: 전체 ${list.length}건 (상장 ${listed}건).${dryRun ? ' [dry-run] DB 미기록, 종료.' : ' 적재 시작...'}`);
+    if (dryRun) {
+        console.log('샘플 3건:', JSON.stringify(list.slice(0, 3)));
+        await pool.end();
+        return;
+    }
 
     const CHUNK = 1000;
     let n = 0;
