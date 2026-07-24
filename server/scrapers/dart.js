@@ -147,7 +147,7 @@ export async function fetchFinancials(corpCode, year, reprtCode, fsDiv) {
 //    (부트 샘플에서 500건이 관측된 원인 대비). 종목당 최근 3개월이면 1페이지(100건)로 충분해
 //    페이지네이션은 쓰지 않는다 — 초보자 UI에 100건 이상은 무의미.
 // ─────────────────────────────────────────────────────────────
-export async function fetchDisclosures(corpCode, bgnDe, endDe) {
+export async function fetchDisclosures(corpCode, bgnDe, endDe, expectedStockCode = null) {
     if (!corpCode) { console.error('[dart] disclosures: corp_code 누락 — 전 시장 조회 방지 위해 중단'); return null; }
     const r = await dartGet('list.json', {
         corp_code: corpCode, bgn_de: bgnDe, end_de: endDe,
@@ -159,6 +159,18 @@ export async function fetchDisclosures(corpCode, bgnDe, endDe) {
     const state = interpretStatus(data.status, 'list');
     if (state === 'no_data') return [];                     // 공시 없음 = 정상 빈 배열
     if (state !== 'ok') return null;
-    const list = Array.isArray(data.list) ? data.list : [];
-    return list.filter(it => it && it.rcept_no);
+    let list = (Array.isArray(data.list) ? data.list : []).filter(it => it && it.rcept_no);
+    // 방어(TASK 3): corp_code 필터가 안 먹어 타 종목이 섞여 와도 오적재 차단.
+    // 응답 stock_code로 재확인 — 빈 값은 corp_code를 신뢰해 유지, 명시적으로 다른 종목만 제외.
+    if (expectedStockCode) {
+        const before = list.length;
+        list = list.filter(it => {
+            const sc = String(it.stock_code || '').trim();
+            return sc === '' || sc === expectedStockCode;
+        });
+        if (list.length !== before) {
+            console.warn(`[dart] ${expectedStockCode}: ${before - list.length}/${before}건 타 종목 응답 제외 — corp_code 필터 파라미터 점검 필요`);
+        }
+    }
+    return list;
 }

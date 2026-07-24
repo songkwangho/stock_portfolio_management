@@ -57,9 +57,27 @@ async function main() {
     let total = 0, i = 0;
     for (const t of targets) {
         i++;
+
+        // 사전 점검(TASK 3): 첫 종목 raw 응답에 여러 종목이 섞이면 corp_code 필터 미동작 →
+        // 186종목 오적재 방지 위해 즉시 중단. (빈 stock_code는 corp_code 신뢰로 무시)
+        if (i === 1) {
+            const probe = await fetchDisclosures(t.corp_code, bgnDe, endDe); // 필터 없이 raw
+            if (probe && probe.length) {
+                const uniq = [...new Set(probe.map(x => String(x.stock_code || '').trim()).filter(Boolean))];
+                if (uniq.length > 1) {
+                    console.error(`[중단] 첫 종목(${t.code}) 응답에 ${uniq.length}개 종목 혼입: ${uniq.slice(0, 8).join(',')} — corp_code 필터 미동작. 오적재 방지 위해 중단.`);
+                    await pool.end();
+                    process.exit(1);
+                }
+                console.log(`[사전점검] 첫 종목 응답 종목 다양성 OK (unique=${uniq.length}: ${uniq.join(',') || '(stock_code 빈값)'})`);
+            }
+            await sleep(120);
+        }
+
         let items;
         try {
-            items = await fetchDisclosures(t.corp_code, bgnDe, endDe);
+            // expectedStockCode 전달 → 응답에 타 종목이 섞여도 방어 필터로 제외.
+            items = await fetchDisclosures(t.corp_code, bgnDe, endDe, t.code);
         } catch (e) {
             console.error(`  [${i}/${targets.length}] ${t.name} (${t.code}) 조회 실패, skip:`, e.message);
             await sleep(120);
