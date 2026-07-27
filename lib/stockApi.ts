@@ -52,6 +52,7 @@ function ensureInterceptors() {
         url.includes('/holdings/correlation') ||
         url.includes('/volatility') ||
         url.includes('/signals') ||
+        url.includes('/dart/') ||
         url.includes('/news');
       if (!silent) {
         try {
@@ -119,6 +120,10 @@ export const stockApi = {
   getFinancials: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/financials`)).data,
   getNews: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/news`)).data,
   getSectorComparison: async (category: string) => (await axios.get(`${API_BASE_URL}/sector/${encodeURIComponent(category)}/compare`)).data,
+  getDartFinancials: async (code: string): Promise<import('@/types/stock').DartFinancialsResult> =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/dart/financials`)).data,
+  getDartDisclosures: async (code: string, months = 3): Promise<import('@/types/stock').DartDisclosuresResult> =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/dart/disclosures`, { params: { months } })).data,
   getChartData: async (code: string, timeframe: 'weekly' | 'monthly') =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/chart/${timeframe}`)).data,
   getHealth: async () => {

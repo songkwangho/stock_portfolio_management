@@ -21,6 +21,7 @@ import portfolioRouter from './domains/portfolio/router.js';
 import analysisRouter from './domains/analysis/router.js';
 import stockRouter from './domains/stock/router.js';
 import systemRouter from './domains/system/router.js';
+import dartRouter from './domains/dart/router.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,6 +108,7 @@ app.use('/api/watchlist', watchlistRouter);
 app.use('/api/holdings', portfolioRouter);
 app.use('/api', systemRouter);   // owns /health, /market/indices (no /stock/* conflict)
 app.use('/api', analysisRouter); // owns /stock/:code/{indicators,volatility,financials,news,chart}, /screener, /sector
+app.use('/api', dartRouter);     // owns /stock/:code/dart/{financials,disclosures} — stockRouter의 /stock/:code보다 먼저
 app.use('/api', stockRouter);    // owns /stock/:code, /stocks, /search, /recommendations
 
 app.listen(PORT, () => {

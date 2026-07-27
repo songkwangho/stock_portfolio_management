@@ -4,10 +4,11 @@ import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import type { StockSummary, StockDetail, Holding, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, StockThemeTag, SignalResult } from '@/types/stock';
+import type { StockSummary, StockDetail, Holding, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, StockThemeTag, SignalResult, DartFinancialsResult, DartDisclosuresResult } from '@/types/stock';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import InvestorChart from '@/components/stock/detail/InvestorChart';
-import FinancialsTable from '@/components/stock/detail/FinancialsTable';
+import DartFinancials from '@/components/stock/detail/DartFinancials';
+import DisclosureList from '@/components/stock/detail/DisclosureList';
 import NewsList from '@/components/stock/detail/NewsList';
 import ConclusionCard from '@/components/stock/detail/ConclusionCard';
 import StatsGrid from '@/components/stock/detail/StatsGrid';
@@ -40,7 +41,9 @@ export default function StockDetailPage({ params }: { params: Promise<{ code: st
         종목 정보를 불러오는 중이에요...
       </div>
     }>
-      <StockDetailContent code={code} />
+      {/* key={code}: 종목→종목 이동 시 리마운트 → 지연 로딩 상태(DART·뉴스·재무·신호 등) 초기화.
+          없으면 이전 종목 데이터가 새 종목 헤더 아래 잠깐 노출됨(App Router가 컴포넌트 재사용). */}
+      <StockDetailContent key={code} code={code} />
     </Suspense>
   );
 }
@@ -82,6 +85,9 @@ function StockDetailContent({ code }: { code: string }) {
   const [news, setNews] = useState<NewsItem[] | null>(null);
   const [financials, setFinancials] = useState<FinancialData | null>(null);
   const [sectorData, setSectorData] = useState<SectorComparison | null>(null);
+  // 4.5a차 — DART 재무제표·공시 (지연 로딩, 데이터 없으면 available:false 폴백)
+  const [dartFin, setDartFin] = useState<DartFinancialsResult | null>(null);
+  const [dartDisc, setDartDisc] = useState<DartDisclosuresResult | null>(null);
   // 3.7차 — 소속 테마 태그 (지연 로딩)
   const [stockThemes, setStockThemes] = useState<StockThemeTag[]>([]);
   // 3.11차 — 관찰형 매수/매도 신호 (지연 로딩)
@@ -112,6 +118,9 @@ function StockDetailContent({ code }: { code: string }) {
         stockApi.getFinancials(stock.code).then(setFinancials).catch(() => {});
         stockApi.getStockThemes(stock.code).then(setStockThemes).catch(() => {});
         stockApi.getSignals(stock.code).then(setSignals).catch(() => {});
+        // DART — 데이터 미적재 시 available:false 폴백. 실패해도 화면 흐름 방해 없음.
+        stockApi.getDartFinancials(stock.code).then(setDartFin).catch(() => {});
+        stockApi.getDartDisclosures(stock.code).then(setDartDisc).catch(() => {});
         const cat = data?.category || stock.category;
         if (cat) {
           stockApi.getSectorComparison(cat).then(setSectorData).catch(() => {});
@@ -282,11 +291,12 @@ function StockDetailContent({ code }: { code: string }) {
         </div>
       )}
 
-      {/* ===== [기업] — 업종비교 → 실적 → 뉴스 → 토스링크(외부, 마지막) ===== */}
+      {/* ===== [기업] — 공시 → 재무제표(DART 우선) → 업종비교 → 뉴스 → 토스링크(외부, 마지막) ===== */}
       {activeTab === 'company' && (
         <div className="space-y-6">
+          <DisclosureList data={dartDisc} />
+          <DartFinancials dart={dartFin} naver={financials} />
           <SectorCompare sectorData={sectorData} currentCode={stock.code} />
-          <FinancialsTable financials={financials} />
           <NewsList news={news} />
           {stockDetail?.tossUrl && (
             <a href={stockDetail.tossUrl} target="_blank" rel="noopener noreferrer"

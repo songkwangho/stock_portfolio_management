@@ -298,3 +298,36 @@ export interface CorrelationResult {
   maxCorrelation?: number;
   avgCorrelation?: number;
 }
+
+// 4.5a차 — DART 재무제표(손익/재무상태/현금흐름). 금액은 원 단위 Number. 데이터 없으면 available:false.
+export interface DartStatementRow {
+  label: string;
+  values: (number | null)[];   // periods 순서(최신 → 과거)와 정렬
+}
+export interface DartFinancialsResult {
+  available: boolean;
+  fsDiv?: 'CFS' | 'OFS';
+  periods?: string[];          // 예: ['2025 3Q', '2025 2Q', ...]
+  statements?: {
+    income: DartStatementRow[];
+    balance: DartStatementRow[];
+    cashflow: DartStatementRow[];
+  };
+}
+
+// 4.5a차 — DART 공시. category는 표시용(호재/악재 아님). rm '정'=정정, '철'=철회.
+export interface DartDisclosureItem {
+  rceptNo: string;
+  reportNm: string;
+  rceptDt: string;             // YYYYMMDD
+  category: string;
+  categoryLabel: string;
+  rm: string | null;
+  isRevised?: boolean;
+  isWithdrawn?: boolean;
+  url: string;
+}
+export interface DartDisclosuresResult {
+  available: boolean;
+  items?: DartDisclosureItem[];
+}
