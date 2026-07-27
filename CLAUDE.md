@@ -417,6 +417,24 @@ PC (md: 이상):
 
 ---
 
+**4.5a차 — DART OpenAPI 연동 ([기업] 탭 강화, 2026-07-27)**
+
+금감원 DART OpenAPI(무료·공식)로 종목상세 [기업] 탭에 재무제표 원문 + 공시를 채움. **AI 없이 순수 파싱.** 성공 응답 구조는 부트 샘플(임시)로 라이브 검증 후 파서 확정 → 임시 코드 제거.
+
+- [x] **[DART-1]** `dart_corp_codes`(고유번호↔종목) / `dart_financials`(canonical 계정) / `dart_disclosures`(rm·corp_cls 포함) 스키마 + migrate 검증
+- [x] **[DART-2]** `server/scrapers/dart.js` — fail-soft(예외 미발생), 키는 env만·로그 노출 0, corpCode ZIP(adm-zip)+정규식 XML, status 000/013/020 분기
+- [x] **[DART-3]** sync 스크립트 3종 — corpcodes / financials(`--dry-run`/`--save-sample`) / disclosures(**적응형 페이징**+노이즈 블랙리스트). 전부 `--dry-run`
+- [x] **[DART-4]** 공시 카테고리 규칙 분류 9종(clarification 포함) + `NOISE_PATTERNS` 블랙리스트(소유상황·대량보유·의결권권유만 제외, 미분류 other는 저장)
+- [x] **[DART-5]** `GET /stock/:code/dart/financials`·`/dart/disclosures` — DB 읽기 전용, 10분 캐시, 데이터 없으면 `available:false`
+- [x] **[DART-6]** [기업] 탭 재배치 — 공시(구분선·무채색 뱃지·정정/철회 표시·DART 원문) → 재무제표(DART 우선, 네이버 폴백, 3섹션 세로) → 업종비교 → 뉴스
+- **검증 파서 보정**(부트 샘플): 재무 계정 부분일치 오매칭(귀속·계속영업 하위라인)→정확일치+배제+PK first-wins / net_income IS·CIS 중복→손익 IS 한정 / 공시 corp_code 필터 정상(삼성 월 778건은 실제 다발) → 적응형+블랙리스트 / rm 꼬리공백 trim
+- **판단**: 재무 증감은 화살표(▲▼)+**무채색**(매출 증가 ≠ 주가 상승, 3.13 방향색 규칙). 기존 네이버 FinancialsTable도 rise색 제거 통일. corp_code 매핑은 부트 샘플에서 005930→00126380 폴백(10만 건 부트 적재 회피)
+- 검증: tsc 0 · build ✓ · npm test 16 · 순수 로직 스모크 53 · 어드버서리얼 리뷰(CONFIRMED 1건 수정)
+- 환경변수: `DART_API_KEY`(Render). 미설정 시 기능 비활성(에러 아님, `available:false`)
+- ⚠️ **운영 대기**: 적재 3종 미실행 상태 — `/dart/*`는 `available:false`(재무는 네이버 폴백, 공시는 "최근 공시가 없어요"). UI 확정 후 1회 적재 예정(운영자 수동)
+
+---
+
 **3.14차 — 벤치마크·상관관계 + 테마 배너 정리 (2026-07-22)**
 
 출처: Vibe-Trading(HKUDS)의 벤치마크 패널·상관관계 히트맵 참고. **AI 없이 기존 데이터(stock_history)만으로 순수 계산**. 포트폴리오 관리의 두 핵심 질문 — "시장 대비 잘하고 있나", "진짜 분산됐나" — 에 답하는 지표 추가.

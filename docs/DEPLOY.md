@@ -8,6 +8,7 @@
 | FRONTEND_URL | https://your-app.vercel.app | CORS 허용 오리진. 반드시 Vercel 프로덕션 URL |
 | PORT | 3001 | Render 기본값 사용 가능 |
 | NODE_ENV | production | |
+| DART_API_KEY | (금감원 OpenDART 인증키) | 4.5a차 — DART 재무제표·공시. **미설정 시 DART 기능 비활성**(에러 아님, `available:false` 폴백). sync 스크립트 실행에도 필요. 코드·로그·커밋에 노출 금지 |
 
 ## Vercel 환경변수 (프론트엔드)
 

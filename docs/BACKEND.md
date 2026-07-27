@@ -68,7 +68,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## DB 스키마 (13개 테이블)
+## DB 스키마 (16개 테이블)
 
 | 테이블 | PK | 주요 컬럼 | 비고 |
 |--------|-----|----------|------|
@@ -85,6 +85,9 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | **stock_themes** | (theme_id, code) | theme_name | 3.7차β 신설. 다대다 테마 매핑. code는 `stocks` FK (ON DELETE CASCADE). 10개 핵심 테마 + 대표 15종목 수동 + category 폴백 자동 시드. 인덱스: code, theme_id |
 | **users** | id (BIGSERIAL) | provider, provider_id, email, nickname, legacy_device_id, created_at | Phase 5 선행. 현재 미사용 (라우트 미연결). `UNIQUE(provider, provider_id)`. 인덱스: legacy_device_id |
 | **user_subscriptions** | id (BIGSERIAL) | user_id FK, status, plan, expires_at, payment_id UNIQUE, created_at | Phase 5 선행. Toss Payments 웹훅 멱등성은 payment_id UNIQUE로 확보 |
+| **dart_corp_codes** | corp_code | stock_code, corp_name, modify_date | 4.5a차 신설. DART 8자리 고유번호 ↔ 종목 6자리 매핑(재무·공시 조회 선행). `stocks`와 FK 없음. 인덱스: stock_code |
+| **dart_financials** | code+year+quarter+fs_div+account_id | account_nm, amount (NUMERIC 20,0), prev_amount | 4.5a차 신설. DART 재무제표. fs_div CFS(연결)/OFS(별도). account_id는 canonical(revenue/operating_income/…)로 저장(표준코드 미사용 PK 충돌 회피). 인덱스: (code, year DESC) |
+| **dart_disclosures** | rcept_no | code, corp_name, report_nm, rcept_dt, flr_nm, category, rm, corp_cls | 4.5a차 신설. DART 공시. category 규칙 분류(표시용). rm=비고(정=정정/철=철회/유·코=시장). 인덱스: (code, rcept_dt DESC) |
 
 ### stocks_directory 동기화 파이프라인
 
@@ -119,7 +122,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (32개)
+## API 엔드포인트 (34개)
 
 ### 종목 (stock — 8개)
 
@@ -167,6 +170,16 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | GET | `/api/stock/:code/chart/:tf` | 주봉/월봉 OHLCV |
 | GET | `/api/screener` | 조건 필터 (perMin/perMax/roeMin 등) OR `?preset=` 분기 (3.7차β: `breakout_52w`/`foreign_buy`/`fund_buy`/`neglected`, 3.8차: `graham`/`momentum_3m`) |
 | GET | `/api/sector/:cat/compare` | 섹터 비교 (averages + medians) |
+
+### DART (dart — 2개, DB 읽기 전용)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| **GET** | **`/api/stock/:code/dart/financials`** | 4.5a차 — `dart_financials` 조회. `{available, fsDiv(CFS>OFS), periods:['2025 3Q',…최근4], statements:{income,balance,cashflow}[]}`. 데이터 없으면 `available:false`(프론트는 네이버 폴백). 캐시 10분 |
+| **GET** | **`/api/stock/:code/dart/disclosures?months=3`** | 4.5a차 — `dart_disclosures` 조회. `{available, items:[{rceptNo,reportNm,rceptDt,category,categoryLabel,rm,isRevised,isWithdrawn,url}]}`. 공시 없음도 `available:true`+`items:[]`(에러 아님). 원문 url=`dart.fss.or.kr/dsaf001/main.do?rcpNo=`. 캐시 10분 |
+
+> DART 라우터는 stockRouter(`/stock/:code`)보다 먼저 마운트 — `/stock/:code/dart/*` 선점.
+> 라이브 DART 호출은 sync 스크립트에서만. 엔드포인트는 적재된 DB만 읽는다.
 
 ### 알림/관심종목/시스템
 
@@ -309,5 +322,8 @@ app.listen(PORT);
 | `scripts/sync-directory.js` | KRX 상장법인목록 → `stocks_directory` 수동 동기화 |
 | `scripts/expand-stocks.js` | 3.7차 감마 — TARGET_CODES(~86) 중 미등록 코드만 네이버 크롤링으로 `stocks`에 추가 (배치 3 × 3초 간격). 테마 매핑은 다음 서버 재시작 시 `CATEGORY_TO_THEMES` 폴백으로 자동 처리 |
 | `scripts/sync-index-history.js` | 3.14차 — KOSPI/KOSDAQ 지수 일봉 → `market_index_history` 적재 (네이버 siseJson, ON CONFLICT 멱등). 벤치마크(초과수익·IR) 데이터 공급. 미실행 시 `/holdings/benchmark`는 `available:false` |
+| `scripts/sync-dart-corpcodes.js` | 4.5a차 — DART 전 상장사 corp_code↔stock_code 매핑 적재(~10만 건, 월 1회). `DART_API_KEY` 필요. `--dry-run` 지원. 재무·공시 선행 |
+| `scripts/sync-dart-financials.js` | 4.5a차 — 186종목 재무제표(최근 N개년×4보고서, CFS→OFS 폴백) → `dart_financials`. `--dry-run`/`--save-sample`(원본 구조 확인). canonical 계정만 저장, PK first-wins 디둡 |
+| `scripts/sync-dart-disclosures.js` | 4.5a차 — 186종목 최근 공시 → `dart_disclosures`. **적응형 페이징**(비노이즈가 target(20) 도달까지, maxPages 3) + 노이즈 블랙리스트(소유상황·대량보유·의결권권유 제외). 첫 종목 종목혼입 사전점검. `--dry-run`/`--months`/`--target`/`--max-pages` |
 
 실행 공통: `DATABASE_URL=postgres://... node scripts/<name>.js`
