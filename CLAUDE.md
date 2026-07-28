@@ -417,6 +417,19 @@ PC (md: 이상):
 
 ---
 
+**4.5c차 — 종합 해석 (초보자용 데이터 풀이, 2026-07-28)**
+
+데이터·지표를 보여주기만 하던 걸 초보자 언어로 풀이 + 상충 짚기. **투자 권유 아님** — 사실+정도표현(싼/비싼/높은/낮은 편)까지만, 판단 단어(좋다/나쁘다/위험/사라/팔라) 금지. 종합은 상충 서술 + 판단 유보. 기존 계산(scoringBreakdown·indicators·sectorData·DART 재무)만 재사용, 신규 계산·백엔드 변경 없음.
+
+- [x] **[INT-1]** `lib/stockDetail/interpret.ts` — 순수 함수: 밸류(PER vs 업종중앙값)/재무(부채비율)/기술(SMA 관찰형)/수급(외국인·기관 연속 순매수·순매도 스트릭)/업종위치 + `synthesize`(상충/쏠림/부족 분기, 결론 유보) + `consecutiveStreak`
+- [x] **[INT-2]** `tests/stockDetail/interpret.test.ts` — 경계값(PER=중앙값, 부채비율 100/200) + available:false + **금지어 전수 스윕**(광범위 입력 출력에 사라/팔라/좋다/나쁘다/위험 미포함, 관찰형 "팔고 있어요"는 허용). 16 → 49 테스트
+- [x] **[INT-3]** [요약] `InterpretationPanel` — 결론 카드와 종합점수 사이. "현재 이렇게 보고 있어요" 항목별 풀이 + 종합 문단 + 면책 각주. 역할 분리(결론=한 줄/해석=근거/점수=수치)
+- [x] **[INT-4]** [기업] 재무제표·업종비교 아래 한 줄 해석(interpretFinancial·interpretSectorPosition)
+- **판단**: tone(positive/caution)은 synthesize 상충 집계용 논리 구분일 뿐 **UI는 무채색**(항목에 방향색 칠하면 "긍정=사라" 오독 → 3.13 규칙). 수급 스트릭은 scoringBreakdown이 매수만 카운트해 부족 → `investorData` net값에서 부호 있는 스트릭 계산
+- 검증: tsc 0 · build ✓ · npm test 49 · 금지어 grep(출력) 0
+
+---
+
 **4.5a차 — DART OpenAPI 연동 ([기업] 탭 강화, 2026-07-27)**
 
 금감원 DART OpenAPI(무료·공식)로 종목상세 [기업] 탭에 재무제표 원문 + 공시를 채움. **AI 없이 순수 파싱.** 성공 응답 구조는 부트 샘플(임시)로 라이브 검증 후 파서 확정 → 임시 코드 제거.
