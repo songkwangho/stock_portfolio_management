@@ -9,7 +9,9 @@ import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomShe
 import InvestorChart from '@/components/stock/detail/InvestorChart';
 import DartFinancials from '@/components/stock/detail/DartFinancials';
 import DisclosureList from '@/components/stock/detail/DisclosureList';
+import InterpretationPanel from '@/components/stock/detail/InterpretationPanel';
 import NewsList from '@/components/stock/detail/NewsList';
+import { interpretValuation, interpretFinancial, interpretTechnical, interpretFlow, interpretSectorPosition, consecutiveStreak } from '@/lib/stockDetail/interpret';
 import ConclusionCard from '@/components/stock/detail/ConclusionCard';
 import StatsGrid from '@/components/stock/detail/StatsGrid';
 import SignalPanel from '@/components/stock/detail/SignalPanel';
@@ -183,6 +185,20 @@ function StockDetailContent({ code }: { code: string }) {
     return Math.max(10, Math.min(99, score));
   };
 
+  // 4.5c차 — 초보자 해석. 기존 계산값(per/pbr/roe·sector 중앙값·sma·투자자 net·DART 재무상태표)만
+  // 재사용, 신규 계산 없음. 순수 함수(interpret.ts)로 위임. 데이터 없는 항목은 available:false.
+  const balRows = dartFin?.available ? dartFin.statements?.balance : null;
+  const balVal = (label: string) => balRows?.find(r => r.label === label)?.values?.[0] ?? null;
+  const inv = stockDetail?.investorData || [];
+  const interps = [
+    interpretValuation(stockDetail?.per, stockDetail?.pbr, stockDetail?.roe, sectorData?.medians?.per, sectorData?.medians?.pbr),
+    interpretFinancial(balVal('자산총계'), balVal('부채총계'), balVal('자본총계')),
+    interpretTechnical(latestPrice, latest.sma5, latest.sma20),
+    interpretFlow(consecutiveStreak(inv.map(d => d.foreign)), consecutiveStreak(inv.map(d => d.institution))),
+  ];
+  const financialInterp = interps[1];
+  const sectorPos = interpretSectorPosition(stockDetail?.per, stockDetail?.roe, sectorData?.medians?.per, sectorData?.medians?.roe);
+
   return (
     <div className="animate-in fade-in slide-in-from-left-4 duration-500 max-w-6xl mx-auto">
       <button onClick={onBack} className="flex items-center space-x-2 text-muted hover:text-ink transition-colors mb-4 px-4 py-2.5 min-h-[44px] -ml-4">
@@ -236,6 +252,8 @@ function StockDetailContent({ code }: { code: string }) {
       {activeTab === 'summary' && (
         <div className="space-y-4">
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
+          {/* 해석 패널 — 결론 카드(한 줄 결론)와 종합점수(수치) 사이. 왜 그런지 근거를 초보자 언어로. */}
+          <InterpretationPanel interps={interps} />
           {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
           {/* items-stretch: 좌우 컬럼 같은 높이. 우측 마지막 카드(Signal Score) flex-1로 슬랙 흡수 → 하단 정렬 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
@@ -295,8 +313,18 @@ function StockDetailContent({ code }: { code: string }) {
       {activeTab === 'company' && (
         <div className="space-y-6">
           <DisclosureList data={dartDisc} />
-          <DartFinancials dart={dartFin} naver={financials} />
-          <SectorCompare sectorData={sectorData} currentCode={stock.code} />
+          <div>
+            <DartFinancials dart={dartFin} naver={financials} />
+            {financialInterp.available && (
+              <p className="text-xs text-muted leading-relaxed break-keep mt-2 px-1">{financialInterp.text}</p>
+            )}
+          </div>
+          <div>
+            <SectorCompare sectorData={sectorData} currentCode={stock.code} />
+            {sectorPos.available && (
+              <p className="text-xs text-muted leading-relaxed break-keep mt-2 px-1">{sectorPos.text}</p>
+            )}
+          </div>
           <NewsList news={news} />
           {stockDetail?.tossUrl && (
             <a href={stockDetail.tossUrl} target="_blank" rel="noopener noreferrer"
