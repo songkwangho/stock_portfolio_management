@@ -7,9 +7,9 @@
 
 ## 개요
 
-- **프레임워크**: Next.js 15 (App Router)
+- **프레임워크**: Next.js 16 (App Router, Turbopack)
 - **언어**: TypeScript
-- **스타일**: Tailwind CSS v4 (다크 테마, slate + blue)
+- **스타일**: Tailwind CSS v4 — **라이트 테마 (paper/surface/ink) + 한국 증시 색** (3.13차 리디자인). 상승/수익/긍정=rise(빨강), 하락/손실/부정=fall(파랑), 경고=caution(amber). 방향색은 가격·수익 방향에만, 게이지·바·범주는 무채색. 토큰 SSOT는 `docs/DESIGN.md`, 규칙은 `docs/FRONTEND_UX.md`
 - **차트**: Recharts v3 (`'use client'`) + lightweight-charts (캔들, `dynamic ssr:false`)
 - **상태관리**: Zustand v5 (`'use client'` 내부에서만)
 - **HTTP**: Axios (`NEXT_PUBLIC_API_BASE_URL`)
@@ -112,17 +112,22 @@ interface ToastActions {
 ### /dashboard (CSR)
 
 **컴포넌트**: `app/dashboard/page.tsx` → `DashboardClient` ('use client')
-**데이터**: `usePortfolioStore`, `stockApi.getHoldingsHistory()`, marketIndices 폴링 (300초)
+**데이터**: `usePortfolioStore`, `stockApi.getHoldingsHistory()`, `getFearGreed`/`getPortfolioSharpe`/`getBenchmark`, marketIndices 폴링 (300초)
 
-**핵심 UI**:
-- 통계 카드 4개 (총자산, 손익, 종목수, 수익률 + KOSPI ℹ️ 툴팁)
-- `PortfolioChart` ('use client') — ComposedChart (평가금액 실선 + 투자원금 파선)
-  - `formatKoreanWon()` Y축 (₩N만 / ₩N.N억)
-  - 손실 구간: 라인 빨간색 (#ef4444)
-  - 힌트: "💡 평가금액(실선)이 투자원금(파선) 위에 있으면 수익 중"
+**핵심 UI (3.13 히어로 재편)**:
+- **히어로**: 80px 수익률 2열 (수익=text-rise / 손실=text-fall). 총자산·손익 요약
+- **요약 라인** (`?` 토글 3종, 실패 시 항목만 미표시):
+  - **시장온도** (3.8차 Fear & Greed) — 점수+라벨, ≤40 fall / ≥60 rise / 중립 무채색
+  - **샤프** (3.8차) — 위험 대비 수익, >0 rise / ≤0 fall
+  - **KOSPI 대비 N%p** (3.14차 벤치마크) — 초과수익 양수 rise / 음수 fall + 툴팁(포트 vs KOSPI 수익률 + 정보비율 설명). `benchmark.available=false`면 미표시
+- **오늘 확인할 것** (3.9 UX-C + 3.11 SIG-6) — 매도[주의 필요]/관망 보유 종목 + **관찰 신호 주의 우세**(caution>0 && caution≥positive, 보유 5개 이하만 조회) + 미읽 알림 집계. 0건+보유있음 시 "모두 양호"
+- `PortfolioChart` ('use client') — Area(평가금액 실선) + Line(투자원금 파선)
+  - `formatKoreanWon()` Y축 (₩N만 / ₩N.N억), 두 라인 모두 들어가는 범위로 Y축 자동 계산
+  - **손실=fall 파랑(#1B5FD0) / 수익=rise 빨강(#D91C1C)** (3.13 한국 증시 색)
+  - 힌트: "평가금액(실선)이 투자원금(파선) 위면 수익 중, 아래면 손실 중"
 - `AssetPieChart` ('use client') — holdings 1개이면 단일 카드 + amber 분산 권유
 - 보유종목 리스트 (읽기전용, 평단→현재가 표시)
-- 빈 포트폴리오: CTA 카드 (onboarding_done 이후만 표시)
+- 빈 포트폴리오: CTA 카드 (온보딩 무관 노출, 3.9 MOB-1로 4카드 — 테마 탐색 추가)
 
 **ErrorBanner**: `historyError` 발생 시 `autoRetryMs={3000}`
 
@@ -140,6 +145,8 @@ interface ToastActions {
   - 집중도 >50% → yellow 테두리 + 분산 권유
   - 수익률 6구간 메시지 — **`holding_opinion === '매도'`일 땐 숨김** (3.7차 UX-INIT 6-3: [주의 필요] 뱃지·설명과 중복 경고 방지)
   - 첫 종목 가이드 카드 (1회, onboarding_first_stock_guided, `holdings.length === 1` 조건)
+  - **분산 상태 점검 (3.14차 CORR-2)** — 비중 경고(weight>50)와 **별개**. 보유 2종목 이상·`getCorrelation().available`일 때만. 최고 상관 ≥0.7 caution / 0.4~0.7 정보성(무채색) / <0.4 "잘 분산돼 있어요". **상관계수는 방향 아닌 관계 강도 → rise/fall 금지, caution/muted만** (3.13 색 규칙)
+  - 인라인 행동 가이드 스텝 (3.9 UX-B) — 매도/관망 종목에 노출, 첫 스텝은 종목 상세 진입
 - 관심종목 탭: `WatchlistContent` 컴포넌트
 
 **holding_opinion 표시 라벨**:
@@ -150,12 +157,13 @@ interface ToastActions {
 '보유'     → '[보유]'
 ```
 
-### /recommendations (ISR 24h + CSR fallback)
+### /recommendations (CSR — ISR은 Sprint 3 예정)
 
-**렌더링**: Server Component (ISR) → 초기 데이터 props → `RecommendationsClient` ('use client')
+**렌더링**: `'use client'` (현재 전 페이지 CSR. 로드맵 M3에서 ISR 전환)
 
 **핵심 UI**:
-- 면책 고지 상단
+- 면책 고지 상단 + "이 종목들은 왜 추천됐나요?" 안내 배너 (3.9 UX-D2)
+- **테마 탐색 진입 배너** (`md:hidden`) — 3.7β THEME-5 + 3.14차: 사이드바(md+)에 "테마 탐색"이 있어 데스크톱에선 중복이라 숨김, 모바일만 `/themes` 진입로로 유지
 - 카테고리 탭 필터
 - RecommendedStockCard 그리드
 - 빈 상태: KST 시간 기반 3분기 메시지
@@ -165,49 +173,43 @@ interface ToastActions {
 - algorithm 추천: score=50 placeholder → score 뱃지 숨김
 - manual 추천 평균 점수만 통계 표시
 
-### /stock/[code] (CSR — 3.12차 리팩터링 구조)
+### /stock/[code] (CSR — 3.13차 3탭 구조)
 
-전부 CSR(`'use client'`). `Suspense`(useSearchParams) + `use(params)`. ISR/lightweight-charts는 미적용(로드맵 상 후속).
+전부 CSR(`'use client'`). `Suspense`(useSearchParams) + `use(params)` + `key={code}` 리마운트(탐색 시 stale 방지). ISR/lightweight-charts는 미적용(로드맵 상 후속).
 
-**구조 (3.12차 — 1444줄 → 셸 254줄 + 컴포넌트 13 + lib 3)**:
-```
-app/stock/[code]/page.tsx          # 셸: fetch 오케스트레이션(Phase1 핵심→Phase2 지연) + 일봉 점수 파생 + 레이아웃 조립
-components/stock/detail/
-├── DetailHeader        # 카테고리/삭제/이름/테마태그/현재가·추세·수익률/보유수정폼 (지역: editMode/editForm)
-├── ConclusionCard      # 결론 카드 (generateStockSummary/generateActionGuide)
-├── StatsGrid           # "한눈에 보기" 9지표 + 52주 게이지 (stockDetail.history 자체 계산 — S0 결합 해소)
-├── SignalPanel         # 관찰형 신호 요약 + stale 경고(P2)
-├── ChartSection        # 주가 라인+SMA+크로스 마커 + 거래량 바 + 흐름 해석 (지역: chartTimeframe/extraChartData)
-├── MetricsGrid         # PER/PBR/ROE/목표가/PEG + 섹터 게이지 (onHelp 콜백)
-├── IndicatorPanel      # RSI/MACD/볼린저 + 변동성 (onHelp 콜백, 기본 펼침)
-├── InvestorChart       # 투자자 매매동향 (아코디언, 지역: showInvestor)
-├── FinancialsTable     # 분기 실적 (아코디언, 지역: showFinancials)
-├── SectorCompare       # 업종 비교 백분위+테이블 (아코디언, 지역: showSector + scroll ref)
-├── NewsList            # 최신 뉴스
-├── RightSidebar        # 종합의견/스코어링/적정가/신호점수/새로고침 + PortfolioAddForm 포함
-└── PortfolioAddForm    # 매수 폼 (지역: addForm/adding). ⚠️ id="portfolio-add-form" DOM 계약(모바일 스크롤 버튼)
-lib/stockDetail/{summary,format,helpTexts}.ts   # 순수 함수 + 정적 맵
-```
+**3탭** (`TabKey = 'summary' | 'chart' | 'company'`, 3.13차 VIS-6 — 사이드바 폐지). 데이터는 셸이 1회 fetch, 탭 전환 시 재요청 없음:
 
-**props 인터페이스 요약**:
-- `DetailHeader`: stock, stockDetail, isHolding, holdingMatch, stockThemes, trend, latestPrice, profitRate, onDeleteHolding, onDeleteStock, onUpdate, addToast, onBack
+- **[요약]** — 결론 → 해석 → 점수/신호 2열 → (미보유) 적정가·추가폼
+  - `ConclusionCard` (한 줄 결론 + 3단계 행동 가이드)
+  - **`InterpretationPanel`** (4.5c차) — 결론↔점수 사이. "현재 이렇게 보고 있어요" 항목별 초보자 풀이 + 종합(상충/판단 유보) + 면책. **무채색**(tone 색 미사용)
+  - 2열: `OpinionScorePanel`(종합 10점) / [`SignalPanel` + Signal Score(0~100 보조지표)]
+  - (미보유) AI 추천 적정가 + `PortfolioAddForm`
+- **[차트·지표]** — `ChartSection`(주가+SMA+크로스마커+거래량+흐름해석) → `IndicatorPanel`(RSI/MACD/볼린저+변동성) → `StatsGrid`(한눈에 9지표+52주 게이지) → `MetricsGrid`(PER/PBR/ROE/목표가/PEG+섹터게이지) → `InvestorChart`(투자자 매매동향) → `AnalysisDetail`
+- **[기업]** — `DisclosureList`(DART 공시) → `DartFinancials`(DART 우선→네이버 폴백) + 재무 한 줄 해석 → `SectorCompare` + 업종위치 한 줄 해석 → `NewsList` → 토스증권 외부 링크(마지막)
+
+**컴포넌트 (`components/stock/detail/` 17개)**: DetailHeader(탭 위, 카테고리/삭제/이름/테마태그/현재가·추세·수익률/보유수정폼), ConclusionCard, InterpretationPanel, OpinionScorePanel, SignalPanel, PortfolioAddForm, ChartSection, IndicatorPanel, StatsGrid, MetricsGrid, InvestorChart, AnalysisDetail, DisclosureList, DartFinancials, FinancialsTable(네이버 폴백), SectorCompare, NewsList
+**lib**: `lib/stockDetail/{summary,format,helpTexts,interpret}.ts` (순수 함수 + 정적 맵. interpret은 4.5c차)
+
+**주요 props**:
 - `ConclusionCard`: stockDetail, isHolding, holdingMatch
-- `StatsGrid`: stockDetail
+- `InterpretationPanel`: interps(`Interpretation[]`) — available 항목만 렌더, 전부 없으면 null
 - `SignalPanel`: signals(SignalResult|null) — stale면 amber, 신호 있으면 패널, 아니면 null
 - `ChartSection`: code, stockDetail, signals(markers 렌더)
-- `MetricsGrid`: stockDetail, category, sectorData, onHelp
-- `IndicatorPanel`: indicators, volatility, onHelp
-- `InvestorChart`: stockDetail, onHelp / `FinancialsTable`: financials / `SectorCompare`: sectorData, currentCode / `NewsList`: news
-- `RightSidebar`: stock, stockDetail, isHolding, signalScore, refreshing, onRefresh, onAdd, holdingsEmpty, onAddSuccess
-- `PortfolioAddForm`: code, name, defaultAvgPrice, holdingsEmpty, onAdd, onSuccess
+- `MetricsGrid`: stockDetail, category, sectorData, onHelp / `IndicatorPanel`: indicators, volatility, onHelp
+- `DisclosureList`: data(DartDisclosuresResult|null) / `DartFinancials`: dart(DartFinancialsResult|null), naver(financials)
+- `SectorCompare`: sectorData, currentCode / `NewsList`: news / `PortfolioAddForm`: code, name, defaultAvgPrice, holdingsEmpty, onAdd, onSuccess
 
-**설계 원칙**: helpTerm은 셸 소유 + `onHelp(t)` 콜백(Context 미도입). refresh fetch는 셸 소유(setter 미하향). 헤더 가격/추세·사이드바 점수·StatsGrid는 일봉(stockDetail.history) 기준 계산(chartTimeframe 무관). 삭제는 보유 여부에 따라 `deleteHolding`/`deleteStock` store 액션.
+**해석 계산 (셸)**: `interps` 배열은 기존 값 재사용으로 조립 — per/pbr/roe + `sectorData.medians` → `interpretValuation`, dartFin balance → `interpretFinancial`, price/sma → `interpretTechnical`, `investorData` net값 → `consecutiveStreak` → `interpretFlow`. 신규 계산·백엔드 변경 없음.
 
-### /stocks (ISR 24h)
+**설계 원칙**: helpTerm은 셸 소유 + `onHelp(t)` 콜백(Context 미도입). DART 재무/공시는 지연(Phase2) fetch, 실패 시 available:false로 조용히 폴백. refresh fetch는 셸 소유. 헤더 가격/추세·점수·StatsGrid는 일봉(stockDetail.history) 기준 계산(chartTimeframe 무관). 삭제는 보유 여부에 따라 `deleteHolding`/`deleteStock` store 액션. `id="portfolio-add-form"` DOM 계약(모바일 스크롤 버튼) 보존.
 
-**렌더링**: Server Component (ISR) → `StocksClient` ('use client')
+### /stocks (CSR — ISR은 Sprint 3 예정)
+
+**렌더링**: `'use client'` (로드맵 M3에서 ISR 전환)
 
 **핵심 UI**:
+- 헤더 "N개 종목 · M개 섹터" 동적 표시 (3.7차 UI-COUNT — 하드코딩 제거)
+- 학습 모드 배너 (`onboarding_mode === 'learn'`, 3.9 UX-G1) — 3단계 기초 가이드
 - 8개 섹터별 종목 그리드
 - 등락률 뱃지 (▲/▼, `['0','0.00','+0.00','-0.00']` placeholder 숨김)
 - 기준 안내: "※ ▲/▼ 등락률은 전일 종가 대비"
@@ -268,8 +270,8 @@ lib/stockDetail/{summary,format,helpTexts}.ts   # 순수 함수 + 정적 맵
 ### HealthGate
 
 서버 연결 확인 후 children 렌더. 3상태: checking / ok / timeout.
-- timeout: 15초 (`AbortController`)
-- timeout 메시지: "서버가 깨어나는 중이에요. 약 30초 후 다시 시도해 주세요."
+- timeout: **25초** (`AbortController`) — Render cold start(첫 요청 30~50초, 재시도 1회 포함) 대응
+- 안내: 처음 접속 시 "30~50초 소요될 수 있어요" + "커피 한 모금 ☕" 문구
 - `/api/health` 응답의 `lastSync` 검사 → null이거나 24h+ 경과 시 amber 서브 배너
 
 ### ScoringBreakdownPanel
@@ -282,11 +284,12 @@ lib/stockDetail/{summary,format,helpTexts}.ts   # 순수 함수 + 정적 맵
 
 디바운스 250ms. 드롭다운에 market_opinion 뱃지. resetKey로 초기화.
 
-### RecommendedStockCard
+### RecommendedStockCard (3.9차 UX-D 결론형 재작성)
 
-- manual 추천만 score 뱃지 (`?` 툴팁 포함)
-- "적정가 대비 현재가 괴리 +N%" 표현 (상승여력 X)
-- source accordion (manual: 전문가 선정 / algorithm: 알고리즘)
+- **왜 지금?** (이유) + **가격 차이** 라벨드 섹션 — "적정가 대비 현재가 괴리 +N%" (상승여력 X)
+- reason 80자 초과 시 "더 보기" 토글 (`reasonExpanded`)
+- 버튼 2개: **상세 분석 보기** + **관심 ♡** — `useWatchlistStore.addToWatchlist` + 추가 토스트에 "알림 설정 →" 액션
+- manual 추천만 score 뱃지 (`?` 툴팁) / source accordion (manual: 전문가 선정 / algorithm: 알고리즘)
 - 하단 면책 문구
 
 ### WatchlistContent
@@ -307,7 +310,8 @@ interface ErrorBannerProps {
 
 ### HelpBottomSheet
 
-8개 용어: PER / PBR / ROE / RSI / MACD / 볼린저밴드 / 수급 / SMA
+9개 용어: PER / PBR / ROE / PEG / RSI / MACD / 볼린저밴드 / 수급 / SMA
+- PER/PBR/ROE/PEG에는 `implication`("그래서 어떻게 보면 되나요?") 시사점 1줄 (3.9 UX-G2)
 모바일: 하단. PC: 중앙. 외부 클릭으로 닫기.
 
 ### StatCard
@@ -362,7 +366,13 @@ interface StatCardProps {
 | getStockThemes(code) | GET /stock/{code}/themes (3.7차β) |
 | getFearGreed() | GET /market/fear-greed (3.8차 시장 온도) |
 | getPortfolioSharpe() | GET /holdings/sharpe (3.8차 위험대비수익) |
+| getBenchmark() | GET /holdings/benchmark (3.14차 KOSPI 대비 초과수익·IR) |
+| getCorrelation() | GET /holdings/correlation (3.14차 보유 상관관계) |
+| getDartFinancials(code) | GET /stock/{code}/dart/financials (4.5a차 DART 재무제표, available:false 폴백) |
+| getDartDisclosures(code) | GET /stock/{code}/dart/disclosures (4.5a차 DART 공시) |
 | getHealth() | GET /health |
+
+> 보조 폴링 실패 토스트를 억제하는 **silent 목록**에 `/market/indices`·`/volatility`·`/news`·`/signals`·`/holdings/benchmark`·`/holdings/correlation`·`/dart/` 포함 (인터셉터에서 에러 토스트 스킵).
 
 > **비중(weight) 처리 (3.12.1 해소)**: 비중은 **서버가 매수가·수량으로 자동 계산**한다 — `recalcWeights`([server/domains/portfolio/service.js](../server/domains/portfolio/service.js))가 `weight = round(cost / totalCost × 100)`을 add/update/delete마다 재계산. `POST /holdings`는 body의 weight를 읽지 않으므로 `addHolding`이 `weight:0`을 보내도 무해(즉시 덮어씀). `GET /holdings`의 `weight` → store `fetchHoldings`가 `Holding.value`로 매핑 → `portfolio/page.tsx` 집중도 경고(`value > 50`)가 자동 계산값으로 동작. 3.12.1에서 **매수/수정 폼의 수동 "총 자산의 몇 %" 입력 필드를 제거**(사용자 외부 자산까지 포함한 값이라 앱의 원가 기준 비중과 충돌하는 거짓 UI였음). 이제 폼은 매수가·수량만 받고 비중은 "자동 계산" 안내.
 
@@ -387,6 +397,13 @@ type HoldingOpinion = '보유' | '추가매수' | '관망' | '매도';
 | TechnicalIndicators | rsi, macd, bollinger, summary, rsi_available?, macd_available?, bollinger_available?, history_days? |
 | Alert | id, code, name, type, source? ('holding'/'watchlist'), message, read, created_at |
 | WatchlistItem | code, name, category, price, market_opinion, added_at |
+| StockSignal / SignalResult | 3.11차 관찰 신호 — signals[], consensus, asOf, stale?(3.12 P2), markers?(3.12 S5 크로스) |
+| BenchmarkResult | 3.14차 — available, portfolioReturn, benchmarkReturn, excessReturn, informationRatio, trackingError |
+| CorrelationResult | 3.14차 — available, reason?('empty'/'single'/'insufficient'/'error'), pairs[], maxCorrelation, avgCorrelation |
+| DartFinancialsResult / DartStatementRow | 4.5a차 — available, fsDiv(CFS/OFS), periods[], statements{income,balance,cashflow}. 금액 원 단위 Number |
+| DartDisclosuresResult / DartDisclosureItem | 4.5a차 — available, items[{rceptNo,reportNm,rceptDt,category,categoryLabel,rm,isRevised,isWithdrawn,url}]. category는 표시용(호재/악재 아님) |
+
+> 4.5c차 해석 타입 `Interpretation`(`{key,label,text,tone,available}`)은 `types/stock.ts`가 아니라 순수 함수 모듈 `lib/stockDetail/interpret.ts`에 정의. tone은 상충 집계용 논리 구분일 뿐 UI는 무채색.
 
 ---
 
@@ -412,11 +429,12 @@ function getDataFreshnessShort(lastUpdated: string): string
 
 ---
 
-## 온보딩 localStorage 키 (4개)
+## 온보딩 localStorage 키 (5개)
 
 | 키 | 역할 |
 |----|------|
-| `disclaimer_accepted` | 면책 모달 확인 |
+| `disclaimer_accepted` | 면책 모달 확인 (없으면 DisclaimerModal Step 0부터) |
 | `onboarding_done` | 온보딩 스텝 완료 |
 | `onboarding_first_stock_guided` | 첫 종목 가이드 카드 노출 완료 |
 | `onboarding_alerts_explained` | 알림 패널 첫 진입 안내 완료 |
+| `onboarding_mode` | 온보딩 3갈래 "주식 기초부터" 선택 시 `'learn'` → `/stocks` 학습 배너 노출 (3.9 UX-E2/G1) |
