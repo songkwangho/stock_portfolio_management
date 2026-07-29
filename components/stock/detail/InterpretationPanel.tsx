@@ -23,7 +23,9 @@ export default function InterpretationPanel({ interps }: { interps: Interpretati
           </div>
         ))}
       </div>
-      <div className="border-t border-line mt-3 pt-3">
+      {/* 종합 블록 — surface(#FFF) 위에 paper(#FAFAF8) inset을 깔아 명도만으로 "근거 → 종합" 위계.
+          색(tone/방향색) 미사용 (3.13: 방향색은 가격 방향에만). */}
+      <div className="mt-3 bg-paper rounded-lg px-3 py-2">
         <p className="text-sm text-ink leading-relaxed break-keep">{synthesize(interps)}</p>
       </div>
       <p className="text-xs text-faint mt-2 break-keep">
