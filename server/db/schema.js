@@ -225,6 +225,24 @@ export async function initSchema(pool) {
     `);
     await pool.query('CREATE INDEX IF NOT EXISTS idx_dart_disc_code_dt ON dart_disclosures(code, rcept_dt DESC)');
 
+    // 4.5b차 — 거래일지(행동편향 진단)용 정규화 거래. 원본 CSV·PII(계좌번호·예수금·성명)는 저장 안 함.
+    // 파싱 즉시 폐기하고 아래 화이트리스트 컬럼만 적재. device_id 익명 모델. DELETE /api/journal로 전량 삭제.
+    // price는 NUMERIC → pg가 string 반환 → 읽을 때 Number() 캐스팅 필수.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS journal_trades (
+            id         BIGSERIAL PRIMARY KEY,
+            device_id  TEXT NOT NULL,
+            code       TEXT NOT NULL,
+            side       TEXT NOT NULL CHECK (side IN ('buy','sell')),
+            quantity   INTEGER NOT NULL,
+            price      NUMERIC(14,2) NOT NULL,
+            traded_at  DATE NOT NULL,
+            source     TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_journal_trades_device ON journal_trades(device_id, code, traded_at)');
+
     // Indices
     await pool.query('CREATE INDEX IF NOT EXISTS idx_investor_history_code_date ON investor_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_history_code_date ON stock_history(code, date)');
