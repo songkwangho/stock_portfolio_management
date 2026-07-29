@@ -629,7 +629,7 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 ### Phase 6 — 데이터 소스 안정화
 - [x] **상장 종목 디렉토리(명↔코드 매핑)**: 3.6차로 선행 이관 완료 (`stocks_directory` + KRX 파싱 + 서버 시작 시 1회 자동 동기화)
 - [ ] **디렉토리 자동 스케줄링 (일 1회)**: 3.6차에서는 '비어 있을 때만' 조건이라 장기적으로 갱신 불가. `setupScheduler`에 일 1회 cron(예: 장마감 후 16:00 KST) 편입 + DIR-5(POST /stocks `q` 확장) + DIR-6(상장폐지 감지) 마무리
-- [ ] **가격·거래량·투자자 매매동향**: KRX OpenAPI 전환 — CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계
+- [ ] **가격·거래량·투자자 매매동향**: KRX OpenAPI 전환 — CSV 응답 + 거래소 접두어 파싱 어댑터 레이어 선행 설계. **레퍼런스: korean-stock-search** (아래 §외부 스킬 자산화 판정 — 네이버 스크래핑 단일소스 리스크 대응책)
 - [ ] **PER/PBR/목표가**: KRX 월별 공시라 실시간 불가 → **네이버 스크래핑 유지** (Phase 6 범위 축소)
 - [ ] 재무지표: FinanceDataReader(Python) — Node `child_process` 또는 별도 Python 마이크로서비스로 격리
 - **목표**: 스크래핑 의존도 축소 (완전 제거 불가)
@@ -656,6 +656,50 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 7. **Turbopack**: Windows+Node24 webpack 이슈 우회 (Next 16 업그레이드로 해소, Turbopack은 유지).
 8. **타입 우회 임시**: `ignoreBuildErrors: true`. Sprint 1 [C1]에서 제거.
 9. **단일 레포 이식 (신규)**: `server/`를 Next.js 레포 루트로 이식. `scripts/` 포함.
+
+---
+
+## 외부 스킬 자산화 판정 — NomaDamas/k-skill (2026-07-29)
+
+레포: https://github.com/NomaDamas/k-skill (스킬 100+, 금융 6종 검토)
+
+라이선스: 루트 MIT / proxy 디렉터리만 AGPL.
+→ 코드 이식 전, 해당 스킬 디렉터리의 라이선스 헤더를 개별 확인할 것. 루트 MIT만 신뢰 금지.
+
+공용 프록시(k-skill-proxy.nomadamas.org): SLA 없음 → 프로덕션 의존 절대 금지.
+자산화 시 반드시 우리 키로 직접 호출한다.
+
+판정:
+- korean-stock-search (KRX Open API) — [전략적 이식·리스크 대응]
+  네이버 스크래핑 단일소스 리스크(차단 시 서비스 중단, 미검증 리스크 1순위)의 대응책.
+  신기능이 아니라 신뢰성/생존 대응으로 분류한다. Phase 6 본작업 시 종목 기본정보·일별시세
+  엔드포인트·파싱 레퍼런스로 사용(프록시 아님, 우리 KRX 키 직접). 서비스 오픈 전
+  신뢰성 체크리스트에 등재.
+
+- bok-ecos-stats (한국은행 ECOS) — [홀드]
+  생(raw) 매크로 스트립은 4.5c "데이터만 보여주고 해석 안 함" 안티패턴을 재현함.
+  해석을 붙이면 거시→주식 인과 판단이 되어 판단어 금지·투자권유 회피 원칙과 충돌
+  (개별 종목 밸류 해석보다 위험 영역). "안전하게 해석 가능한 매크로" 설계가 나오기
+  전에는 착수 금지. 착수 시 4.5b 이후 소규모 차수(4.6)로 독립.
+
+- k-dart (이벤트 확장) — [아이디어만]
+  우리 4.5a는 공시목록·재무제표까지 보유. 배당/증자/CB/소송 corp_code 자동해석 및
+  이벤트 타입 분류는 미보유 → [기업]탭 확장 백로그.
+
+- daishin-report-search — [프로덕션 부적합]
+  서드파티 GitHub 미러 지속성 불확실 + 리포트 저작권 리스크. "리포트 요약" 컨셉만
+  향후 정식 소스(FnGuide 등) 확보 시 재검토.
+
+- toss-securities — [홀드, Phase 5 이후]
+  사용자별 OAuth(Client ID/Secret) 전제 → 현재 익명 device_id 모델과 상충.
+  로그인 도입(Phase 5) 이후 실시간 호가·계좌연동 재평가.
+
+- kosis-stats — [낮음]
+  인구·물가·고용 통계. 주식앱과 거리 멂.
+
+개발 레버리지(앱 런타임 무관): k-skill을 Claude Code 플러그인으로 설치해
+DART 파서 정합성 대조·KRX 데이터 크로스체크에 활용
+(`/plugin marketplace add NomaDamas/k-skill`, 운영자 실행).
 
 ---
 
