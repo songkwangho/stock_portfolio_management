@@ -53,6 +53,7 @@ function ensureInterceptors() {
         url.includes('/volatility') ||
         url.includes('/signals') ||
         url.includes('/dart/') ||
+        url.includes('/journal/analysis') ||
         url.includes('/news');
       if (!silent) {
         try {
@@ -126,6 +127,13 @@ export const stockApi = {
     (await axios.get(`${API_BASE_URL}/stock/${code}/dart/disclosures`, { params: { months } })).data,
   getChartData: async (code: string, timeframe: 'weekly' | 'monthly') =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/chart/${timeframe}`)).data,
+  // 4.5b — 거래일지. csvText는 프론트에서 EUC-KR 디코드된 텍스트.
+  uploadJournal: async (csvText: string, broker?: string): Promise<import('@/types/stock').JournalUploadResult> =>
+    (await axios.post(`${API_BASE_URL}/journal/upload`, { csvText, broker })).data,
+  getJournalAnalysis: async (): Promise<import('@/types/stock').JournalAnalysis> =>
+    (await axios.get(`${API_BASE_URL}/journal/analysis`)).data,
+  deleteJournal: async (): Promise<{ deleted: number }> =>
+    (await axios.delete(`${API_BASE_URL}/journal`)).data,
   getHealth: async () => {
     // 25s: Render free-tier cold start(30~50s) 대응. HealthGate는 fetch+AbortController 직접 사용.
     const r = await axios.get(`${API_BASE_URL}/health`, { timeout: 25000 });

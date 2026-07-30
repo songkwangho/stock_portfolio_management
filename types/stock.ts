@@ -331,3 +331,34 @@ export interface DartDisclosuresResult {
   available: boolean;
   items?: DartDisclosureItem[];
 }
+
+// 4.5b차 — 거래일지(행동편향 진단). 서버는 수치·flag만, 한국어 풀이는 lib/journal/interpret.ts.
+export interface JournalUploadResult {
+  broker: string | null;
+  imported: number;
+  skipped: number;
+  dateRange: { from: string; to: string } | null;
+  coverage: { matched: number; unmatched: number };
+}
+export interface JournalSummary {
+  roundtripCount: number;
+  winRate: number | null;
+  avgHoldWin: number | null;
+  avgHoldLoss: number | null;
+  profitFactor: number | null;
+  maxDrawdown: number;   // 원, 실현손익 기준
+  totalPnl: number;
+}
+// 편향은 키별 필드가 달라 열린 형태 — interpret이 key로 분기. flag는 UI 색 아님(관찰 집계용).
+export interface JournalBiasMetric {
+  key: string;
+  available: boolean;
+  flag?: boolean;
+  [k: string]: unknown;
+}
+export interface JournalAnalysis {
+  available: boolean;
+  summary?: JournalSummary;
+  biases?: JournalBiasMetric[];
+  coverage?: { trades: number; roundtrips: number };
+}

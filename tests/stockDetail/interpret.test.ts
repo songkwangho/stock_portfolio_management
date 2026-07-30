@@ -3,6 +3,7 @@ import {
   interpretValuation, interpretFinancial, interpretTechnical, interpretFlow,
   interpretSectorPosition, synthesize, consecutiveStreak, type Interpretation,
 } from '@/lib/stockDetail/interpret';
+import { FORBIDDEN_BASE } from '../forbiddenWords';
 
 describe('interpretValuation', () => {
   it('PER < 업종중앙값 → 싼 편, positive', () => {
@@ -169,8 +170,8 @@ describe('synthesize', () => {
 
 // ── 금지 단어 전수 검사: 모든 함수의 광범위 입력 출력에 판단/명령 단어 미포함 ──
 describe('금지 단어 미포함 (사라/팔라/좋다/나쁘다/위험 등)', () => {
-  // 명령/판단어 + 품질 판정어(탄탄/건전/안전/우량 — 정도표현이 아닌 가치 평가) 회귀 차단.
-  const FORBIDDEN = ['사세요', '파세요', '사십시오', '파십시오', '매수하세요', '매도하세요', '사라', '팔라', '좋다', '좋은', '좋아요', '나쁘', '위험', '안전', '건전', '탄탄', '우량'];
+  // 명령/판단어 + 품질 판정어 — 공용 사전(tests/forbiddenWords.ts) 재사용.
+  const FORBIDDEN = FORBIDDEN_BASE;
   const texts: string[] = [];
   // 밸류: 다양한 PER × 중앙값
   for (const per of [null, -5, 0, 5, 8.7, 14, 20, 40]) {
