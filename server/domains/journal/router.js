@@ -2,7 +2,7 @@
 // analysis(GET)는 4.5b-2에서 추가.
 import express from 'express';
 import { requireDeviceIdMiddleware } from '../../helpers/deviceId.js';
-import { ingest, deleteAll } from './service.js';
+import { ingest, deleteAll, analyze } from './service.js';
 
 const router = express.Router();
 router.use(requireDeviceIdMiddleware);
@@ -20,6 +20,18 @@ router.post('/upload', async (req, res) => {
     } catch (e) {
         console.error('journal upload error:', e.message);
         res.status(500).json({ error: '거래내역을 처리하지 못했어요. 파일 형식을 확인해 주세요.' });
+    }
+});
+
+// GET /api/journal/analysis → { available, summary, biases, coverage }
+// 데이터 없으면 available:false (500 금지).
+router.get('/analysis', async (req, res) => {
+    try {
+        const result = await analyze(req.deviceId);
+        res.json(result);
+    } catch (e) {
+        console.error('journal analysis error:', e.message);
+        res.json({ available: false });
     }
 });
 

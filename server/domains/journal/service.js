@@ -3,6 +3,8 @@
 // 종목 식별: 6자리 코드 우선, 없으면 종목명→stocks 매핑. 유니버스 밖은 skip + coverage로 투명 처리.
 import { query } from '../../db/connection.js';
 import { parseTrades } from './parsers/index.js';
+import { computeRoundtrips, summarize } from './roundtrip.js';
+import { computeBiases } from './biases/index.js';
 
 // 종목명 정규화(공백 제거)로 매핑 견고화.
 const norm = (s) => String(s || '').replace(/\s/g, '');
@@ -66,4 +68,62 @@ async function bulkInsert(deviceId, trades) {
 export async function deleteAll(deviceId) {
     const { rowCount } = await query('DELETE FROM journal_trades WHERE device_id = $1', [deviceId]);
     return { deleted: rowCount };
+}
+
+// deviceId → { available, summary, biases, coverage }
+// 데이터 없으면 available:false (500 금지, dart 패턴).
+export async function analyze(deviceId) {
+    // traded_at은 TO_CHAR로 문자열 고정(pg DATE 타입 파서의 TZ 변환 회피), price는 Number 캐스팅.
+    const { rows } = await query(
+        `SELECT code, side, quantity, TO_CHAR(traded_at,'YYYY-MM-DD') AS traded_at, price
+         FROM journal_trades WHERE device_id = $1 ORDER BY traded_at ASC, id ASC`,
+        [deviceId]
+    );
+    if (rows.length === 0) return { available: false };
+    const trades = rows.map(r => ({
+        code: r.code, side: r.side, quantity: Number(r.quantity), price: Number(r.price), tradedAt: r.traded_at,
+    }));
+
+    const roundtrips = computeRoundtrips(trades);
+    const summary = summarize(roundtrips);
+    const priceReader = await buildPriceReader(trades);
+    const biases = await computeBiases({ trades, roundtrips, priceReader });
+
+    return {
+        available: true,
+        summary,
+        biases,
+        coverage: { trades: trades.length, roundtrips: roundtrips.length },
+    };
+}
+
+// 추격매수 편향용 가격조회 포트 — 거래 종목의 stock_history를 한 번에 로드해 in-memory 조회
+// (매수 건마다 쿼리하면 Neon 풀 5 제한에 부담 → 종목 단위 벌크 로드 후 메모리 계산).
+// 반환: priceReader(code, tradedAt, days) → 직전 days 거래일 상승률(%) | null(히스토리 부족)
+async function buildPriceReader(trades) {
+    const codes = [...new Set(trades.filter(t => t.side === 'buy').map(t => t.code))];
+    if (codes.length === 0) return () => null;
+    // 조회 하한: 가장 이른 매수일 - 60일(YYYYMMDD). 히스토리 로드 범위를 좁힌다.
+    const earliest = trades.map(t => t.tradedAt).sort()[0];
+    const lb = new Date(Date.parse(earliest) - 60 * 86400000);
+    const lbYmd = `${lb.getUTCFullYear()}${String(lb.getUTCMonth() + 1).padStart(2, '0')}${String(lb.getUTCDate()).padStart(2, '0')}`;
+    const { rows } = await query(
+        `SELECT code, date, price FROM stock_history WHERE code = ANY($1) AND date >= $2 ORDER BY code, date ASC`,
+        [codes, lbYmd]
+    );
+    const byCode = {};
+    for (const r of rows) (byCode[r.code] ||= []).push({ date: r.date, price: Number(r.price) });
+
+    return (code, tradedAt, days) => {
+        const arr = byCode[code];
+        if (!arr || arr.length < 5) return null;
+        const ymd = tradedAt.replace(/-/g, '');
+        const before = arr.filter(r => r.date < ymd);   // 매수일 이전 종가 (date는 'YYYYMMDD', 고정폭 사전순=시간순)
+        if (before.length < 5) return null;
+        const window = before.slice(-days);
+        const startClose = window[0].price;
+        const endClose = window[window.length - 1].price;
+        if (!startClose || startClose <= 0) return null;
+        return ((endClose - startClose) / startClose) * 100;
+    };
 }
