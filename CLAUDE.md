@@ -417,6 +417,24 @@ PC (md: 이상):
 
 ---
 
+**4.5b차 — 거래일지·행동편향 진단 (2026-07-29)**
+
+출처 컨셉: Vibe-Trading(HKUDS) Shadow Account. **규칙 기반, AI 불필요.** 초보자에게 "내가 뭘 반복하는지"를 본인 거래 데이터로 **관찰형**으로 보여준다(판정 아님, interpret.ts 안전 원칙 계승). 4.5c 이후 구현(순번은 논리적 위치).
+
+- [x] **[JRN-1]** 신규 도메인 `server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter): `detectBroker`(헤더 시그니처) + `parseKiwoom/Toss/Samsung` + `normalize`(CSV 파싱·값정제·side/date 표준화·검증) + `index`(레지스트리+폴백). 브로커 추가 = 어댑터 추가
+- [x] **[JRN-2]** `journal_trades` 스키마 — `{device_id, code, side, quantity, price, traded_at, source}`만. **원본 CSV·PII(계좌번호·예수금·성명) 미저장** — 파서 화이트리스트에서 제거. `DELETE /api/journal` 전량 삭제. price NUMERIC→Number() 캐스팅
+- [x] **[JRN-3]** `roundtrip.js` — 종목별 FIFO 매수lot↔매도 매칭(부분/당일/공매도 skip) + `summarize`(승률·손익비·이익/손실 평균보유일·MDD, 전부 **실현손익 기준**)
+- [x] **[JRN-4]** `biases/`(순수, metrics·flag만 — 판단 텍스트 없음): 처분효과/과매매/추격매수(stock_history 가격조회 포트 주입, coverage)/앵커링. **임계값 전부 미검증 임시값(provisional)** → Phase 4 백테스팅 대상
+- [x] **[JRN-5]** API 3종 (`router.use(requireDeviceIdMiddleware)`): `POST /api/journal/upload`(csvText·broker?) / `GET /api/journal/analysis`(available:false 폴백) / `DELETE /api/journal`. `express.json` limit 4mb. journalRouter는 `/api/journal` prefix 전용 마운트
+- [x] **[JRN-6]** 프론트 `app/journal/` — CSV 업로드(**EUC-KR 디코드→utf-8 폴백**, 프론트 처리라 백엔드 iconv 불필요) → 매매 통계 표 + 행동 관찰 카드 + "실증 검증 전" 뱃지 + 면책. **전 영역 무채색**(방향색 금지). Sidebar '거래 진단'(PC). x-device-id는 axios 인터셉터 재사용
+- [x] **[JRN-7]** `lib/journal/interpret.ts`(순수) — 서버 metrics→초보자 관찰형 한국어(4.5c 구조 동일). `tests/forbiddenWords.ts` 공용 추출(4.5c도 재사용) + 질책·후회·손익판정·명령형(~세요) 확장, 전 출력 전수 검사
+- **안전**: 편향은 태생이 판단적이라 원칙 위반 위험 최대 → 사실+중립 교육정의+관찰형("~하는 흐름이 보여요")까지만. 금지어(잘못/실수/손해/후회/좋다/나쁘/위험/사라/팔라/~세요) 전수 테스트로 회귀 차단
+- 검증: tsc 0 · next build ✓(/journal) · npm test 82(파서13+라운드트립·편향13+해석 금지어 스윕) · 금지어 grep(출력) 0 · 방향색 0
+- **단계 커밋**: 4.5b-1(파이프라인·적재) / 4.5b-2(FIFO·편향·analysis) / 4.5b-3(페이지·해석·금지어)
+- ⚠️ **운영 대기/검증**: ① **파서 헤더 시노님은 추정** — 키움/토스/삼성 실제 export CSV로 운영자 검증 필요(어긋나면 각 `parseX.js` SYN만 보강, 파이프라인 불변). ② 추격매수는 `stock_history` 필요 — 없으면 coverage로 skip 투명 공개. ③ 재업로드는 append(중복 방지 없음) → 재분석 전 전체 삭제로 리셋
+
+---
+
 **4.5c차 — 종합 해석 (초보자용 데이터 풀이, 2026-07-28)**
 
 데이터·지표를 보여주기만 하던 걸 초보자 언어로 풀이 + 상충 짚기. **투자 권유 아님** — 사실+정도표현(싼/비싼/높은/낮은 편)까지만, 판단 단어(좋다/나쁘다/위험/사라/팔라) 금지. 종합은 상충 서술 + 판단 유보. 기존 계산(scoringBreakdown·indicators·sectorData·DART 재무)만 재사용, 신규 계산·백엔드 변경 없음.

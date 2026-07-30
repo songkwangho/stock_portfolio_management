@@ -88,6 +88,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | **dart_corp_codes** | corp_code | stock_code, corp_name, modify_date | 4.5a차 신설. DART 8자리 고유번호 ↔ 종목 6자리 매핑(재무·공시 조회 선행). `stocks`와 FK 없음. 인덱스: stock_code |
 | **dart_financials** | code+year+quarter+fs_div+account_id | account_nm, amount (NUMERIC 20,0), prev_amount | 4.5a차 신설. DART 재무제표. fs_div CFS(연결)/OFS(별도). account_id는 canonical(revenue/operating_income/…)로 저장(표준코드 미사용 PK 충돌 회피). 인덱스: (code, year DESC) |
 | **dart_disclosures** | rcept_no | code, corp_name, report_nm, rcept_dt, flr_nm, category, rm, corp_cls | 4.5a차 신설. DART 공시. category 규칙 분류(표시용). rm=비고(정=정정/철=철회/유·코=시장). 인덱스: (code, rcept_dt DESC) |
+| **journal_trades** | id (BIGSERIAL) | device_id, code, side('buy'/'sell' CHECK), quantity, price (NUMERIC 14,2), traded_at (DATE), source | 4.5b차 신설. 거래일지(행동편향 진단). **원본 CSV·PII(계좌·예수금·성명) 미저장** — 화이트리스트 컬럼만. price NUMERIC→Number() 캐스팅. 인덱스: (device_id, code, traded_at) |
 
 ### stocks_directory 동기화 파이프라인
 
@@ -180,6 +181,19 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 > DART 라우터는 stockRouter(`/stock/:code`)보다 먼저 마운트 — `/stock/:code/dart/*` 선점.
 > 라이브 DART 호출은 sync 스크립트에서만. 엔드포인트는 적재된 DB만 읽는다.
+
+### 거래일지 (journal — 3개, `requireDeviceIdMiddleware`)
+
+`server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index 레지스트리), `roundtrip.js`(FIFO), `biases/`(disposition/overtrading/chasing/anchoring — metrics·flag만), `service.js`(오케스트레이션), `router.js`.
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| **POST** | **`/api/journal/upload`** | 4.5b차 — body `{csvText, broker?}`(csvText는 프론트 EUC-KR 디코드). 파싱→정규화→종목코드 해석(6자리 우선/종목명 폴백)→적재. `{broker, imported, skipped, dateRange, coverage}`. 유니버스 밖은 skip. **원본 CSV·PII 미저장** |
+| **GET** | **`/api/journal/analysis`** | 4.5b차 — FIFO 라운드트립→요약(승률·손익비·평균보유·MDD, 실현손익 기준) + 4대 편향(수치·flag, 임계값 미검증 provisional). `{available, summary, biases[], coverage}`. 데이터 없으면 `available:false` |
+| **DELETE** | **`/api/journal`** | 4.5b차 — 해당 device 거래 전량 삭제 `{deleted}`. 재업로드는 append라 재분석 전 리셋용 |
+
+> 편향 텍스트(한국어 관찰형 풀이)는 백엔드에 없음 — 서버는 수치·flag만, 풀이는 프론트 `lib/journal/interpret.ts`(4.5c와 동일 구조 + 금지어 테스트 재사용).
+> 추격매수는 `stock_history` 가격조회 포트 주입 — 히스토리 없으면 coverage로 skip. `express.json` limit 4mb(CSV 텍스트).
 
 ### 알림/관심종목/시스템
 

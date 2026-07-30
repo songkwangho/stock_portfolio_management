@@ -255,6 +255,19 @@ interface ToastActions {
 - 서버 상태 확인 (health API)
 - 닉네임 설정
 
+### /journal (CSR, PC 전용 — 4.5b차 거래 진단)
+
+**컴포넌트**: `app/journal/page.tsx`
+**데이터**: `stockApi.uploadJournal/getJournalAnalysis/deleteJournal`, `lib/journal/interpret.ts`(순수)
+
+**핵심 UI**:
+- 증권사 선택(자동 감지/키움/토스/삼성) + CSV 업로드 — **File→ArrayBuffer→`TextDecoder('euc-kr')` 디코드**(BOM/대체문자 시 utf-8 폴백) → csvText만 POST. 백엔드 iconv/multer 불필요
+- 결과: **매매 통계 표**(청산건수·이익실현비율·이익/손실 평균보유·손익비·누적손익·MDD "실현손익 기준") + **행동 관찰 카드**(처분효과/과매매/추격매수/앵커링) + **"실증 검증 전" 뱃지**(caution) + 면책 각주
+- **전 영역 무채색** (방향색 금지 — 판정 아닌 관찰. 손익 수치도 ink). 편향 텍스트는 `readBiases()`가 생성(관찰형·판단어 금지)
+- 원본 CSV·PII 미저장 안내, "전체 삭제" 버튼(재업로드는 append라 리셋용)
+- 빈 상태: "증권사 앱/HTS에서 거래내역 CSV 내려받아 업로드" 안내
+- 진입: Sidebar '거래 진단'(PC). 모바일 탭바 미노출(파일 업로드는 데스크톱 지향 — screener/watchlist와 동일)
+
 ---
 
 ## 컴포넌트
@@ -370,6 +383,9 @@ interface StatCardProps {
 | getCorrelation() | GET /holdings/correlation (3.14차 보유 상관관계) |
 | getDartFinancials(code) | GET /stock/{code}/dart/financials (4.5a차 DART 재무제표, available:false 폴백) |
 | getDartDisclosures(code) | GET /stock/{code}/dart/disclosures (4.5a차 DART 공시) |
+| uploadJournal(csvText, broker?) | POST /journal/upload (4.5b차 거래내역 CSV 텍스트) |
+| getJournalAnalysis() | GET /journal/analysis (4.5b차 통계+편향, available:false 폴백) |
+| deleteJournal() | DELETE /journal (4.5b차 거래 전량 삭제) |
 | getHealth() | GET /health |
 
 > 보조 폴링 실패 토스트를 억제하는 **silent 목록**에 `/market/indices`·`/volatility`·`/news`·`/signals`·`/holdings/benchmark`·`/holdings/correlation`·`/dart/` 포함 (인터셉터에서 에러 토스트 스킵).
@@ -402,6 +418,7 @@ type HoldingOpinion = '보유' | '추가매수' | '관망' | '매도';
 | CorrelationResult | 3.14차 — available, reason?('empty'/'single'/'insufficient'/'error'), pairs[], maxCorrelation, avgCorrelation |
 | DartFinancialsResult / DartStatementRow | 4.5a차 — available, fsDiv(CFS/OFS), periods[], statements{income,balance,cashflow}. 금액 원 단위 Number |
 | DartDisclosuresResult / DartDisclosureItem | 4.5a차 — available, items[{rceptNo,reportNm,rceptDt,category,categoryLabel,rm,isRevised,isWithdrawn,url}]. category는 표시용(호재/악재 아님) |
+| JournalUploadResult / JournalSummary / JournalBiasMetric / JournalAnalysis | 4.5b차 — 거래일지. summary(승률·손익비·평균보유·MDD) + biases[](key별 열린 형태, 서버는 수치·flag만). 관찰형 한국어는 `lib/journal/interpret.ts` |
 
 > 4.5c차 해석 타입 `Interpretation`(`{key,label,text,tone,available}`)은 `types/stock.ts`가 아니라 순수 함수 모듈 `lib/stockDetail/interpret.ts`에 정의. tone은 상충 집계용 논리 구분일 뿐 UI는 무채색.
 
