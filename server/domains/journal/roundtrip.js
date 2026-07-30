@@ -8,13 +8,19 @@ function daysBetween(a, b) {
     return Math.round(ms / 86400000);
 }
 
-// Trade[] → Roundtrip[]
+// Trade[] → { roundtrips: Roundtrip[], unmatched: { sellCount, sellQty } }
 // Roundtrip = { code, buyDate, sellDate, quantity, buyPrice, sellPrice, holdingDays, pnl, pnlRate }
+//
+// F2(리뷰): 앞선 매수 lot이 없는 매도분(업로드 구간 이전 보유분의 매도가 대부분)을 집계해
+// unmatched로 반환한다. 예전엔 silent skip이라 승률·손익비·MDD가 부분집합으로 계산되는데
+// 사용자에게 고지가 없었음 → coverage 투명성 원칙 위반. 이제 호출부가 고지할 수 있게 노출.
 export function computeRoundtrips(trades) {
     const byCode = {};
     for (const t of trades) (byCode[t.code] ||= []).push(t);
 
     const roundtrips = [];
+    let unmatchedSellCount = 0;
+    let unmatchedSellQty = 0;
     for (const list of Object.values(byCode)) {
         // 날짜 오름차순, 같은 날은 매수를 먼저 (당일 매수분이 당일 매도에 매칭되도록).
         const sorted = [...list].sort((a, b) => {
@@ -50,10 +56,12 @@ export function computeRoundtrips(trades) {
                 qty -= m;
                 if (lot.remaining <= 0) lots.shift();
             }
-            // qty>0 잔여 = 매수기록 없는 매도(공매도/이관 등) → 매칭 불가로 skip
+            // qty>0 잔여 = 매수기록 없는 매도(업로드 구간 이전 보유분/이관/공매도) → 매칭 불가.
+            // silent skip 대신 집계해 coverage로 고지(F2).
+            if (qty > 0) { unmatchedSellCount++; unmatchedSellQty += qty; }
         }
     }
-    return roundtrips;
+    return { roundtrips, unmatched: { sellCount: unmatchedSellCount, sellQty: unmatchedSellQty } };
 }
 
 const round1 = (n) => Math.round(n * 10) / 10;

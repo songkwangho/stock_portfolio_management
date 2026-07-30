@@ -31,19 +31,25 @@ const NOT_ENOUGH = '아직 이 항목을 볼 만큼 청산된 거래가 모이�
 
 const num = (v: unknown): number => (typeof v === 'number' && isFinite(v) ? v : 0);
 
-// ── 처분효과 — 이익/손실 평균 보유일 두 숫자를 사실로 + 중립 정의 ──
+// ── 처분효과 — 이익/손실 평균 보유일 두 숫자는 항상 사실로, 편향명은 서버 flag일 때만 ──
+// F3(리뷰): 예전엔 l>w이기만 하면(0.1일 차·n=1도) "처분효과" 명명 → 과다 명명·소표본 노이즈.
+// 이제 문턱(격차·표본)을 통과한 서버 b.flag가 true일 때만 명명한다. l>w 재계산 금지(서버 flag 사용).
 export function readDisposition(b: JournalBias): JournalReading {
   const label = LABELS.disposition;
   if (!b || !b.available) return { key: 'disposition', label, text: NOT_ENOUGH, available: false };
   const w = num(b.winnerAvgHold);
   const l = num(b.loserAvgHold);
   let text = `이익이 난 종목은 평균 ${w}일, 손실이 난 종목은 평균 ${l}일 들고 계셨어요.`;
-  if (l > w) {
+  if (b.flag === true) {
     text += ' 손실 종목을 더 오래 들고 가는 흐름이 보여요. 이익은 짧게, 손실은 길게 가져가는 경향을 처분효과라고 불러요.';
-  } else if (w > l) {
-    text += ' 이익 종목을 더 오래 들고 가는 흐름이에요.';
   } else {
-    text += ' 이익·손실 보유기간이 비슷한 편이에요.';
+    // 문턱 미달/역방향 — 편향명 없이 중립 서술만.
+    const gap = num(b.gap);   // loserAvgHold - winnerAvgHold
+    const th = (b.thresholds as { minGapDays?: number }) || {};
+    const minGap = th.minGapDays ?? 3;
+    if (Math.abs(gap) < minGap) text += ' 이익·손실 보유기간이 비슷한 편이에요.';
+    else if (gap > 0) text += ' 손실 종목을 조금 더 오래 들고 가는 흐름이에요.';
+    else text += ' 이익 종목을 조금 더 오래 들고 가는 흐름이에요.';
   }
   return { key: 'disposition', label, text, available: true };
 }
@@ -100,6 +106,14 @@ const READERS: Record<string, (b: JournalBias) => JournalReading> = {
 // biases[] → JournalReading[] (서버 순서 유지, 미지원 키는 스킵)
 export function readBiases(biases: JournalBias[]): JournalReading[] {
   return (biases || []).filter(b => READERS[b.key]).map(b => READERS[b.key](b));
+}
+
+// F2(리뷰) — 매수기록 없는 매도(업로드 구간 이전 보유분)가 지표에서 빠졌음을 관찰형으로 고지.
+// coverage.unmatchedSellCount>0 이면 각주 문자열, 아니면 null. 판단어 없음.
+export function journalCoverageNote(coverage: { unmatchedSellCount?: number } | null | undefined): string | null {
+  const n = num(coverage?.unmatchedSellCount);
+  if (n <= 0) return null;
+  return `업로드 구간 이전에 사둔 물량의 매도 ${n}건은 승률·손익 계산에서 빠졌어요.`;
 }
 
 export const JOURNAL_DISCLAIMER =

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Upload, Trash2, FileText } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import { readBiases, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
+import { readBiases, journalCoverageNote, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
 import type { JournalAnalysis, JournalUploadResult, JournalSummary } from '@/types/stock';
 
 // File → 텍스트. 한국 증권사 CSV는 EUC-KR(CP949)이 흔함 → euc-kr 우선, BOM/대체문자 시 utf-8 폴백.
@@ -74,9 +74,10 @@ export default function JournalPage() {
       const result = await stockApi.uploadJournal(csvText, broker || undefined);
       setUploadResult(result);
       if (result.imported === 0) {
-        setMessage({ type: 'error', text: '거래를 하나도 읽지 못했어요. 증권사 선택을 바꾸거나 다른 파일을 시도해 주세요.' });
+        setMessage({ type: 'error', text: '거래를 하나도 읽지 못했어요. 증권사 선택을 바꾸거나 다른 파일을 시도해 주세요. (기존 데이터는 그대로 두었어요.)' });
       } else {
-        setMessage({ type: 'info', text: `${result.imported}건을 불러왔어요${result.skipped ? ` (분석 대상 밖 ${result.skipped}건은 제외)` : ''}.` });
+        // F1: 업로드는 기존 거래를 새 파일로 교체(append 아님) — 사용자가 인지하도록 명시.
+        setMessage({ type: 'info', text: `기존 거래를 새 파일로 교체했어요 — ${result.imported}건 불러왔어요${result.skipped ? ` (분석 대상 밖 ${result.skipped}건은 제외)` : ''}.` });
       }
       await loadAnalysis();
     } catch {
@@ -150,6 +151,9 @@ export default function JournalPage() {
           <section>
             <h3 className="text-sm font-bold text-ink mb-2">매매 통계</h3>
             <SummaryTable s={analysis.summary} />
+            {journalCoverageNote(analysis.coverage) && (
+              <p className="text-xs text-faint mt-2 break-keep">※ {journalCoverageNote(analysis.coverage)}</p>
+            )}
           </section>
 
           <section>

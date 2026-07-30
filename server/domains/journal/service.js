@@ -1,7 +1,7 @@
 // 4.5b차 — 거래일지 오케스트레이션: 파싱 → 정규화 → (종목코드 해석) → 적재 / 삭제.
 // 안전: 원본 CSV는 저장하지 않는다(파싱 즉시 폐기). PII는 파서 화이트리스트에서 이미 제거됨.
 // 종목 식별: 6자리 코드 우선, 없으면 종목명→stocks 매핑. 유니버스 밖은 skip + coverage로 투명 처리.
-import { query } from '../../db/connection.js';
+import { query, withTransaction } from '../../db/connection.js';
 import { parseTrades } from './parsers/index.js';
 import { computeRoundtrips, summarize } from './roundtrip.js';
 import { computeBiases } from './biases/index.js';
@@ -9,11 +9,17 @@ import { computeBiases } from './biases/index.js';
 // 종목명 정규화(공백 제거)로 매핑 견고화.
 const norm = (s) => String(s || '').replace(/\s/g, '');
 
-// deviceId, csvText, brokerHint → { broker, imported, skipped, dateRange, coverage }
+// deviceId, csvText, brokerHint → { broker, imported, skipped, dateRange, coverage, replaced }
+//
+// F1(리뷰): 재업로드 시맨틱은 append가 아니라 **해당 device 전량 교체(replace)**.
+// journal_trades에 자연키 unique가 없어 append면 같은 CSV 재업로드가 거래를 2배로 만들어
+// 전 지표를 오염시킴. 트랜잭션 안에서 DELETE→INSERT로 원자적 교체한다.
+// **데이터 파괴 방지 가드**: 유효 신규 데이터(resolved.length>0)일 때만 교체.
+// 파싱 0건 / 전건 unmatched(resolved 0)면 기존 데이터를 절대 지우지 않는다(나쁜 업로드로 파괴 금지).
 export async function ingest(deviceId, csvText, brokerHint) {
     const { broker, trades } = parseTrades(csvText, brokerHint);
     if (trades.length === 0) {
-        return { broker, imported: 0, skipped: 0, dateRange: null, coverage: { matched: 0, unmatched: 0 } };
+        return { broker, imported: 0, skipped: 0, dateRange: null, coverage: { matched: 0, unmatched: 0 }, replaced: false };
     }
 
     // 우리 유니버스(stocks) 로드 — 코드셋 + 종목명→코드 맵.
@@ -32,7 +38,15 @@ export async function ingest(deviceId, csvText, brokerHint) {
         resolved.push({ code, side: t.side, quantity: t.quantity, price: t.price, tradedAt: t.tradedAt, source: t.source || broker });
     }
 
-    if (resolved.length > 0) await bulkInsert(deviceId, resolved);
+    // 유효 신규 데이터가 있을 때만 원자적 교체. 없으면 기존 데이터 보존(가드).
+    let replaced = false;
+    if (resolved.length > 0) {
+        await withTransaction(async (client) => {
+            await client.query('DELETE FROM journal_trades WHERE device_id = $1', [deviceId]);
+            await bulkInsert(client, deviceId, resolved);
+        });
+        replaced = true;
+    }
 
     const dates = resolved.map(t => t.tradedAt).sort();
     return {
@@ -41,11 +55,12 @@ export async function ingest(deviceId, csvText, brokerHint) {
         skipped: unmatched,
         dateRange: dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null,
         coverage: { matched: resolved.length, unmatched },
+        replaced,
     };
 }
 
-// 다중행 INSERT (파라미터 상한 회피 위해 1000행 단위 청크).
-async function bulkInsert(deviceId, trades) {
+// 다중행 INSERT (파라미터 상한 회피 위해 1000행 단위 청크). client(트랜잭션 핸들)로 실행.
+async function bulkInsert(client, deviceId, trades) {
     const CHUNK = 1000;
     for (let i = 0; i < trades.length; i += CHUNK) {
         const slice = trades.slice(i, i + CHUNK);
@@ -56,7 +71,7 @@ async function bulkInsert(deviceId, trades) {
             values.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`);
             params.push(deviceId, t.code, t.side, t.quantity, t.price, t.tradedAt, t.source);
         });
-        await query(
+        await client.query(
             `INSERT INTO journal_trades (device_id, code, side, quantity, price, traded_at, source)
              VALUES ${values.join(',')}`,
             params
@@ -84,7 +99,7 @@ export async function analyze(deviceId) {
         code: r.code, side: r.side, quantity: Number(r.quantity), price: Number(r.price), tradedAt: r.traded_at,
     }));
 
-    const roundtrips = computeRoundtrips(trades);
+    const { roundtrips, unmatched } = computeRoundtrips(trades);
     const summary = summarize(roundtrips);
     const priceReader = await buildPriceReader(trades);
     const biases = await computeBiases({ trades, roundtrips, priceReader });
@@ -93,7 +108,8 @@ export async function analyze(deviceId) {
         available: true,
         summary,
         biases,
-        coverage: { trades: trades.length, roundtrips: roundtrips.length },
+        // F2: 매수기록 없는 매도(구간 이전 보유분)를 고지 → 프론트 journalCoverageNote.
+        coverage: { trades: trades.length, roundtrips: roundtrips.length, unmatchedSellCount: unmatched.sellCount },
     };
 }
 

@@ -360,5 +360,5 @@ export interface JournalAnalysis {
   available: boolean;
   summary?: JournalSummary;
   biases?: JournalBiasMetric[];
-  coverage?: { trades: number; roundtrips: number };
+  coverage?: { trades: number; roundtrips: number; unmatchedSellCount?: number };
 }
