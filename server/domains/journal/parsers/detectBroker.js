@@ -4,13 +4,17 @@
 import { parseCsv } from './normalize.js';
 
 // 각 브로커의 "그 브로커에서 특히 자주 보이는" 헤더 토큰 (가중치 합산).
+// ✅ kiwoom은 실파일 대조(2026-07-31)로 실헤더 토큰 교체 — 기존(체결수량/주문번호…)은 실헤더에 하나도 없어
+//    점수 0 → '거래구분' 때문에 toss로 오판하던 K2 버그. samsung '거래일'이 '거래일자'에 +1 되지만 kiwoom 우세.
 const SIGNATURES = {
-    kiwoom: ['체결수량', '체결단가', '주문번호', '주문일자', '주문구분'],
+    kiwoom: ['거래수량', '거래단가', '매체구분', '정산금액', '거래세'],
     toss: ['거래구분', '주문일시', '체결일시'],
     samsung: ['거래일', '약정일', '매매구분'],
 };
 
 export function detectBroker(text) {
+    // 프리앰블 마커 우선 — 헤더가 바뀌어도 확정(키움 export 1행이 '[키움증권]…').
+    if (text && text.includes('[키움증권]')) return { broker: 'kiwoom', confidence: 99 };
     const { headers } = parseCsv(text);
     if (!headers.length) return { broker: null, confidence: 0 };
     const joined = headers.join('|').replace(/\s/g, '');
