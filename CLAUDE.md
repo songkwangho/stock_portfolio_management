@@ -45,10 +45,12 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── watchlist/page.tsx        # PC 전용
 │   ├── screener/page.tsx         # PC 전용
 │   ├── stocks/page.tsx
+│   ├── themes/page.tsx           # 3.7차β — 테마 탐색 (모바일 허용, ?id=<theme>)
 │   ├── stock/[code]/
-│   │   ├── page.tsx              # CSR, Suspense(useSearchParams), use(params)
+│   │   ├── page.tsx              # CSR 3탭[요약/차트·지표/기업] (3.13 VIS-6), Suspense(useSearchParams), use(params)
 │   │   └── loading.tsx           # use(params) 깜빡임 완화
 │   ├── alerts/page.tsx           # PC/모바일 통일, 첫 진입 안내 카드
+│   ├── journal/page.tsx          # 4.5b·C차 — 거래 진단 (CSR, PC 전용)
 │   └── settings/page.tsx
 │
 ├── components/
@@ -63,7 +65,9 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── stock/
 │   │   ├── ScoringBreakdownPanel.tsx
 │   │   ├── StockSearchInput.tsx
-│   │   └── RecommendedStockCard.tsx
+│   │   ├── RecommendedStockCard.tsx
+│   │   └── detail/               # 3.12차 리팩터링 — 종목상세 17개 컴포넌트
+│   │                             #   (ChartSection·ConclusionCard·InterpretationPanel·DartFinancials 등)
 │   ├── portfolio/
 │   │   └── WatchlistContent.tsx
 │   └── ui/
@@ -71,18 +75,22 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │       ├── HelpBottomSheet.tsx
 │       ├── StatCard.tsx
 │       └── NavButton.tsx
-│   # components/charts/ 는 Sprint 3 [M1]에서 신설 예정 — 현재 차트는 전부 페이지 인라인
+│   # 차트는 3.12차 S5에서 components/stock/detail/ChartSection.tsx로 추출됨.
+│   # 공유 청크(dynamic import)로 묶는 components/charts/ 신설은 Sprint 3 [M1] 잔여.
 │
 ├── stores/                       # Zustand ('use client' 내부에서만 import)
 │   ├── usePortfolioStore.ts
 │   ├── useAlertStore.ts
 │   ├── useWatchlistStore.ts
+│   ├── useMarketStore.ts         # 3.5차 Fix-6 — 시장지수 300s TTL + inflight 공용 구독
 │   └── useToastStore.ts
 │
 ├── lib/
 │   ├── stockApi.ts
 │   ├── deviceId.ts               # SSR-safe
-│   └── dataFreshness.ts
+│   ├── dataFreshness.ts
+│   ├── stockDetail/              # 3.12차 — summary·format·helpTexts + 4.5c interpret (순수)
+│   └── journal/                  # 4.5b·C차 — interpret.ts (서버 metrics → 관찰형 한국어, 순수)
 │
 ├── types/
 │   └── stock.ts
@@ -93,12 +101,13 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── db/                       # 스키마·마이그레이션 (stocks_directory, ai_report 포함)
 │   ├── helpers/                  # deviceId(requireDeviceIdMiddleware), cache, sma
 │   ├── scrapers/                 # 네이버 증권
-│   ├── domains/
-│   │   └── stock/
-│   │       ├── service.js        # getStockData + syncAllStocks
-│   │       ├── data.js           # registerInitialData (97 + 20)
-│   │       ├── directory.js      # 3.6차 — KRX stocks_directory 동기화
-│   │       └── router.js
+│   ├── domains/                  # analysis·alert·portfolio·watchlist·system·dart(4.5a)·journal(4.5b) — 아래는 발췌
+│   │   ├── stock/
+│   │   │   ├── service.js        # getStockData + syncAllStocks
+│   │   │   ├── data.js           # registerInitialData (97 + 20 + 10테마)
+│   │   │   ├── directory.js      # 3.6차 — KRX stocks_directory 동기화
+│   │   │   └── router.js
+│   │   └── journal/              # 4.5b·C차 — parsers/·biases/·roundtrip·service (상세는 docs/BACKEND.md)
 │   ├── scheduler.js              # setupScheduler + syncDirectoryIfEmpty 10s 지연
 │   └── package.json              # 별도 의존성 — `cd server && npm install` 필요
 │   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
@@ -106,7 +115,13 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 └── scripts/
     ├── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
     ├── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
-    └── expand-stocks.js          # 3.7차 감마 — 종목 96→~180 확대 (배치 3 × 3초)
+    ├── expand-stocks.js          # 3.7차 감마 — 종목 96→~180 확대 (배치 3 × 3초)
+    ├── cleanup-delisted.js       # 상장폐지 종목 정리 (Cleanup-1)
+    ├── sync-index-history.js     # 3.14차 — KOSPI/KOSDAQ 지수 일봉 적재 (벤치마크용, 운영자 수동)
+    ├── sync-dart-corpcodes.js    # 4.5a차 — DART 고유번호↔종목 매핑 (--dry-run)
+    ├── sync-dart-financials.js   # 4.5a차 — DART 재무제표 (--dry-run/--save-sample)
+    ├── sync-dart-disclosures.js  # 4.5a차 — DART 공시 (적응형 페이징 + 노이즈 블랙리스트)
+    └── shoot-journal.mjs         # Playwright 시각검증 하네스 — /journal 스크린샷 (npm run shot:journal)
 ```
 
 ---
@@ -139,8 +154,10 @@ Server Component (기본):
 /watchlist           → 관심종목 (CSR, PC 전용)
 /screener            → 종목 스크리너 (CSR, PC 전용)
 /stocks              → 주요 종목 (CSR, Sprint 3에서 ISR 전환)
-/stock/[code]        → 종목 상세, ?from=holding|recommendation|watchlist|major|search|alerts
+/themes              → 테마 탐색 (CSR, 모바일 허용), ?id=<theme>          # 3.7차β
+/stock/[code]        → 종목 상세 (3탭), ?from=holding|recommendation|watchlist|major|search|alerts|theme
 /alerts              → 알림 (CSR, PC/모바일 통일)
+/journal             → 거래 진단 (CSR, PC 전용)                            # 4.5b·C차
 /settings            → 설정
 ```
 
@@ -153,6 +170,9 @@ Server Component (기본):
 npm run dev              # 포트 3000 (--turbopack)
 npm run build
 npm run start
+npm test                 # vitest run (순수 로직 유닛 — 파서·라운드트립·편향·해석 금지어 스윕 등)
+npm run shot:journal     # Playwright 시각검증 하네스 — /journal 스크린샷 (artifacts/, CI 제외)
+                         #   로컬/prod 대상: SHOT_BASE_URL·SHOT_API_BASE 오버라이드. chromium 필요(npx playwright install chromium)
 
 # 백엔드
 DATABASE_URL=postgres://... node server/server.js  # 포트 3001
@@ -166,6 +186,14 @@ DATABASE_URL=postgres://... node scripts/sync-directory.js
 # 종목 확대 — TARGET_CODES에 정의된 ~86개 코드를 네이버 크롤링으로 stocks 테이블에 추가
 # (배치 3 × 3초 간격, 전체 ~10~15분)
 DATABASE_URL=postgres://... node scripts/expand-stocks.js
+
+# KOSPI/KOSDAQ 지수 일봉 적재 (벤치마크 초과수익·IR용) — 3.14차, 운영자 수동
+DATABASE_URL=postgres://... node scripts/sync-index-history.js
+
+# DART 적재 3종 (4.5a차) — 전부 --dry-run 지원. DART_API_KEY 필요
+DART_API_KEY=... node scripts/sync-dart-corpcodes.js
+DART_API_KEY=... node scripts/sync-dart-financials.js --dry-run
+DART_API_KEY=... node scripts/sync-dart-disclosures.js --dry-run
 ```
 
 ### 환경변수
@@ -741,8 +769,10 @@ DART 파서 정합성 대조·KRX 데이터 크로스체크에 활용
 
 | 파일 | 내용 |
 |------|------|
-| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마, API 28개, 알고리즘, 스케줄링) |
+| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마 18테이블, API 42개, 알고리즘, 스케줄링) |
 | `docs/FRONTEND.md` | 프론트엔드 상세 (페이지별 스펙, 컴포넌트, 스토어 인터페이스) |
 | `docs/FRONTEND_UX.md` | UX 원칙 (온보딩, 면책, 디자인 시스템, 초보자 안내) |
 | `docs/NEXTJS.md` | Next.js 전환 상세 (Server/Client 경계, ISR 패턴, 라우팅) |
+| `docs/DESIGN.md` | 디자인 시스템 SSOT (3.13차 라이트 + 한국 증시 색 토큰) |
+| `docs/DEPLOY.md` | 배포 체크리스트 (Render/Vercel 환경변수, 순서, cold start) |
 | `docs/SKILL_KOREAN_STOCK_APP.md` | 도메인 지식 (주식 지표, 섹터별 특성, 면책 표현) |

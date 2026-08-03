@@ -23,7 +23,7 @@ server/
 ├── index.js              # 진입점 래퍼
 ├── db/
 │   ├── connection.js     # pg.Pool + query()/withTransaction()
-│   ├── schema.js         # 8개 테이블 PG DDL
+│   ├── schema.js         # 18개 테이블 PG DDL
 │   └── migrate.js        # information_schema 기반 컬럼 검증
 ├── helpers/
 │   ├── cache.js          # getCached/setCache/invalidateCache (10분 TTL)
@@ -36,22 +36,31 @@ server/
 │   ├── analysis/
 │   │   ├── scoring.js    # MarketOpinion 10점 스코어링
 │   │   ├── indicators.js # RSI/MACD/볼린저 + *_available 플래그
-│   │   └── router.js     # 7 endpoints
+│   │   ├── signals.js    # 3.11차 — 7종 관찰 신호 + detectCrossHistory (markers)
+│   │   └── router.js     # 8 endpoints
 │   ├── alert/
 │   │   ├── service.js    # generateAlerts + ALERT_COOLDOWNS
 │   │   └── router.js     # 4 endpoints
 │   ├── portfolio/
 │   │   ├── service.js    # recalcWeights (withTransaction)
-│   │   └── router.js     # 5 endpoints
+│   │   └── router.js     # 8 endpoints (history·sharpe·benchmark·correlation 포함)
 │   ├── watchlist/
 │   │   └── router.js     # 3 endpoints
 │   ├── stock/
 │   │   ├── service.js    # getStockData + syncAllStocks + scheduleDaily8AM
-│   │   ├── data.js       # registerInitialData (97종목 + 20개 추천)
+│   │   ├── data.js       # registerInitialData (97종목 + 20개 추천 + 10테마 시드)
 │   │   ├── directory.js  # 3.6차 — KRX stocks_directory 동기화 (syncDirectory/syncDirectoryIfEmpty)
-│   │   └── router.js     # 8 endpoints (directory/search 포함)
+│   │   └── router.js     # 11 endpoints (directory/search·themes 포함)
+│   ├── dart/             # 4.5a차 — DART OpenAPI (재무제표·공시, DB 읽기 전용)
+│   │   └── router.js     # 2 endpoints
+│   ├── journal/          # 4.5b·C차 — 거래일지·행동편향 (CBD 분해)
+│   │   ├── parsers/      # Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index
+│   │   ├── biases/       # disposition/overtrading/chasing/anchoring/avgdown (순수, metrics·flag만)
+│   │   ├── roundtrip.js  # FIFO 매칭 + summarize + openLots·evaluateOpenLots (C-2)
+│   │   ├── service.js    # ingest(F1 교체 트랜잭션) + analyze(valueOpenLots)
+│   │   └── router.js     # 3 endpoints
 │   └── system/
-│       └── router.js     # health, market/indices
+│       └── router.js     # health, market/indices, fear-greed
 └── scheduler.js          # setupScheduler + setupCleanup
 ```
 
@@ -61,14 +70,18 @@ server/
 app.use('/api/alerts',    alertRouter);
 app.use('/api/watchlist', watchlistRouter);
 app.use('/api/holdings',  portfolioRouter);
-app.use('/api', systemRouter);    // /health, /market/indices
+app.use('/api/journal',   journalRouter);   // 4.5b — 거래일지 (prefix 전용, 충돌 없음)
+app.use('/api', systemRouter);    // /health, /market/indices, /market/fear-greed
 app.use('/api', analysisRouter);  // /stock/:code/indicators 등
+app.use('/api', dartRouter);      // /stock/:code/dart/* — stockRouter의 /stock/:code보다 먼저
 app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 ```
 
+> `dartRouter`는 `stockRouter`보다 **먼저** 마운트돼야 `/stock/:code/dart/*`가 `/stock/:code`에 가로채이지 않음. 같은 이유로 `analysisRouter`도 `stockRouter`보다 먼저.
+
 ---
 
-## DB 스키마 (16개 테이블)
+## DB 스키마 (18개 테이블)
 
 | 테이블 | PK | 주요 컬럼 | 비고 |
 |--------|-----|----------|------|
@@ -124,9 +137,9 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (34개)
+## API 엔드포인트 (42개)
 
-### 종목 (stock — 8개)
+### 종목 (stock — 11개)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -185,7 +198,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ### 거래일지 (journal — 3개, `requireDeviceIdMiddleware`)
 
-`server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index 레지스트리), `roundtrip.js`(FIFO), `biases/`(disposition/overtrading/chasing/anchoring — metrics·flag만), `service.js`(오케스트레이션), `router.js`.
+`server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index 레지스트리), `roundtrip.js`(FIFO 매칭 + summarize + **openLots·evaluateOpenLots** — 미청산분 최근 종가 평가, C-2), `biases/`(disposition/overtrading/chasing/anchoring/**avgdown**[평단 하향 추가매수, C-3] — metrics·flag만), `service.js`(ingest[F1 교체 트랜잭션 + journal_imports upsert] + analyze[valueOpenLots DB 로드]), `router.js`.
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
