@@ -12,7 +12,7 @@ export async function runMigrations(pool) {
         { table: 'watchlist',          columns: ['device_id'] },
         { table: 'stock_analysis',     columns: ['opinion', 'toss_url'] },
         { table: 'recommended_stocks', columns: ['source', 'created_at'] },
-        { table: 'stocks_directory',   columns: ['code', 'name', 'market'] },
+        { table: 'stocks_directory',   columns: ['code', 'name', 'market', 'type'] },
         { table: 'stock_themes',       columns: ['theme_id', 'theme_name', 'code'] },
         { table: 'users',              columns: ['provider', 'provider_id', 'email'] },
         { table: 'user_subscriptions', columns: ['user_id', 'status', 'payment_id'] },
@@ -55,6 +55,11 @@ export async function runMigrations(pool) {
     // 첫 배포 때 CREATE된 테이블에는 없으므로 ALTER로 추가(신규 DB는 schema.js가 이미 생성 → no-op).
     await addColumnIfNotExists(pool, 'dart_disclosures', 'rm', 'TEXT');
     await addColumnIfNotExists(pool, 'dart_disclosures', 'corp_cls', 'TEXT');
+
+    // 유니버스 확장 T1 — stocks_directory.type(보통주/우선주/ETF 구분) 컬럼 보강 (기존 DB 호환).
+    // ALTER ADD COLUMN ... DEFAULT 'common'은 기존 행을 전부 'common'으로 채움. KIND 적재분은 전부 common,
+    // Phase 2(KRX issue 소스)에서 preferred/etf/etn 태깅. CHECK 미부여(신규 CREATE와 동일 정책).
+    await addColumnIfNotExists(pool, 'stocks_directory', 'type', "TEXT NOT NULL DEFAULT 'common'");
 
     console.log('PostgreSQL migration checks complete.');
 }

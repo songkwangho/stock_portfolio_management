@@ -127,10 +127,14 @@ export async function initSchema(pool) {
             code        TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
             market      TEXT NOT NULL CHECK (market IN ('KOSPI', 'KOSDAQ', 'KONEX')),
+            type        TEXT NOT NULL DEFAULT 'common',
             listed_at   DATE,
             delisted_at DATE,
             updated_at  TIMESTAMPTZ DEFAULT NOW()
         )
+        -- 유니버스 확장 T1: type 값 도메인 = common(보통주)|preferred(우선주)|etf|etn|reit|spac.
+        -- KIND corpList 적재분은 소스가 구분 못 해 전부 'common'. Phase 2(KRX issue 소스)에서 태깅.
+        -- CHECK 미부여: Phase 2 값 확장 시 제약 마이그레이션 회피 + 신규/기존(ALTER) DB 정합 유지.
     `);
 
     // 3.7차 — 다대다 테마 매핑. 초기 10개 테마 + 종목 큐레이션 (data.js).
