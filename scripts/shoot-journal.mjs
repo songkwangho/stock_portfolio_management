@@ -41,7 +41,14 @@ async function main() {
 
     // 2) device_id 주입(앱 부팅 전) 후 /journal 로드
     const page = await ctx.newPage();
-    await page.addInitScript((id) => { try { localStorage.setItem('device_id', id); } catch { /* noop */ } }, DEV);
+    // device_id 주입 + 온보딩/면책 모달 억제(시각검증 노이즈 제거 — /journal 본문만 캡처).
+    await page.addInitScript((id) => {
+      try {
+        localStorage.setItem('device_id', id);
+        localStorage.setItem('disclaimer_accepted', '1');
+        localStorage.setItem('onboarding_done', '1');
+      } catch { /* noop */ }
+    }, DEV);
     await page.goto(`${BASE}/journal`, { waitUntil: 'networkidle', timeout: 90000 });
 
     // 3) 킬러 카드 대기 (HealthGate + cold start + analysis fetch → 넉넉히). 없으면 전체만 캡처.
