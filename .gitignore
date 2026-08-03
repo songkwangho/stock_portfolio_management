@@ -16,4 +16,6 @@ next-env.d.ts
 scripts/.backfill-state.json
 # DART 응답 원본 샘플 (구조 대조용, 커밋 금지 — 습관적 안전장치)
 scripts/.dart-sample.json
+# Playwright 시각검증 스크린샷 (스냅샷 커밋 금지 — 기준 스냅샷만 별도 관리)
+artifacts/
 

@@ -151,11 +151,11 @@ export default function JournalPage() {
         <div className="space-y-5">
           {/* C-2: 미실현 손실 킬러 한 줄 — 결과 최상단. 무채색(방향색 금지), '최근 종가 기준' 명시. */}
           {headline.available && (
-            <div className="bg-surface border border-line rounded-xl p-4">
+            <div data-testid="journal-headline" className="bg-surface border border-line rounded-xl p-4">
               <p className="text-sm text-ink leading-relaxed break-keep">{headline.text}</p>
             </div>
           )}
-          <section>
+          <section data-testid="journal-summary">
             <h3 className="text-sm font-bold text-ink mb-2">매매 통계</h3>
             <SummaryTable s={analysis.summary} />
             {journalCoverageNotes(analysis.coverage).map((note, i) => (
