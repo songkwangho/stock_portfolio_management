@@ -4,14 +4,16 @@ import { disposition } from './disposition.js';
 import { overtrading } from './overtrading.js';
 import { chasing } from './chasing.js';
 import { anchoring } from './anchoring.js';
+import { avgdown } from './avgdown.js';
 
 // { trades, roundtrips, priceReader } → Bias[]
-// priceReader는 chasing 전용 가격조회 포트(async). 나머지는 순수.
+// priceReader는 chasing 전용 가격조회 포트(async). 나머지는 순수. avgdown은 trades 기반(C-3).
 export async function computeBiases({ trades, roundtrips, priceReader }) {
     return [
         disposition(roundtrips),
         overtrading(trades, roundtrips),
         await chasing(trades, priceReader),
         anchoring(roundtrips),
+        avgdown(trades),
     ];
 }

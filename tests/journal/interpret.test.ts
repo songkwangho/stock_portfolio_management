@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   readDisposition, readOvertrading, readChasing, readAnchoring, readBiases, journalCoverageNotes,
-  readOpenLossHeadline, type JournalBias,
+  readOpenLossHeadline, readAvgDown, type JournalBias,
 } from '@/lib/journal/interpret';
 import { FORBIDDEN_JOURNAL } from '../forbiddenWords';
 
@@ -95,6 +95,21 @@ describe('journal interpret — 사실 + 관찰형', () => {
     const r = readOpenLossHeadline({ roundtripCount: 2, realizedLossCount: 0, openLossCount: 1, openLossAvgHoldDays: 5, asOfDate: '2025-08-27', unvaluedCount: 2 });
     expect(r.text).toContain('시세 정보가 없는 2종목');
   });
+  it('평단 하향 추가매수(C-3) — 건수 + 종목명 예시, "물타기/편향" 미사용', () => {
+    const r = readAvgDown({ key: 'avgdown', available: true, count: 3, codes: ['DEEP'], names: ['딥노이드'], flag: true, thresholds: { perStockMin: 2 } });
+    expect(r.text).toContain('평단을 낮춘 매수가 3건');
+    expect(r.text).toContain('딥노이드');
+    expect(r.text).not.toContain('물타기');
+    expect(r.text).not.toContain('편향');
+  });
+  it('평단 하향 추가매수(C-3) — 0건이면 중립 서술', () => {
+    const r = readAvgDown({ key: 'avgdown', available: true, count: 0 });
+    expect(r.available).toBe(true);
+    expect(r.text).toContain('눈에 띄지 않았어요');
+  });
+  it('평단 하향 추가매수(C-3) — 비교 불가면 available:false', () => {
+    expect(readAvgDown({ key: 'avgdown', available: false }).available).toBe(false);
+  });
   it('readBiases — 서버 순서 유지, 미지원 키 스킵', () => {
     const out = readBiases([
       { key: 'disposition', available: false },
@@ -119,6 +134,10 @@ describe('금지 단어 미포함 (질책·판정·명령형 포함)', () => {
   // 킬러 한 줄(C-2) — 실현 이익/손실 혼합 × 미실현 손실수 × unvalued
   for (const rl of [0, 2]) for (const ol of [0, 1, 5]) for (const uv of [0, 3]) {
     texts.push(readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: rl, openLossCount: ol, openLossAvgHoldDays: 12, asOfDate: '2025-08-27', unvaluedCount: uv }).text);
+  }
+  // 평단 하향 추가매수(C-3) — available/flag/count 조합
+  for (const avail of [true, false]) for (const flag of [true, false]) for (const cnt of [0, 1, 5]) {
+    texts.push(readAvgDown({ key: 'avgdown', available: avail, count: cnt, codes: ['DEEP', 'ALU', 'YU', 'X'], names: ['딥노이드', '알루코', '유유제약', '기타'], flag, thresholds: { perStockMin: 2 } }).text);
   }
   for (const avail of [true, false]) {
     for (const flag of [true, false]) {

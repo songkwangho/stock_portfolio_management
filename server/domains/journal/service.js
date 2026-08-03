@@ -116,6 +116,14 @@ export async function analyze(deviceId) {
     const priceReader = await buildPriceReader(trades);
     const biases = await computeBiases({ trades, roundtrips, priceReader });
 
+    // C-3: avgdown 표시용 종목명 부착 (interpret은 프론트라 code→name 매핑이 없음).
+    const avgBias = biases.find(b => b.key === 'avgdown');
+    if (avgBias && Array.isArray(avgBias.codes) && avgBias.codes.length > 0) {
+        const { rows: nameRows } = await query('SELECT code, name FROM stocks WHERE code = ANY($1)', [avgBias.codes]);
+        const nameByCode = Object.fromEntries(nameRows.map(r => [r.code, r.name]));
+        avgBias.names = avgBias.codes.map(c => nameByCode[c] || c);
+    }
+
     // C-1: 적재 메타(유니버스 제외 건수·종목) 병합 → 지속 캐비엇. 메타 없으면(구버전 적재) 필드 생략.
     const { rows: metaRows } = await query(
         'SELECT total, imported, skipped, skipped_names FROM journal_imports WHERE device_id = $1',

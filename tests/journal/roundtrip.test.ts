@@ -4,6 +4,7 @@ import { disposition } from '@/server/domains/journal/biases/disposition.js';
 import { overtrading } from '@/server/domains/journal/biases/overtrading.js';
 import { anchoring } from '@/server/domains/journal/biases/anchoring.js';
 import { chasing } from '@/server/domains/journal/biases/chasing.js';
+import { avgdown } from '@/server/domains/journal/biases/avgdown.js';
 
 const T = (code: string, side: string, quantity: number, price: number, tradedAt: string) =>
   ({ code, side, quantity, price, tradedAt });
@@ -183,5 +184,38 @@ describe('편향 — 수치·flag만 (텍스트 없음)', () => {
     const c = await chasing([T('A', 'buy', 1, 100, '2026-02-01')], () => null);
     expect(c.available).toBe(false);
     expect(c.coverage.skipped).toBe(1);
+  });
+
+  it('avgdown(C-3) — 딥노이드 하락 재매수 시퀀스 → 첫 매수 제외, 3건 감지, flag', () => {
+    const a = avgdown([
+      T('DEEP', 'buy', 1, 1440, '2026-01-01'),   // 첫 매수(제외)
+      T('DEEP', 'buy', 1, 1315, '2026-01-05'),   // < 1440 → 이벤트1
+      T('DEEP', 'buy', 1, 1250, '2026-01-10'),   // < 1377.5 → 이벤트2
+      T('DEEP', 'buy', 1, 1227, '2026-01-15'),   // < 1335 → 이벤트3
+    ]);
+    expect(a.available).toBe(true);
+    expect(a.count).toBe(3);
+    expect(a.evaluableBuys).toBe(3);
+    expect(a.codes).toEqual(['DEEP']);
+    expect(a.flag).toBe(true);   // 한 종목 3회 ≥ perStockMin 2
+    expect(a.thresholds.provisional).toBe(true);
+  });
+  it('avgdown(C-3) — 상승 재매수는 이벤트 아님', () => {
+    const a = avgdown([
+      T('A', 'buy', 1, 100, '2026-01-01'), T('A', 'buy', 1, 120, '2026-01-05'),   // 120 > 100 → 이벤트 아님
+    ]);
+    expect(a.available).toBe(true);
+    expect(a.count).toBe(0);
+  });
+  it('avgdown(C-3) — 매도는 평단 미변경 (재매수 비교는 매수 누적 평단 기준)', () => {
+    const a = avgdown([
+      T('A', 'buy', 1, 100, '2026-01-01'),
+      T('A', 'sell', 1, 130, '2026-01-03'),      // 매도 → 평단 미변경(100 유지)
+      T('A', 'buy', 1, 90, '2026-01-05'),         // 90 < 100 → 이벤트
+    ]);
+    expect(a.count).toBe(1);
+  });
+  it('avgdown(C-3) — 종목당 매수 1회뿐이면 available:false(비교 불가)', () => {
+    expect(avgdown([T('A', 'buy', 1, 100, '2026-01-01')]).available).toBe(false);
   });
 });

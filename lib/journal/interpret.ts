@@ -25,6 +25,7 @@ const LABELS: Record<string, string> = {
   overtrading: '매매 빈도',
   chasing: '매수 시점',
   anchoring: '청산 시점',
+  avgdown: '추가 매수 패턴',
 };
 
 const NOT_ENOUGH = '아직 이 항목을 볼 만큼 청산된 거래가 모이지 않았어요.';
@@ -67,7 +68,31 @@ export function readOvertrading(b: JournalBias): JournalReading {
   return { key: 'overtrading', label, text, available: true };
 }
 
+// ── 평단 하향 추가매수 — 하락 뒤 재매수로 평단 낮춘 매수 (C-3, 중립·관찰형) ──
+// "물타기"·"편향"·판단어 미사용. 인과("이익만 실현이라 리스크")는 서술하지 않고 사실만.
+export function readAvgDown(b: JournalBias): JournalReading {
+  const label = LABELS.avgdown;
+  if (!b || !b.available) {
+    return { key: 'avgdown', label, text: '같은 종목을 두 번 이상 사신 기록이 아직 부족해요.', available: false };
+  }
+  const count = num(b.count);
+  if (count === 0) {
+    return { key: 'avgdown', label, text: '하락한 뒤 다시 사서 평단을 낮춘 매수는 눈에 띄지 않았어요.', available: true };
+  }
+  const names = Array.isArray((b as { names?: string[] }).names) ? (b as { names?: string[] }).names! : [];
+  const codes = Array.isArray(b.codes) ? (b.codes as string[]) : [];
+  const list = names.length ? names : codes;
+  const shown = list.slice(0, 3).join('·');
+  let text = `하락한 뒤 다시 사서 평단을 낮춘 매수가 ${count}건 있었어요`;
+  if (shown) text += `(예: ${shown}${list.length > 3 ? '…' : ''})`;
+  text += '.';
+  if (b.flag) text += ' 같은 종목을 여러 번 낮춰 사신 경우도 있어요.';
+  return { key: 'avgdown', label, text, available: true };
+}
+
 // ── 추격매수 — 급등 직후 매수 비율 + coverage ──
+// C-3 재프레이밍: 평단 하향(하락 중 매수) 프로필에선 직전 N일 수익률이 음수라 추격 0%가 정합
+// ('예상된 null'). 0/N은 버그가 아니라 하락 매수 성향의 자연스러운 결과일 수 있음.
 export function readChasing(b: JournalBias): JournalReading {
   const label = LABELS.chasing;
   if (!b || !b.available) return { key: 'chasing', label, text: NOT_ENOUGH, available: false };
@@ -101,6 +126,7 @@ const READERS: Record<string, (b: JournalBias) => JournalReading> = {
   overtrading: readOvertrading,
   chasing: readChasing,
   anchoring: readAnchoring,
+  avgdown: readAvgDown,
 };
 
 // biases[] → JournalReading[] (서버 순서 유지, 미지원 키는 스킵)
