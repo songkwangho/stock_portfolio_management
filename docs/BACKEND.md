@@ -89,6 +89,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | **dart_financials** | code+year+quarter+fs_div+account_id | account_nm, amount (NUMERIC 20,0), prev_amount | 4.5a차 신설. DART 재무제표. fs_div CFS(연결)/OFS(별도). account_id는 canonical(revenue/operating_income/…)로 저장(표준코드 미사용 PK 충돌 회피). 인덱스: (code, year DESC) |
 | **dart_disclosures** | rcept_no | code, corp_name, report_nm, rcept_dt, flr_nm, category, rm, corp_cls | 4.5a차 신설. DART 공시. category 규칙 분류(표시용). rm=비고(정=정정/철=철회/유·코=시장). 인덱스: (code, rcept_dt DESC) |
 | **journal_trades** | id (BIGSERIAL) | device_id, code, side('buy'/'sell' CHECK), quantity, price (NUMERIC 14,2), traded_at (DATE), source | 4.5b차 신설. 거래일지(행동편향 진단). **원본 CSV·PII(계좌·예수금·성명) 미저장** — 화이트리스트 컬럼만. price NUMERIC→Number() 캐스팅. 인덱스: (device_id, code, traded_at) |
+| **journal_imports** | device_id | total, imported, skipped, skipped_names (TEXT[]), uploaded_at | C-1차 신설. 거래일지 적재 메타(디바이스당 1행, F1 교체 트랜잭션 안 upsert). 지속 커버리지 캐비엇용 — 제외 **건수(skipped)와 distinct 종목명(skipped_names) 분리**. resolved>0일 때만 upsert(가드) |
 
 ### stocks_directory 동기화 파이프라인
 
@@ -189,7 +190,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | **POST** | **`/api/journal/upload`** | 4.5b차 — body `{csvText, broker?}`(csvText는 프론트 EUC-KR 디코드). 파싱→정규화→종목코드 해석(6자리 우선/종목명 폴백)→적재. `{broker, imported, skipped, dateRange, coverage}`. 유니버스 밖은 skip. **원본 CSV·PII 미저장** |
-| **GET** | **`/api/journal/analysis`** | 4.5b차 — FIFO 라운드트립→요약(승률·손익비·평균보유·MDD, 실현손익 기준) + 4대 편향(수치·flag, 임계값 미검증 provisional). `{available, summary, biases[], coverage}`. 데이터 없으면 `available:false` |
+| **GET** | **`/api/journal/analysis`** | 4.5b차 — FIFO 라운드트립→요약(승률·손익비·평균보유·MDD, 실현손익 기준) + 편향(수치·flag, provisional). **C-2**: 미청산 openLots를 최근 종가로 평가 → summary에 `openLossCount/openLossAvgHoldDays/asOfDate/unvaluedCount/realizedLossCount`(가격=stock_history 최신 종가→stocks.price 폴백, **asOfDate 필수·"지금" 아님**). **C-1**: coverage에 적재 메타(`total/imported/skipped/skippedNames`) 병합. **C-3**: biases에 `avgdown`(평단 하향 추가매수) 추가 + code→name 부착. `{available, summary, biases[], coverage}`, 데이터 없으면 `available:false` |
 | **DELETE** | **`/api/journal`** | 4.5b차 — 해당 device 거래 전량 삭제 `{deleted}`. 재업로드는 append라 재분석 전 리셋용 |
 
 > 편향 텍스트(한국어 관찰형 풀이)는 백엔드에 없음 — 서버는 수치·flag만, 풀이는 프론트 `lib/journal/interpret.ts`(4.5c와 동일 구조 + 금지어 테스트 재사용).

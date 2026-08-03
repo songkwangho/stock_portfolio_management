@@ -436,6 +436,21 @@ PC (md: 이상):
 
 ---
 
+**Phase C — 매매 패턴 관찰 활성화 (와닿는 포트폴리오 관리, 2026-08-03)**
+
+동료 평가("와닿는 게 없다") + 실계좌 E2E 진단 → 안전 원칙 과적용으로 인한 "공허" 반전. **신규 데이터 0**(journal 도메인 내 조립·표출). 경계선 R1(현저성 정렬)·R2(이벤트 배지 O/해석 라벨 X)·판단어 금지 준수, 인과 서술 금지(두 사실 나란히). "실현손실 전제라 침묵하던 처분효과"의 반쪽을 미실현 손실로 완성.
+
+- [x] **[C-1]** 적재 메타·지속 커버리지 캐비엇 — `journal_imports(device_id PK, total, imported, skipped, skipped_names[], uploaded_at)` F1 교체 트랜잭션 안 upsert(가드 동일). `analyze`가 병합 → `journalCoverageNotes`(배열: 유니버스 제외+미매칭 매도 2축). **건수(skipped)≠종목수(skipped_names.length)** 분리 고지. 업로드 직후 1회성 → analysis 지속 노출로 전환
+- [x] **[C-2]** open-lot 미실현 손실·킬러 한 줄 — `computeRoundtrips`가 FIFO 미청산분 `openLots`({code,quantity,avgBuyPrice 잔여가중,firstBuyDate}) 반환. `valueOpenLots`: stock_history 최신 종가(+날짜) → stocks.price 폴백 → unvalued. **asOfDate(최신 종가 날짜)·"지금" 금지**. `readOpenLossHeadline`: "실현 청산 N건 전부 이익, 최근 종가(asOfDate) 기준 미실현 손실 M종목(평균 K일)". 스코프 캐비엇 2축(가격=최근 종가/수량=업로드 내역) 내장. 결과 최상단 무채색 카드
+- [x] **[C-3]** 평단 하향 추가매수 관찰 — `biases/avgdown.js`(순수): 매수만으로 러닝 평단 유지(매도 미변경), 각 매수가<직전 평단→이벤트, 첫 매수 제외. `readAvgDown`: "하락 뒤 다시 사서 평단을 낮춘 매수 N건(예: 딥노이드…)". **"물타기"·"편향"·판단어 금지**, 인과 미서술. 추격 0/N은 '예상된 null'로 재프레이밍(주석)
+- **원칙**: 전 영역 무채색, provisional 뱃지, 면책, FORBIDDEN 스윕(물타기/편향 추가). tone/방향색 미사용
+- 검증: tsc 0 · next build ✓(/journal) · **npm test 114** · 금지어 grep(출력) 0 · 방향색 0
+- **어드버서리얼 리뷰(8에이전트/4렌즈)**: 4 CONFIRMED 수정 — ① 미실현 보유일 전역 asOfDate→종목별 날짜+음수 클램프(순수 `evaluateOpenLots` 추출·단위테스트), ② "전부 이익"을 winCount===roundtripCount로 게이트(본전 pnl=0 과장 방지), ③ FORBIDDEN 스윕에 물타기/편향 추가(전 브랜치 커버)
+- ⚠️ **운영 대기/검증**: ① ingest 메타 upsert·`valueOpenLots`(DB 로드부)는 DB 통합이라 실DB는 운영자 검증(F1 동일 — 계산은 순수 `evaluateOpenLots`로 단위테스트됨). ② 미실현 평가는 **"업로드하신 내역 기준"**(부분 히스토리면 open-lot 과대 가능 — 미매칭 매도 캐비엇과 짝) + "최근 종가(asOfDate) 기준". ③ 추격 0/N 1종목 손계산 스팟체크
+- **후속(로드맵)**: 유니버스 확장(§A 선행) → A 주목 레이어(트리아지) → B 포지션 앵커 해석 → D 성과 귀인
+
+---
+
 **4.5c차 — 종합 해석 (초보자용 데이터 풀이, 2026-07-28)**
 
 데이터·지표를 보여주기만 하던 걸 초보자 언어로 풀이 + 상충 짚기. **투자 권유 아님** — 사실+정도표현(싼/비싼/높은/낮은 편)까지만, 판단 단어(좋다/나쁘다/위험/사라/팔라) 금지. 종합은 상충 서술 + 판단 유보. 기존 계산(scoringBreakdown·indicators·sectorData·DART 재무)만 재사용, 신규 계산·백엔드 변경 없음.
