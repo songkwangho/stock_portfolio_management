@@ -342,12 +342,19 @@ export interface JournalUploadResult {
 }
 export interface JournalSummary {
   roundtripCount: number;
+  realizedLossCount?: number;   // C-2
   winRate: number | null;
   avgHoldWin: number | null;
   avgHoldLoss: number | null;
   profitFactor: number | null;
   maxDrawdown: number;   // 원, 실현손익 기준
   totalPnl: number;
+  // C-2: 미청산 보유분(openLots) 최근 종가 평가
+  openPositionCount?: number;
+  openLossCount?: number;
+  openLossAvgHoldDays?: number | null;
+  asOfDate?: string | null;   // '최근 종가' 날짜 (YYYY-MM-DD)
+  unvaluedCount?: number;
 }
 // 편향은 키별 필드가 달라 열린 형태 — interpret이 key로 분기. flag는 UI 색 아님(관찰 집계용).
 export interface JournalBiasMetric {

@@ -74,6 +74,33 @@ describe('computeRoundtrips — 미매칭 매도 집계 (F2 coverage)', () => {
   });
 });
 
+describe('computeRoundtrips — 미청산 보유분 openLots (C-2)', () => {
+  it('매수 10 / 매도 4 → openLot 잔여 6, 첫 매수일 보존', () => {
+    const { openLots } = computeRoundtrips([
+      T('A', 'buy', 10, 100, '2026-01-01'),
+      T('A', 'sell', 4, 120, '2026-01-10'),
+    ]);
+    expect(openLots).toHaveLength(1);
+    expect(openLots[0]).toMatchObject({ code: 'A', quantity: 6, avgBuyPrice: 100, firstBuyDate: '2026-01-01' });
+  });
+  it('여러 lot 부분 소진 → 잔여 가중평균가', () => {
+    const { openLots } = computeRoundtrips([
+      T('A', 'buy', 5, 100, '2026-01-01'),   // 첫 lot
+      T('A', 'buy', 5, 200, '2026-01-02'),   // 둘째 lot
+      T('A', 'sell', 3, 150, '2026-01-10'),  // 첫 lot에서 3 소진 → 잔여: 첫 2@100 + 둘째 5@200
+    ]);
+    expect(openLots[0].quantity).toBe(7);
+    expect(openLots[0].avgBuyPrice).toBeCloseTo((2 * 100 + 5 * 200) / 7, 6);
+    expect(openLots[0].firstBuyDate).toBe('2026-01-01');
+  });
+  it('전량 매도면 openLots 없음', () => {
+    const { openLots } = computeRoundtrips([
+      T('A', 'buy', 5, 100, '2026-01-01'), T('A', 'sell', 5, 120, '2026-01-10'),
+    ]);
+    expect(openLots).toHaveLength(0);
+  });
+});
+
 describe('summarize — 실현손익 요약', () => {
   it('승률·손익비·평균보유(이익/손실)·MDD', () => {
     const rt = rts([
@@ -82,6 +109,7 @@ describe('summarize — 실현손익 요약', () => {
     ]);
     const s = summarize(rt);
     expect(s.roundtripCount).toBe(2);
+    expect(s.realizedLossCount).toBe(1);   // C-2: B 청산이 손실
     expect(s.winRate).toBe(50);
     expect(s.avgHoldWin).toBe(10);
     expect(s.avgHoldLoss).toBe(50);

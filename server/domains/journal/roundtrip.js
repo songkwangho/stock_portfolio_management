@@ -8,17 +8,20 @@ function daysBetween(a, b) {
     return Math.round(ms / 86400000);
 }
 
-// Trade[] → { roundtrips: Roundtrip[], unmatched: { sellCount, sellQty } }
+// Trade[] → { roundtrips: Roundtrip[], unmatched: { sellCount, sellQty }, openLots: OpenLot[] }
 // Roundtrip = { code, buyDate, sellDate, quantity, buyPrice, sellPrice, holdingDays, pnl, pnlRate }
+// OpenLot   = { code, quantity(잔여합), avgBuyPrice(잔여 가중평균), firstBuyDate }
 //
 // F2(리뷰): 앞선 매수 lot이 없는 매도분(업로드 구간 이전 보유분의 매도가 대부분)을 집계해
 // unmatched로 반환한다. 예전엔 silent skip이라 승률·손익비·MDD가 부분집합으로 계산되는데
 // 사용자에게 고지가 없었음 → coverage 투명성 원칙 위반. 이제 호출부가 고지할 수 있게 노출.
+// C-2: FIFO 종료 후 미청산 매수 lot = 현재 보유분 → openLots로 반환(호출부가 최근 종가로 미실현 평가).
 export function computeRoundtrips(trades) {
     const byCode = {};
     for (const t of trades) (byCode[t.code] ||= []).push(t);
 
     const roundtrips = [];
+    const openLots = [];
     let unmatchedSellCount = 0;
     let unmatchedSellQty = 0;
     for (const list of Object.values(byCode)) {
@@ -60,8 +63,16 @@ export function computeRoundtrips(trades) {
             // silent skip 대신 집계해 coverage로 고지(F2).
             if (qty > 0) { unmatchedSellCount++; unmatchedSellQty += qty; }
         }
+        // C-2: 종목의 미청산 매수 lot = 현재 보유분. 잔여 가중평균가·첫 매수일 집계.
+        if (lots.length > 0) {
+            const code = list[0].code;
+            const quantity = lots.reduce((s, l) => s + l.remaining, 0);
+            const cost = lots.reduce((s, l) => s + l.price * l.remaining, 0);
+            const firstBuyDate = lots.reduce((min, l) => (l.date < min ? l.date : min), lots[0].date);
+            openLots.push({ code, quantity, avgBuyPrice: quantity > 0 ? cost / quantity : 0, firstBuyDate });
+        }
     }
-    return { roundtrips, unmatched: { sellCount: unmatchedSellCount, sellQty: unmatchedSellQty } };
+    return { roundtrips, unmatched: { sellCount: unmatchedSellCount, sellQty: unmatchedSellQty }, openLots };
 }
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -90,6 +101,7 @@ export function summarize(roundtrips) {
 
     return {
         roundtripCount: n,
+        realizedLossCount: losses.length,   // C-2: 실현 손실 청산 건수(0이면 "전부 이익" 헤드라인 분기)
         winRate: decided > 0 ? round1((wins.length / decided) * 100) : null,
         avgHoldWin: winHold == null ? null : round1(winHold),
         avgHoldLoss: lossHold == null ? null : round1(lossHold),

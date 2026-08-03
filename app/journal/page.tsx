@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Upload, Trash2, FileText } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import { readBiases, journalCoverageNotes, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
+import { readBiases, journalCoverageNotes, readOpenLossHeadline, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
 import type { JournalAnalysis, JournalUploadResult, JournalSummary } from '@/types/stock';
 
 // File → 텍스트. 한국 증권사 CSV는 EUC-KR(CP949)이 흔함 → euc-kr 우선, BOM/대체문자 시 utf-8 폴백.
@@ -100,6 +100,7 @@ export default function JournalPage() {
   };
 
   const readings = analysis?.available && analysis.biases ? readBiases(analysis.biases as JournalBias[]) : [];
+  const headline = analysis?.available ? readOpenLossHeadline(analysis.summary) : { available: false, text: '' };
 
   return (
     <div className="max-w-3xl animate-in slide-in-from-bottom-4 duration-500">
@@ -148,6 +149,12 @@ export default function JournalPage() {
       {/* 결과 */}
       {analysis?.available && analysis.summary ? (
         <div className="space-y-5">
+          {/* C-2: 미실현 손실 킬러 한 줄 — 결과 최상단. 무채색(방향색 금지), '최근 종가 기준' 명시. */}
+          {headline.available && (
+            <div className="bg-surface border border-line rounded-xl p-4">
+              <p className="text-sm text-ink leading-relaxed break-keep">{headline.text}</p>
+            </div>
+          )}
           <section>
             <h3 className="text-sm font-bold text-ink mb-2">매매 통계</h3>
             <SummaryTable s={analysis.summary} />

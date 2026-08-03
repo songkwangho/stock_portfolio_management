@@ -138,5 +138,32 @@ export function journalCoverageNotes(coverage: JournalCoverage | null | undefine
   return notes;
 }
 
+export interface OpenLossSummary {
+  roundtripCount?: number;
+  realizedLossCount?: number;
+  openLossCount?: number;
+  openLossAvgHoldDays?: number | null;
+  asOfDate?: string | null;
+  unvaluedCount?: number;
+}
+
+// C-2 — 미실현 손실 보유 킬러 한 줄. 실현이 전부 이익이면 그 사실을 나란히(인과 서술 금지 — 두 사실만).
+// 스코프 캐비엇 2축을 문구에 내장: 가격="최근 종가(asOfDate) 기준", 수량="업로드하신 내역에서".
+// ⚠️ "지금" 금지(asOfDate 명시). openLossCount==0 또는 asOfDate 없으면 available:false. 판단어 0.
+export function readOpenLossHeadline(s: OpenLossSummary | null | undefined): { available: boolean; text: string } {
+  const openLoss = num(s?.openLossCount);
+  const asOf = s?.asOfDate;
+  if (!s || openLoss <= 0 || !asOf) return { available: false, text: '' };
+  const m = s.openLossAvgHoldDays == null ? null : num(s.openLossAvgHoldDays);
+  const hold = m == null ? '' : `(평균 ${m}일 보유 중)`;
+  const realizedCount = num(s.roundtripCount);
+  const allProfit = num(s.realizedLossCount) === 0 && realizedCount > 0;
+  const tail = `최근 종가(${asOf}) 기준 업로드하신 내역에서 아직 안 파신 보유분 중 손실인 종목이 ${openLoss}개예요${hold}.`;
+  let text = allProfit ? `실현한 청산 ${realizedCount}건은 전부 이익이었는데, ${tail}` : tail;
+  const unvalued = num(s.unvaluedCount);
+  if (unvalued > 0) text += ` 시세 정보가 없는 ${unvalued}종목은 평가에서 빠졌어요.`;
+  return { available: true, text };
+}
+
 export const JOURNAL_DISCLAIMER =
   '※ 본인 거래 데이터를 관찰용으로 풀어드린 거예요. 판정이 아니라 참고이고, 투자 판단과 거래는 직접·증권사 앱에서 진행하시면 돼요.';

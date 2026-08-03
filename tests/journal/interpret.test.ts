@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   readDisposition, readOvertrading, readChasing, readAnchoring, readBiases, journalCoverageNotes,
-  type JournalBias,
+  readOpenLossHeadline, type JournalBias,
 } from '@/lib/journal/interpret';
 import { FORBIDDEN_JOURNAL } from '../forbiddenWords';
 
@@ -70,6 +70,31 @@ describe('journal interpret — 사실 + 관찰형', () => {
     expect(readDisposition({ key: 'disposition', available: false }).available).toBe(false);
     expect(readChasing({ key: 'chasing', available: false }).text).toContain('모이지 않았어요');
   });
+  it('킬러 한 줄(C-2) — 실현 전부 이익 + 미실현 손실 N종목, asOfDate 포함·"지금" 미포함', () => {
+    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 0, openLossCount: 3, openLossAvgHoldDays: 27, asOfDate: '2025-08-27' });
+    expect(r.available).toBe(true);
+    expect(r.text).toContain('청산 4건은 전부 이익');
+    expect(r.text).toContain('손실인 종목이 3개');
+    expect(r.text).toContain('27일');
+    expect(r.text).toContain('2025-08-27');      // asOfDate 명시
+    expect(r.text).toContain('최근 종가');
+    expect(r.text).not.toContain('지금');          // "지금" 금지
+  });
+  it('킬러 한 줄(C-2) — 실현에 손실 섞이면 "전부 이익" 제거', () => {
+    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 1, openLossCount: 2, openLossAvgHoldDays: 10, asOfDate: '2025-08-27' });
+    expect(r.available).toBe(true);
+    expect(r.text).not.toContain('전부 이익');
+    expect(r.text).toContain('손실인 종목이 2개');
+  });
+  it('킬러 한 줄(C-2) — 미실현 손실 0 또는 asOfDate 없으면 available:false', () => {
+    expect(readOpenLossHeadline({ openLossCount: 0, asOfDate: '2025-08-27' }).available).toBe(false);
+    expect(readOpenLossHeadline({ openLossCount: 3, asOfDate: null }).available).toBe(false);
+    expect(readOpenLossHeadline(undefined).available).toBe(false);
+  });
+  it('킬러 한 줄(C-2) — 평가 불가 종목 있으면 고지', () => {
+    const r = readOpenLossHeadline({ roundtripCount: 2, realizedLossCount: 0, openLossCount: 1, openLossAvgHoldDays: 5, asOfDate: '2025-08-27', unvaluedCount: 2 });
+    expect(r.text).toContain('시세 정보가 없는 2종목');
+  });
   it('readBiases — 서버 순서 유지, 미지원 키 스킵', () => {
     const out = readBiases([
       { key: 'disposition', available: false },
@@ -90,6 +115,10 @@ describe('금지 단어 미포함 (질책·판정·명령형 포함)', () => {
   ];
   for (const [t, im, sk, nm] of univ) {
     texts.push(...journalCoverageNotes({ total: t, imported: im, skipped: sk, skippedNames: nm }));
+  }
+  // 킬러 한 줄(C-2) — 실현 이익/손실 혼합 × 미실현 손실수 × unvalued
+  for (const rl of [0, 2]) for (const ol of [0, 1, 5]) for (const uv of [0, 3]) {
+    texts.push(readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: rl, openLossCount: ol, openLossAvgHoldDays: 12, asOfDate: '2025-08-27', unvaluedCount: uv }).text);
   }
   for (const avail of [true, false]) {
     for (const flag of [true, false]) {

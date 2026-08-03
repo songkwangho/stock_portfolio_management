@@ -109,8 +109,10 @@ export async function analyze(deviceId) {
         code: r.code, side: r.side, quantity: Number(r.quantity), price: Number(r.price), tradedAt: r.traded_at,
     }));
 
-    const { roundtrips, unmatched } = computeRoundtrips(trades);
-    const summary = summarize(roundtrips);
+    const { roundtrips, unmatched, openLots } = computeRoundtrips(trades);
+    // C-2: 미청산 보유분(openLots)을 최근 종가로 평가 → 미실현 손실 종목수·보유일·asOfDate.
+    const openEval = await valueOpenLots(openLots);
+    const summary = { ...summarize(roundtrips), ...openEval };
     const priceReader = await buildPriceReader(trades);
     const biases = await computeBiases({ trades, roundtrips, priceReader });
 
@@ -137,6 +139,53 @@ export async function analyze(deviceId) {
                 skippedNames: meta.skipped_names || [],
             } : {}),
         },
+    };
+}
+
+// C-2 — 미청산 보유분(openLots)을 최근 종가로 평가. 실현손실이 없어도 처분효과의 반쪽을 사실로.
+// 가격: stock_history 최신 종가(+날짜) 우선, 없으면 stocks.price 폴백, 그것도 없으면 평가 불가(unvalued).
+// asOfDate: 사용된 최신 종가 날짜 중 가장 최근 — "지금"이 아니라 "최근 종가(그 날짜) 기준"으로만 서술.
+const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+const round1 = (n) => Math.round(n * 10) / 10;
+
+async function valueOpenLots(openLots) {
+    const base = { openPositionCount: openLots.length, openLossCount: 0, openLossAvgHoldDays: null, asOfDate: null, unvaluedCount: 0 };
+    if (openLots.length === 0) return base;
+    const codes = openLots.map(o => o.code);
+
+    // 종목별 최신 종가(+날짜). stock_history.date는 'YYYYMMDD' TEXT → 사전순 DESC = 최신.
+    const { rows: histRows } = await query(
+        `SELECT DISTINCT ON (code) code, date, price FROM stock_history WHERE code = ANY($1) ORDER BY code, date DESC`,
+        [codes]
+    );
+    const hist = {};
+    for (const r of histRows) hist[r.code] = { date: r.date, close: Number(r.price) };
+    // stocks.price 폴백
+    const { rows: stkRows } = await query('SELECT code, price FROM stocks WHERE code = ANY($1)', [codes]);
+    const stkPrice = {};
+    for (const r of stkRows) stkPrice[r.code] = r.price == null ? null : Number(r.price);
+
+    // asOfDate = 히스토리로 평가된 종목의 최신 종가 날짜 중 가장 최근.
+    let maxYmd = null;
+    for (const c of codes) if (hist[c] && (!maxYmd || hist[c].date > maxYmd)) maxYmd = hist[c].date;
+    const asOfDate = maxYmd ? `${maxYmd.slice(0, 4)}-${maxYmd.slice(4, 6)}-${maxYmd.slice(6, 8)}` : null;
+
+    let unvalued = 0, lossCount = 0;
+    const lossHoldDays = [];
+    for (const o of openLots) {
+        const cur = hist[o.code]?.close ?? stkPrice[o.code] ?? null;
+        if (cur == null || cur <= 0) { unvalued++; continue; }
+        if (cur < o.avgBuyPrice) {
+            lossCount++;
+            if (asOfDate) lossHoldDays.push(daysBetween(o.firstBuyDate, asOfDate));   // 보유일은 asOfDate 기준
+        }
+    }
+    return {
+        openPositionCount: openLots.length,
+        openLossCount: lossCount,
+        openLossAvgHoldDays: lossHoldDays.length ? round1(lossHoldDays.reduce((s, d) => s + d, 0) / lossHoldDays.length) : null,
+        asOfDate,
+        unvaluedCount: unvalued,
     };
 }
 
