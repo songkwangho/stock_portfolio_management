@@ -5,9 +5,7 @@ import { query, withTransaction } from '../../db/connection.js';
 import { parseTrades } from './parsers/index.js';
 import { computeRoundtrips, summarize, evaluateOpenLots } from './roundtrip.js';
 import { computeBiases } from './biases/index.js';
-
-// 종목명 정규화(공백 제거)로 매핑 견고화.
-const norm = (s) => String(s || '').replace(/\s/g, '');
+import { norm, buildNameIndex } from './universe.js';
 
 // deviceId, csvText, brokerHint → { broker, imported, skipped, dateRange, coverage, replaced }
 //
@@ -22,11 +20,11 @@ export async function ingest(deviceId, csvText, brokerHint) {
         return { broker, imported: 0, skipped: 0, dateRange: null, coverage: { matched: 0, unmatched: 0 }, replaced: false };
     }
 
-    // 우리 유니버스(stocks) 로드 — 코드셋 + 종목명→코드 맵.
-    const { rows: universe } = await query('SELECT code, name FROM stocks');
-    const codeSet = new Set(universe.map(r => r.code));
-    const nameToCode = new Map();
-    for (const r of universe) if (r.name) nameToCode.set(norm(r.name), r.code);
+    // 유니버스 확장(T2): 187 stocks가 아니라 전 상장목록(stocks_directory ~2,600)에 매핑.
+    // 관측된 40% 사각(코스닥 중소형)의 직접 원인이 좁은 유니버스였음. codeSet=6자리 코드 직매핑,
+    // nameToCode=종목명→코드(정확 일치·유일할 때만 — 동명 종목은 오매핑 대신 unmatched로 남김).
+    const { rows: universe } = await query('SELECT code, name FROM stocks_directory');
+    const { codeSet, nameToCode } = buildNameIndex(universe);
 
     // 코드 해석 — 유니버스 밖은 unmatched(skip). 제외 종목명은 distinct로 수집(C-1 지속 캐비엇용).
     const resolved = [];
@@ -117,9 +115,10 @@ export async function analyze(deviceId) {
     const biases = await computeBiases({ trades, roundtrips, priceReader });
 
     // C-3: avgdown 표시용 종목명 부착 (interpret은 프론트라 code→name 매핑이 없음).
+    // T2: stocks_directory에서 조회 — 승격(T3) 전이라 stocks에 없는 코드도 이름이 나와야 함(디렉토리는 전 상장 superset).
     const avgBias = biases.find(b => b.key === 'avgdown');
     if (avgBias && Array.isArray(avgBias.codes) && avgBias.codes.length > 0) {
-        const { rows: nameRows } = await query('SELECT code, name FROM stocks WHERE code = ANY($1)', [avgBias.codes]);
+        const { rows: nameRows } = await query('SELECT code, name FROM stocks_directory WHERE code = ANY($1)', [avgBias.codes]);
         const nameByCode = Object.fromEntries(nameRows.map(r => [r.code, r.name]));
         avgBias.names = avgBias.codes.map(c => nameByCode[c] || c);
     }
