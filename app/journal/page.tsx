@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Upload, Trash2, FileText } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import { readBiases, journalCoverageNote, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
+import { readBiases, journalCoverageNotes, JOURNAL_DISCLAIMER, type JournalBias } from '@/lib/journal/interpret';
 import type { JournalAnalysis, JournalUploadResult, JournalSummary } from '@/types/stock';
 
 // File → 텍스트. 한국 증권사 CSV는 EUC-KR(CP949)이 흔함 → euc-kr 우선, BOM/대체문자 시 utf-8 폴백.
@@ -151,9 +151,9 @@ export default function JournalPage() {
           <section>
             <h3 className="text-sm font-bold text-ink mb-2">매매 통계</h3>
             <SummaryTable s={analysis.summary} />
-            {journalCoverageNote(analysis.coverage) && (
-              <p className="text-xs text-faint mt-2 break-keep">※ {journalCoverageNote(analysis.coverage)}</p>
-            )}
+            {journalCoverageNotes(analysis.coverage).map((note, i) => (
+              <p key={i} className="text-xs text-faint mt-2 break-keep">※ {note}</p>
+            ))}
           </section>
 
           <section>

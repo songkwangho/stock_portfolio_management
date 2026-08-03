@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  readDisposition, readOvertrading, readChasing, readAnchoring, readBiases, journalCoverageNote,
+  readDisposition, readOvertrading, readChasing, readAnchoring, readBiases, journalCoverageNotes,
   type JournalBias,
 } from '@/lib/journal/interpret';
 import { FORBIDDEN_JOURNAL } from '../forbiddenWords';
@@ -24,10 +24,29 @@ describe('journal interpret — 사실 + 관찰형', () => {
     expect(r.text).toContain('비슷한 편');
     expect(r.text).not.toContain('처분효과');
   });
-  it('coverage 고지(F2) — 미매칭 매도 있으면 문구, 없으면 null', () => {
-    expect(journalCoverageNote({ unmatchedSellCount: 3 })).toContain('매도 3건');
-    expect(journalCoverageNote({ unmatchedSellCount: 0 })).toBe(null);
-    expect(journalCoverageNote(undefined)).toBe(null);
+  it('coverage 고지(F2) — 미매칭 매도 있으면 문구, 없으면 빈 배열', () => {
+    expect(journalCoverageNotes({ unmatchedSellCount: 3 })[0]).toContain('매도 3건');
+    expect(journalCoverageNotes({ unmatchedSellCount: 0 })).toEqual([]);
+    expect(journalCoverageNotes(undefined)).toEqual([]);
+  });
+  it('coverage 고지(C-1) — 유니버스 제외: 건수≠종목수 구분', () => {
+    const notes = journalCoverageNotes({ total: 75, imported: 45, skipped: 30, skippedNames: ['A', 'B', 'C', 'D'] });
+    expect(notes[0]).toContain('75건 중 45건');
+    expect(notes[0]).toContain('제외 30건');   // 거래 건수
+    expect(notes[0]).toContain('종목 4개');       // distinct 종목수(≠30)
+    expect(notes[0]).toContain('A·B·C…');         // 상위 3개 + 말줄임
+    expect(notes[0]).toContain('분석 범위 밖');
+  });
+  it('coverage 고지(C-1) — 종목명 없이 건수만', () => {
+    const notes = journalCoverageNotes({ total: 10, imported: 8, skipped: 2, skippedNames: [] });
+    expect(notes[0]).toContain('제외 2건');
+    expect(notes[0]).not.toContain('종목');
+  });
+  it('coverage 고지 — 두 축(유니버스 + 미매칭 매도) 동시', () => {
+    const notes = journalCoverageNotes({ total: 75, imported: 45, skipped: 30, skippedNames: ['A'], unmatchedSellCount: 3 });
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toContain('분석 범위 밖');
+    expect(notes[1]).toContain('매도 3건');
   });
   it('과매매 — 월평균·보유일', () => {
     const r = readOvertrading({ key: 'overtrading', available: true, months: 6, tradesPerMonth: 30, avgHoldingDays: 3, flag: true });
@@ -64,8 +83,14 @@ describe('journal interpret — 사실 + 관찰형', () => {
 // ── 금지어 전수 검사: 모든 reader의 광범위 입력 출력에 판단/명령/질책어 미포함 ──
 describe('금지 단어 미포함 (질책·판정·명령형 포함)', () => {
   const texts: string[] = [];
-  // coverage 고지(F2)
-  for (const n of [0, 1, 3, 999]) { const s = journalCoverageNote({ unmatchedSellCount: n }); if (s) texts.push(s); }
+  // coverage 고지(F2 미매칭 매도 + C-1 유니버스 제외)
+  for (const n of [0, 1, 3, 999]) texts.push(...journalCoverageNotes({ unmatchedSellCount: n }));
+  const univ: Array<[number, number, number, string[]]> = [
+    [75, 45, 30, ['딥노이드', '알루코', '유유제약', '기타']], [10, 8, 2, []], [0, 0, 0, []],
+  ];
+  for (const [t, im, sk, nm] of univ) {
+    texts.push(...journalCoverageNotes({ total: t, imported: im, skipped: sk, skippedNames: nm }));
+  }
   for (const avail of [true, false]) {
     for (const flag of [true, false]) {
       // gap 부호/크기별로 F3 flag=false 분기(비슷/조금 더 오래) 전부 커버

@@ -360,5 +360,9 @@ export interface JournalAnalysis {
   available: boolean;
   summary?: JournalSummary;
   biases?: JournalBiasMetric[];
-  coverage?: { trades: number; roundtrips: number; unmatchedSellCount?: number };
+  // C-1: 적재 메타(total/imported/skipped/skippedNames)로 지속 커버리지 캐비엇. F2: unmatchedSellCount.
+  coverage?: {
+    trades: number; roundtrips: number; unmatchedSellCount?: number;
+    total?: number; imported?: number; skipped?: number; skippedNames?: string[];
+  };
 }

@@ -28,22 +28,32 @@ export async function ingest(deviceId, csvText, brokerHint) {
     const nameToCode = new Map();
     for (const r of universe) if (r.name) nameToCode.set(norm(r.name), r.code);
 
-    // 코드 해석 — 유니버스 밖은 unmatched(skip).
+    // 코드 해석 — 유니버스 밖은 unmatched(skip). 제외 종목명은 distinct로 수집(C-1 지속 캐비엇용).
     const resolved = [];
     let unmatched = 0;
+    const skippedNameSet = new Set();
     for (const t of trades) {
         let code = t.code && codeSet.has(t.code) ? t.code : null;
         if (!code && t.name) code = nameToCode.get(norm(t.name)) || null;
-        if (!code) { unmatched++; continue; }
+        if (!code) { unmatched++; if (t.name) skippedNameSet.add(t.name); continue; }
         resolved.push({ code, side: t.side, quantity: t.quantity, price: t.price, tradedAt: t.tradedAt, source: t.source || broker });
     }
 
-    // 유효 신규 데이터가 있을 때만 원자적 교체. 없으면 기존 데이터 보존(가드).
+    // 유효 신규 데이터가 있을 때만 원자적 교체 + 메타 upsert. 없으면 기존 거래·메타 모두 보존(가드).
     let replaced = false;
     if (resolved.length > 0) {
         await withTransaction(async (client) => {
             await client.query('DELETE FROM journal_trades WHERE device_id = $1', [deviceId]);
             await bulkInsert(client, deviceId, resolved);
+            // C-1: 적재 메타(디바이스당 1행) upsert — analysis가 지속 캐비엇으로 읽음.
+            await client.query(
+                `INSERT INTO journal_imports (device_id, total, imported, skipped, skipped_names, uploaded_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW())
+                 ON CONFLICT (device_id) DO UPDATE
+                   SET total = EXCLUDED.total, imported = EXCLUDED.imported,
+                       skipped = EXCLUDED.skipped, skipped_names = EXCLUDED.skipped_names, uploaded_at = NOW()`,
+                [deviceId, trades.length, resolved.length, unmatched, [...skippedNameSet]]
+            );
         });
         replaced = true;
     }
@@ -104,12 +114,29 @@ export async function analyze(deviceId) {
     const priceReader = await buildPriceReader(trades);
     const biases = await computeBiases({ trades, roundtrips, priceReader });
 
+    // C-1: 적재 메타(유니버스 제외 건수·종목) 병합 → 지속 캐비엇. 메타 없으면(구버전 적재) 필드 생략.
+    const { rows: metaRows } = await query(
+        'SELECT total, imported, skipped, skipped_names FROM journal_imports WHERE device_id = $1',
+        [deviceId]
+    );
+    const meta = metaRows[0] || null;
+
     return {
         available: true,
         summary,
         biases,
-        // F2: 매수기록 없는 매도(구간 이전 보유분)를 고지 → 프론트 journalCoverageNote.
-        coverage: { trades: trades.length, roundtrips: roundtrips.length, unmatchedSellCount: unmatched.sellCount },
+        // F2: 매수기록 없는 매도(구간 이전 보유분) + C-1: 유니버스 제외 → 프론트 journalCoverageNotes.
+        coverage: {
+            trades: trades.length,
+            roundtrips: roundtrips.length,
+            unmatchedSellCount: unmatched.sellCount,
+            ...(meta ? {
+                total: meta.total,
+                imported: meta.imported,
+                skipped: meta.skipped,
+                skippedNames: meta.skipped_names || [],
+            } : {}),
+        },
     };
 }
 

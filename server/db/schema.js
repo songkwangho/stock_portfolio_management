@@ -243,6 +243,20 @@ export async function initSchema(pool) {
     `);
     await pool.query('CREATE INDEX IF NOT EXISTS idx_journal_trades_device ON journal_trades(device_id, code, traded_at)');
 
+    // C-1차 — 거래일지 적재 메타(디바이스당 1행). 커버리지 고지를 업로드 직후 1회성이 아니라
+    // analysis에서 지속 노출하기 위함. skipped(제외 "거래 건수")와 skipped_names(제외 "distinct 종목명")를
+    // 분리 저장 → "30건(종목 X개)"로 구분 고지. F1 교체와 동일하게 업로드마다 upsert(1행).
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS journal_imports (
+            device_id     TEXT PRIMARY KEY,
+            total         INTEGER,
+            imported      INTEGER,
+            skipped       INTEGER,
+            skipped_names TEXT[],
+            uploaded_at   TIMESTAMPTZ DEFAULT NOW()
+        )
+    `);
+
     // Indices
     await pool.query('CREATE INDEX IF NOT EXISTS idx_investor_history_code_date ON investor_history(code, date)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_stock_history_code_date ON stock_history(code, date)');

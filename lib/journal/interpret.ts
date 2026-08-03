@@ -108,12 +108,34 @@ export function readBiases(biases: JournalBias[]): JournalReading[] {
   return (biases || []).filter(b => READERS[b.key]).map(b => READERS[b.key](b));
 }
 
-// F2(리뷰) — 매수기록 없는 매도(업로드 구간 이전 보유분)가 지표에서 빠졌음을 관찰형으로 고지.
-// coverage.unmatchedSellCount>0 이면 각주 문자열, 아니면 null. 판단어 없음.
-export function journalCoverageNote(coverage: { unmatchedSellCount?: number } | null | undefined): string | null {
-  const n = num(coverage?.unmatchedSellCount);
-  if (n <= 0) return null;
-  return `업로드 구간 이전에 사둔 물량의 매도 ${n}건은 승률·손익 계산에서 빠졌어요.`;
+export interface JournalCoverage {
+  unmatchedSellCount?: number;
+  total?: number;
+  imported?: number;
+  skipped?: number;
+  skippedNames?: string[];
+}
+
+// C-1 + F2 — 커버리지 고지(지속형, 여러 축). 판단어 없음. 해당 없으면 빈 배열.
+//   1) 유니버스 제외(적재 메타): 분석 대상 total 중 imported 분석, 제외 skipped건(종목 K개)은 범위 밖.
+//   2) 미매칭 매도(F2): 업로드 구간 이전 보유분 매도는 승률·손익에서 빠짐.
+export function journalCoverageNotes(coverage: JournalCoverage | null | undefined): string[] {
+  const c = coverage || {};
+  const notes: string[] = [];
+  const skipped = num(c.skipped);
+  if (skipped > 0) {
+    const names = Array.isArray(c.skippedNames) ? c.skippedNames : [];
+    const k = names.length;
+    let note = `분석 대상 ${num(c.total)}건 중 ${num(c.imported)}건을 분석했어요. 제외 ${skipped}건`;
+    if (k > 0) note += `(종목 ${k}개: ${names.slice(0, 3).join('·')}${k > 3 ? '…' : ''})`;
+    note += `은 아직 분석 범위 밖이에요.`;
+    notes.push(note);
+  }
+  const unmatched = num(c.unmatchedSellCount);
+  if (unmatched > 0) {
+    notes.push(`업로드 구간 이전에 사둔 물량의 매도 ${unmatched}건은 승률·손익 계산에서 빠졌어요.`);
+  }
+  return notes;
 }
 
 export const JOURNAL_DISCLAIMER =
