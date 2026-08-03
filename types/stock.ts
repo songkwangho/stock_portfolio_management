@@ -343,6 +343,7 @@ export interface JournalUploadResult {
 export interface JournalSummary {
   roundtripCount: number;
   realizedLossCount?: number;   // C-2
+  winCount?: number;            // C-2(리뷰): "전부 이익" 게이트
   winRate: number | null;
   avgHoldWin: number | null;
   avgHoldLoss: number | null;

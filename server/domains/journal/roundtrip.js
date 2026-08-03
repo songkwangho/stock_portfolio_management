@@ -101,12 +101,49 @@ export function summarize(roundtrips) {
 
     return {
         roundtripCount: n,
-        realizedLossCount: losses.length,   // C-2: 실현 손실 청산 건수(0이면 "전부 이익" 헤드라인 분기)
+        realizedLossCount: losses.length,   // C-2: 실현 손실 청산 건수
+        winCount: wins.length,              // C-2(리뷰): "전부 이익"은 winCount===roundtripCount일 때만(본전 pnl=0 배제)
         winRate: decided > 0 ? round1((wins.length / decided) * 100) : null,
         avgHoldWin: winHold == null ? null : round1(winHold),
         avgHoldLoss: lossHold == null ? null : round1(lossHold),
         profitFactor: grossLoss > 0 ? round1(grossProfit / grossLoss) : null,   // 손실 없으면 null(무한대 대신)
         maxDrawdown: Math.round(mdd),   // 원
         totalPnl: Math.round(cum),
+    };
+}
+
+// C-2 — 미청산 보유분(openLots)을 종목별 가격으로 평가 (순수, DB 접근 없음 → 단위테스트 가능).
+// priceByCode = { code: { close:number, date:'YYYY-MM-DD'|null } }  (date null = stocks.price 폴백, 날짜 없음)
+// 보유일은 **그 종목의 최신 종가 날짜 기준**(폴백이면 전역 asOfDate)으로, Math.max(0,…)로 음수 클램프.
+// (리뷰 지적: 전역 asOfDate를 모든 lot에 쓰면 오늘 산 보유분이 어제 종가보다 뒤라 '-1일'이 나옴.)
+export function evaluateOpenLots(openLots, priceByCode) {
+    const base = { openPositionCount: openLots.length, openLossCount: 0, openLossAvgHoldDays: null, asOfDate: null, unvaluedCount: 0 };
+    if (openLots.length === 0) return base;
+
+    // asOfDate = 히스토리로 평가된 종목의 최신 종가 날짜 중 가장 최근('YYYY-MM-DD' 사전순).
+    let asOfDate = null;
+    for (const o of openLots) {
+        const p = priceByCode[o.code];
+        if (p && p.date && (!asOfDate || p.date > asOfDate)) asOfDate = p.date;
+    }
+
+    let unvalued = 0, lossCount = 0;
+    const lossHoldDays = [];
+    for (const o of openLots) {
+        const p = priceByCode[o.code];
+        const cur = p && p.close != null && p.close > 0 ? p.close : null;
+        if (cur == null) { unvalued++; continue; }
+        if (cur < o.avgBuyPrice) {
+            lossCount++;
+            const refDate = p.date || asOfDate;   // 종목 최신 종가 날짜(폴백이면 전역)
+            if (refDate) lossHoldDays.push(Math.max(0, daysBetween(o.firstBuyDate, refDate)));
+        }
+    }
+    return {
+        openPositionCount: openLots.length,
+        openLossCount: lossCount,
+        openLossAvgHoldDays: lossHoldDays.length ? round1(lossHoldDays.reduce((s, d) => s + d, 0) / lossHoldDays.length) : null,
+        asOfDate,
+        unvaluedCount: unvalued,
     };
 }

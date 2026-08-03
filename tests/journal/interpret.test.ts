@@ -71,7 +71,7 @@ describe('journal interpret — 사실 + 관찰형', () => {
     expect(readChasing({ key: 'chasing', available: false }).text).toContain('모이지 않았어요');
   });
   it('킬러 한 줄(C-2) — 실현 전부 이익 + 미실현 손실 N종목, asOfDate 포함·"지금" 미포함', () => {
-    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 0, openLossCount: 3, openLossAvgHoldDays: 27, asOfDate: '2025-08-27' });
+    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 0, winCount: 4, openLossCount: 3, openLossAvgHoldDays: 27, asOfDate: '2025-08-27' });
     expect(r.available).toBe(true);
     expect(r.text).toContain('청산 4건은 전부 이익');
     expect(r.text).toContain('손실인 종목이 3개');
@@ -81,10 +81,16 @@ describe('journal interpret — 사실 + 관찰형', () => {
     expect(r.text).not.toContain('지금');          // "지금" 금지
   });
   it('킬러 한 줄(C-2) — 실현에 손실 섞이면 "전부 이익" 제거', () => {
-    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 1, openLossCount: 2, openLossAvgHoldDays: 10, asOfDate: '2025-08-27' });
+    const r = readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: 1, winCount: 3, openLossCount: 2, openLossAvgHoldDays: 10, asOfDate: '2025-08-27' });
     expect(r.available).toBe(true);
     expect(r.text).not.toContain('전부 이익');
     expect(r.text).toContain('손실인 종목이 2개');
+  });
+  it('킬러 한 줄(C-2, 리뷰) — 본전(pnl=0) 섞이면 "전부 이익" 미표시(realizedLossCount=0이어도)', () => {
+    // 3청산 = 2이익 + 1본전 → realizedLossCount 0이지만 winCount 2 < 3 → "전부 이익" 금지
+    const r = readOpenLossHeadline({ roundtripCount: 3, realizedLossCount: 0, winCount: 2, openLossCount: 1, openLossAvgHoldDays: 5, asOfDate: '2025-08-27' });
+    expect(r.text).not.toContain('전부 이익');
+    expect(r.text).toContain('손실인 종목이 1개');
   });
   it('킬러 한 줄(C-2) — 미실현 손실 0 또는 asOfDate 없으면 available:false', () => {
     expect(readOpenLossHeadline({ openLossCount: 0, asOfDate: '2025-08-27' }).available).toBe(false);
@@ -131,9 +137,9 @@ describe('금지 단어 미포함 (질책·판정·명령형 포함)', () => {
   for (const [t, im, sk, nm] of univ) {
     texts.push(...journalCoverageNotes({ total: t, imported: im, skipped: sk, skippedNames: nm }));
   }
-  // 킬러 한 줄(C-2) — 실현 이익/손실 혼합 × 미실현 손실수 × unvalued
+  // 킬러 한 줄(C-2) — 실현 이익/손실 혼합 × 미실현 손실수 × unvalued (winCount로 allProfit 분기 커버)
   for (const rl of [0, 2]) for (const ol of [0, 1, 5]) for (const uv of [0, 3]) {
-    texts.push(readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: rl, openLossCount: ol, openLossAvgHoldDays: 12, asOfDate: '2025-08-27', unvaluedCount: uv }).text);
+    texts.push(readOpenLossHeadline({ roundtripCount: 4, realizedLossCount: rl, winCount: 4 - rl, openLossCount: ol, openLossAvgHoldDays: 12, asOfDate: '2025-08-27', unvaluedCount: uv }).text);
   }
   // 평단 하향 추가매수(C-3) — available/flag/count 조합
   for (const avail of [true, false]) for (const flag of [true, false]) for (const cnt of [0, 1, 5]) {

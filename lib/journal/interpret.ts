@@ -167,6 +167,7 @@ export function journalCoverageNotes(coverage: JournalCoverage | null | undefine
 export interface OpenLossSummary {
   roundtripCount?: number;
   realizedLossCount?: number;
+  winCount?: number;
   openLossCount?: number;
   openLossAvgHoldDays?: number | null;
   asOfDate?: string | null;
@@ -183,7 +184,8 @@ export function readOpenLossHeadline(s: OpenLossSummary | null | undefined): { a
   const m = s.openLossAvgHoldDays == null ? null : num(s.openLossAvgHoldDays);
   const hold = m == null ? '' : `(평균 ${m}일 보유 중)`;
   const realizedCount = num(s.roundtripCount);
-  const allProfit = num(s.realizedLossCount) === 0 && realizedCount > 0;
+  // "전부 이익"은 모든 청산이 실제 이익(winCount===roundtripCount)일 때만 — 본전(pnl=0) 섞이면 과장(리뷰 수정).
+  const allProfit = realizedCount > 0 && num(s.winCount) === realizedCount;
   const tail = `최근 종가(${asOf}) 기준 업로드하신 내역에서 아직 안 파신 보유분 중 손실인 종목이 ${openLoss}개예요${hold}.`;
   let text = allProfit ? `실현한 청산 ${realizedCount}건은 전부 이익이었는데, ${tail}` : tail;
   const unvalued = num(s.unvaluedCount);

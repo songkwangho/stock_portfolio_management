@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeRoundtrips, summarize } from '@/server/domains/journal/roundtrip.js';
+import { computeRoundtrips, summarize, evaluateOpenLots } from '@/server/domains/journal/roundtrip.js';
 import { disposition } from '@/server/domains/journal/biases/disposition.js';
 import { overtrading } from '@/server/domains/journal/biases/overtrading.js';
 import { anchoring } from '@/server/domains/journal/biases/anchoring.js';
@@ -99,6 +99,44 @@ describe('computeRoundtrips — 미청산 보유분 openLots (C-2)', () => {
       T('A', 'buy', 5, 100, '2026-01-01'), T('A', 'sell', 5, 120, '2026-01-10'),
     ]);
     expect(openLots).toHaveLength(0);
+  });
+});
+
+describe('evaluateOpenLots — 미실현 평가(순수, 리뷰 수정)', () => {
+  const lot = (code: string, quantity: number, avgBuyPrice: number, firstBuyDate: string) => ({ code, quantity, avgBuyPrice, firstBuyDate });
+
+  it('손실 종목 카운트 + 종목별 날짜로 보유일', () => {
+    const r = evaluateOpenLots(
+      [lot('A', 10, 1000, '2025-08-01'), lot('B', 5, 500, '2025-08-10')],
+      { A: { close: 800, date: '2025-08-27' }, B: { close: 600, date: '2025-08-27' } },   // A 손실, B 이익
+    );
+    expect(r.openLossCount).toBe(1);
+    expect(r.asOfDate).toBe('2025-08-27');
+    expect(r.openLossAvgHoldDays).toBe(26);   // 08-01 → 08-27
+  });
+  it('보유일 음수 클램프 — 최신 종가보다 뒤에 산 보유분(오늘 매수·어제 종가)', () => {
+    const r = evaluateOpenLots(
+      [lot('A', 1, 10000, '2025-08-28')],   // firstBuyDate가 asOfDate보다 뒤
+      { A: { close: 9500, date: '2025-08-27' } },   // 손실
+    );
+    expect(r.openLossCount).toBe(1);
+    expect(r.openLossAvgHoldDays).toBe(0);   // -1 → 0 클램프 (음수 '평균 -1일' 방지)
+  });
+  it('stocks.price 폴백(날짜 없음) → 전역 asOfDate 기준 보유일', () => {
+    const r = evaluateOpenLots(
+      [lot('A', 1, 1000, '2025-08-01'), lot('B', 1, 1000, '2025-08-05')],
+      { A: { close: 900, date: '2025-08-27' }, B: { close: 900, date: null } },   // B는 폴백
+    );
+    expect(r.openLossCount).toBe(2);
+    expect(r.asOfDate).toBe('2025-08-27');   // 히스토리 있는 A에서 도출
+  });
+  it('평가 불가(가격 없음) → unvalued', () => {
+    const r = evaluateOpenLots([lot('A', 1, 1000, '2025-08-01')], { A: { close: null as unknown as number, date: null } });
+    expect(r.unvaluedCount).toBe(1);
+    expect(r.openLossCount).toBe(0);
+  });
+  it('빈 openLots', () => {
+    expect(evaluateOpenLots([], {})).toMatchObject({ openLossCount: 0, asOfDate: null, openLossAvgHoldDays: null });
   });
 });
 
