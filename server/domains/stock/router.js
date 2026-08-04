@@ -1,10 +1,22 @@
 import express from 'express';
+import { timingSafeEqual } from 'crypto';
 import { query, withTransaction } from '../../db/connection.js';
 import { getDeviceId } from '../../helpers/deviceId.js';
 import { invalidateCache } from '../../helpers/cache.js';
 import { getStockData } from './service.js';
+import { syncDirectory } from './directory.js';
 
 const router = express.Router();
+
+// D3 — 관리 토큰 상수시간 비교. 길이 다르면 즉시 false(timingSafeEqual는 동일 길이 요구).
+// 토큰은 Render 환경변수(ADMIN_SYNC_TOKEN)로만 주입 — 코드/로그/커밋 노출 금지.
+function safeTokenEqual(provided, expected) {
+    if (typeof provided !== 'string' || typeof expected !== 'string' || !expected) return false;
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+}
 
 // GET /api/stock/:code - fetch and store stock data
 router.get('/stock/:code', async (req, res) => {
@@ -68,6 +80,24 @@ router.get('/stocks/directory/search', async (req, res) => {
     } catch (error) {
         console.error('Directory Search Error:', error.message);
         res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// D3 — POST /api/stocks/directory/sync : 디렉토리 강제 재동기화(IfEmpty 가드 우회).
+// 무료 Render(Shell 불가)에서 재배포 없이 Render IP로 재적재하는 수동 레버.
+//   curl -X POST ".../api/stocks/directory/sync" -H "x-admin-token: <secret>"
+// 인가: x-admin-token 헤더 또는 ?token= 를 ADMIN_SYNC_TOKEN과 상수시간 비교. 불일치·미설정 시 401.
+router.post('/stocks/directory/sync', async (req, res) => {
+    const provided = req.get('x-admin-token') || req.query.token || '';
+    if (!safeTokenEqual(String(provided), process.env.ADMIN_SYNC_TOKEN || '')) {
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+        // syncDirectory는 마켓별 실패를 내부에서 삼키고 카운트를 반환(throw 없음) — 운영자가 HTTP로 상태 확인.
+        const result = await syncDirectory();
+        res.json({ ok: true, ...result });
+    } catch (e) {
+        res.json({ ok: false, kospi: 0, kosdaq: 0, error: e.message });
     }
 });
 
