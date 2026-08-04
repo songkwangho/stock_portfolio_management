@@ -21,6 +21,11 @@ const MIN_EXPECTED_ROWS = {
     KOSDAQ: 800,
 };
 
+// D1 — 자동 sync 재동기화 임계값. "행 0개일 때만"이 아니라 KOSPI+KOSDAQ 합계가 이 값 미만이면
+// 재동기화한다. 이전엔 실패로 남은 1행이 count>0이라 auto-sync를 영구 skip시켰다(디렉토리 공백 고착).
+// 정상 ~2,600의 안전 하한. 성공 후엔 >1000이라 매 부팅마다 KRX를 두드리지 않는다.
+const MIN_DIRECTORY_TOTAL = 1000;
+
 // HTML 테이블 1행을 { code, name, listedAt } 으로 파싱.
 // <tr> 내 <td> 순서대로 회사명, 종목코드, ..., 상장일, ... 이므로 간단 정규식으로 추출한다.
 function parseRow(trHtml) {
@@ -50,7 +55,8 @@ async function fetchMarket(market) {
     const url = KRX_URLS[market];
     const response = await axios.get(url, {
         responseType: 'arraybuffer',
-        headers: { 'User-Agent': 'Mozilla/5.0' },
+        // D2 — Referer 추가. KRX은 Referer 없는 요청을 봇으로 보고 에러 페이지를 주기도 한다.
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://kind.krx.co.kr/' },
         timeout: 30000,
     });
     if (response.status !== 200) {
@@ -95,6 +101,25 @@ async function fetchMarket(market) {
     return parsed;
 }
 
+// D2 — fetchMarket 재시도 래퍼. KRX rate-limit 순간(HTML 에러 페이지·threshold 미달·네트워크)에
+// 선형 백오프로 재시도한다. 부팅 자동 sync가 순간적 차단에 걸려도 흡수. 전 시도 실패면 마지막 에러 throw.
+async function fetchMarketWithRetry(market, attempts = 3, baseDelayMs = 6000) {
+    let lastErr;
+    for (let i = 1; i <= attempts; i++) {
+        try {
+            return await fetchMarket(market);
+        } catch (e) {
+            lastErr = e;
+            if (i < attempts) {
+                const delay = baseDelayMs * i;   // 선형 백오프: 6s, 12s, ...
+                console.warn(`[directory] ${market} fetch 실패 (${i}/${attempts}): ${e.message} — ${delay / 1000}s 후 재시도`);
+                await new Promise(r => setTimeout(r, delay));
+            }
+        }
+    }
+    throw lastErr;
+}
+
 async function upsertBatch(rows) {
     if (rows.length === 0) return 0;
     // Neon pool max=5 경합 방지를 위해 한 번에 한 행씩 upsert (전 종목 ~2,600행 * ~20ms = 52s).
@@ -120,14 +145,14 @@ export async function syncDirectory() {
     let kosdaqCount = 0;
 
     try {
-        const kospi = await fetchMarket('KOSPI');
+        const kospi = await fetchMarketWithRetry('KOSPI');
         kospiCount = await upsertBatch(kospi);
     } catch (e) {
         console.error('[directory] KOSPI fetch/upsert failed:', e.message);
     }
 
     try {
-        const kosdaq = await fetchMarket('KOSDAQ');
+        const kosdaq = await fetchMarketWithRetry('KOSDAQ');
         kosdaqCount = await upsertBatch(kosdaq);
     } catch (e) {
         console.error('[directory] KOSDAQ fetch/upsert failed:', e.message);
@@ -138,16 +163,18 @@ export async function syncDirectory() {
     return { kospi: kospiCount, kosdaq: kosdaqCount };
 }
 
-// 디렉토리에 행이 하나라도 있으면 skip — 서버 시작 시 반복 동기화 방지.
-// 일 1회 스케줄링은 Phase 6 본작업에서 setupScheduler 편입 예정.
+// D1 — 이름은 유지하되(호출부 scheduler.js 영향 최소화) 시맨틱은 "empty"가 아니라
+// **under-threshold 재동기화**. 디렉토리가 MIN_DIRECTORY_TOTAL 미만이면(실패로 남은 소수 행 포함)
+// 자동 재적재한다. 성공해 임계값을 넘기면 이후 부팅에선 skip.
 export async function syncDirectoryIfEmpty() {
     try {
         const { rows } = await query('SELECT COUNT(*)::int AS count FROM stocks_directory');
         const count = rows[0]?.count ?? 0;
-        if (count > 0) {
-            console.log(`[directory] ${count}건 이미 존재 — 초기 동기화 skip`);
+        if (count >= MIN_DIRECTORY_TOTAL) {
+            console.log(`[directory] ${count}건 (임계값 ${MIN_DIRECTORY_TOTAL} 이상) — 초기 동기화 skip`);
             return { skipped: true, count };
         }
+        console.log(`[directory] ${count}건 (임계값 ${MIN_DIRECTORY_TOTAL} 미만) — 자동 재동기화`);
         return await syncDirectory();
     } catch (e) {
         console.error('[directory] syncDirectoryIfEmpty failed:', e.message);
