@@ -69,13 +69,9 @@ async function fetchMarket(market) {
         throw new Error(`KRX ${market} response too short (${html?.length ?? 0} bytes)`);
     }
 
-    // KRX이 XLS-wrapped HTML이 아닌 순수 HTML 에러 페이지(<!DOCTYPE html>, <html>)를
-    // 돌려주는 케이스 감지. 정상 응답은 <table>로 시작하는 Excel-wrapping 구조라
-    // <!DOCTYPE·<html·<head로 시작하는 경우 오류 페이지로 판정.
-    const head = html.trimStart().slice(0, 200).toLowerCase();
-    if (head.startsWith('<!doctype html') || head.startsWith('<html') || head.startsWith('<head')) {
-        throw new Error(`KRX ${market} returned an HTML error page (likely rate-limited or maintenance)`);
-    }
+    // E1 — 머리글 문자열 기반 "HTML error page" 판정 제거. KRX 엑셀 export가 유효하면서도
+    // MS Office HTML 래퍼(<html ...>)로 시작하는 케이스가 있어 정상 데이터를 오탐했다(sync 0건).
+    // 진짜 유효성 기준은 "파싱된 종목 행 수"(아래 MIN_EXPECTED_ROWS) — 그게 유일한 게이트다.
 
     // tbody 내부 행만 매칭 — header/footer 오염 방지.
     const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
@@ -90,14 +86,19 @@ async function fetchMarket(market) {
 
     // 파싱된 종목 수가 최소 임계값 미달이면 KRX 응답 이상으로 간주하고 upsert 스킵.
     // (0건 조용히 성공 처리로 디렉토리가 공백으로 유지되는 문제 방지)
+    const ct = response.headers['content-type'] || '';
     const minExpected = MIN_EXPECTED_ROWS[market];
     if (parsed.length < minExpected) {
+        // E1 — 실패 시 다음 진단(포맷 변경 vs IP 차단)이 가능하도록 응답 메타를 남긴다.
+        const headPreview = html.trimStart().slice(0, 300).replace(/\s+/g, ' ');
+        console.error(`[directory] ${market} parsed=${parsed.length} (<${minExpected}) | content-type=${ct} | len=${html.length} | head="${headPreview}"`);
         throw new Error(
             `KRX ${market} parsed ${parsed.length} rows, below threshold ${minExpected} ` +
             `— likely HTML error page or format change. Skipping upsert.`
         );
     }
 
+    console.log(`[directory] ${market} parsed ${parsed.length} rows, content-type=${ct}`);
     return parsed;
 }
 
