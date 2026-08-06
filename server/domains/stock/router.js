@@ -101,6 +101,34 @@ router.post('/stocks/directory/sync', async (req, res) => {
     }
 });
 
+// 진단용 임시 — GET /api/stocks/directory/debug : 연결 DB·쓰기 커밋 가시성 확인.
+// sync가 upsert하는데도 디렉토리가 비어 보이는 원인(연결 DB 불일치 vs 커밋 미가시)을 판별.
+// GET이지만 센티넬 쓰기(999999)를 포함(운영자 요청, 토큰 보호). 진단 종료 후 라우트·센티넬 제거 예정.
+router.get('/stocks/directory/debug', async (req, res) => {
+    const provided = req.get('x-admin-token') || req.query.token || '';
+    if (!safeTokenEqual(String(provided), process.env.ADMIN_SYNC_TOKEN || '')) {
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+        const who = (await query('SELECT current_database() AS db, current_user AS usr')).rows[0];
+        await query(
+            `INSERT INTO stocks_directory (code, name, market) VALUES ('999999', '__DEBUG__', 'KOSPI')
+             ON CONFLICT (code) DO UPDATE SET name = '__DEBUG__', updated_at = NOW()`
+        );
+        const counts = (await query(
+            `SELECT count(*)::int AS total,
+                    (SELECT count(*)::int FROM stocks_directory WHERE code = '999999') AS sentinel
+             FROM stocks_directory`
+        )).rows[0];
+        const sample = (await query(
+            `SELECT code, name, market FROM stocks_directory ORDER BY code LIMIT 5`
+        )).rows;
+        res.json({ who, total: counts.total, sentinel: counts.sentinel, sample });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/stocks - list all stocks; prices kept fresh by background sync
 router.get('/stocks', async (req, res) => {
     try {
