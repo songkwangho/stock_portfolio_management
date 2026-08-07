@@ -49,15 +49,18 @@ server/
 │   ├── stock/
 │   │   ├── service.js    # getStockData + syncAllStocks + scheduleDaily8AM
 │   │   ├── data.js       # registerInitialData (97종목 + 20개 추천 + 10테마 시드)
-│   │   ├── directory.js  # 3.6차 — KRX stocks_directory 동기화 (syncDirectory/syncDirectoryIfEmpty)
-│   │   └── router.js     # 11 endpoints (directory/search·themes 포함)
+│   │   ├── directory.js  # 3.6차 — KRX stocks_directory 동기화 + self-heal 하드닝(D1~D4)
+│   │   ├── history.js    # 2A — fetchHistory/upsertHistory 공용(backfill·journal 승격 공유)
+│   │   └── router.js     # 12 endpoints (directory/search·directory/sync·themes 포함)
 │   ├── dart/             # 4.5a차 — DART OpenAPI (재무제표·공시, DB 읽기 전용)
 │   │   └── router.js     # 2 endpoints
-│   ├── journal/          # 4.5b·C차 — 거래일지·행동편향 (CBD 분해)
+│   ├── journal/          # 4.5b·C·T2·T3 — 거래일지·행동편향 + 유니버스 확장·승격 (CBD 분해)
 │   │   ├── parsers/      # Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index
 │   │   ├── biases/       # disposition/overtrading/chasing/anchoring/avgdown (순수, metrics·flag만)
+│   │   ├── universe.js   # T2 — 종목명→코드 인덱스(정확·유일 매핑만, 순수·단위테스트)
 │   │   ├── roundtrip.js  # FIFO 매칭 + summarize + openLots·evaluateOpenLots (C-2)
-│   │   ├── service.js    # ingest(F1 교체 트랜잭션) + analyze(valueOpenLots)
+│   │   ├── promote.js    # T3 — 보유·거래 종목 stocks 승격(동기 현재가 + 비동기 12개월 backfill)
+│   │   ├── service.js    # ingest(F1 교체 + T2 디렉토리 매핑 + T3 promoteCodes) + analyze
 │   │   └── router.js     # 3 endpoints
 │   └── system/
 │       └── router.js     # health, market/indices, fear-greed
@@ -94,7 +97,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | **market_index_history** | symbol+date | close (NUMERIC 12,2) | 3.14차 신설. KOSPI/KOSDAQ 지수 일봉(벤치마크 초과수익 계산용). `stocks`와 FK 없음. stock_history 오염 회피 위해 전용 테이블 + close NUMERIC(지수 소수점 보존). 적재는 `scripts/sync-index-history.js`(운영자 수동). 자동 스케줄링 Phase 6 이월 |
 | alerts | id (BIGSERIAL) | device_id, code, type, source (holding/watchlist), message, read | |
 | watchlist | device_id+code | added_at | ON DELETE CASCADE |
-| **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), listed_at, delisted_at, updated_at | 3.6차 신설. KRX 상장법인목록 파싱으로 동기화. `stocks` 테이블과 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market. 서버 시작 시 데이터 0건이면 1회 자동 동기화. KRX 응답 4중 가드(HTTP 200 / 본문 1,000B+ / HTML 에러 페이지 차단 / 최소 행 수) |
+| **stocks_directory** | code | name, market (KOSPI/KOSDAQ/KONEX), **type** (common/preferred/etf/etn/reit/spac, 기본 common — T1), listed_at, delisted_at, updated_at | 3.6차 신설(~2,650행). KRX 상장법인목록 파싱으로 동기화. `stocks`와 FK 없음 (디렉토리는 전 상장 종목, `stocks`는 앱 등록 종목만). 인덱스: name, market. **T1**: type 컬럼 — KIND 적재분은 전부 common, Phase 2(KRX issue 소스)에서 우선주/ETF 태깅. **D1**: 서버 시작 시 `MIN_DIRECTORY_TOTAL`(1000) 미만이면 자동 재동기화(실패로 남은 소수 행이 auto-sync를 영구 skip시키던 고착 해소). KRX 응답 가드: HTTP 200 / 본문 1,000B+ / **파싱된 종목 행 수 임계값**(E1 — 머리글 sniff 제거, 행 수가 유일 게이트) |
 | **stock_themes** | (theme_id, code) | theme_name | 3.7차β 신설. 다대다 테마 매핑. code는 `stocks` FK (ON DELETE CASCADE). 10개 핵심 테마 + 대표 15종목 수동 + category 폴백 자동 시드. 인덱스: code, theme_id |
 | **users** | id (BIGSERIAL) | provider, provider_id, email, nickname, legacy_device_id, created_at | Phase 5 선행. 현재 미사용 (라우트 미연결). `UNIQUE(provider, provider_id)`. 인덱스: legacy_device_id |
 | **user_subscriptions** | id (BIGSERIAL) | user_id FK, status, plan, expires_at, payment_id UNIQUE, created_at | Phase 5 선행. Toss Payments 웹훅 멱등성은 payment_id UNIQUE로 확보 |
@@ -107,16 +110,17 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 ### stocks_directory 동기화 파이프라인
 
 - **소스**: `https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType={stockMkt|kosdaqMkt}`
-  - 확장자는 `.xls`지만 실제 응답은 EUC-KR HTML `<table>`
-  - 컬럼 순서: 회사명, 종목코드, 업종, 주요제품, 상장일, 결산월, ...
-  - `TextDecoder('euc-kr')` + 정규식 `<tr>/<td>` 파싱 (`naver.js`와 동일 패턴, iconv-lite 불필요)
+  - 확장자는 `.xls`지만 실제 응답은 EUC-KR HTML(MS Office 래퍼라 `<html>`로 시작 가능 — E1로 머리글 판정 폐기)
+  - 컬럼 순서(현행): 회사명(0)·**시장구분(1)**·종목코드(2)·업종(3)·주요제품(4)·상장일(5)…
+  - `TextDecoder('euc-kr')` + 정규식 `<tr>/<td>` 파싱. **parseRow(1A)**: code는 stripped[2] 우선 + 끝자리 영문 허용(`/^[0-9A-Z]{6}$/` — 우선주/스팩 `00088K`류), listedAt은 날짜 패턴 셀 스캔(인덱스 고정 대신) → 컬럼 순서 재변경(시장구분 삽입처럼)에 견고
 - **구현**: `server/domains/stock/directory.js`
-  - `syncDirectory()` — KOSPI + KOSDAQ 연속 fetch, UPSERT (code PK 기준 name/market/listed_at 덮어쓰기)
-  - `syncDirectoryIfEmpty()` — COUNT 체크해서 0건일 때만 실행
+  - `syncDirectory()` — KOSPI + KOSDAQ 연속 fetch(`fetchMarketWithRetry` — **D2**: 3회 선형 백오프 6/12s + `Referer`), UPSERT (마켓별 실패 격리)
+  - `syncDirectoryIfEmpty()` — **D1**: COUNT < 1000이면 재동기화(함수명 유지, 시맨틱은 under-threshold)
 - **트리거**:
-  - 서버 시작 후 10초 지연으로 1회 (`setupScheduler` 내, 비어 있을 때만) — 3.6차
-  - 수동: `DATABASE_URL=... node scripts/sync-directory.js` — 3.6차
-  - 일 1회 cron 편입은 Phase 6 본작업으로 이월
+  - 서버 시작 후 10초 — under-threshold면 자동 (D1)
+  - **D4**: 매일 07:30 강제 재동기화(상장/상폐 반영, 08:00 `syncAllStocks` 앞)
+  - **D3**: `POST /api/stocks/directory/sync`(토큰 보호) — 무료 Render(Shell 불가)에서 재적재 수동 레버
+  - 수동 CLI: `DATABASE_URL=... node scripts/sync-directory.js`
 
 **용도**: `/settings` 수동 추가에서 종목명 → 코드 매핑. 네이버 금융 URL이 `?code=` 필수라 사용자 입력 종목명을 code로 해석하는 조회 레이어. 가격·지표 데이터는 여전히 네이버 크롤링(`stocks` 테이블).
 
@@ -137,9 +141,9 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (42개)
+## API 엔드포인트 (43개)
 
-### 종목 (stock — 11개)
+### 종목 (stock — 12개)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
@@ -150,6 +154,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | DELETE | `/api/stocks/:code` | 종목 삭제 (cascade) |
 | GET | `/api/search?q=` | 검색 (`stocks` 테이블, 시작 일치 우선 정렬, 최대 10건) |
 | **GET** | **`/api/stocks/directory/search?q=`** | 3.6차 신설. `stocks_directory`(전 상장 종목) 대상 name/code ILIKE 검색. 시작 일치 우선 정렬, `delisted_at IS NULL`, 최대 10건. 앱 등록 여부와 무관 (`stocks` 테이블에 없어도 검색됨) |
+| **POST** | **`/api/stocks/directory/sync`** | D3 — 디렉토리 강제 재동기화(IfEmpty 가드 우회). `x-admin-token`(또는 `?token=`)을 `ADMIN_SYNC_TOKEN`과 상수시간 비교, 불일치·미설정 401. `{ok, kospi, kosdaq}` 반환. 무료 Render(Shell 불가) 재적재 레버 |
 | **GET** | **`/api/themes`** | 3.7차β 신설. 테마 목록 + 종목 수 (`{theme_id, theme_name, stock_count}[]`) |
 | **GET** | **`/api/themes/:themeId/stocks`** | 3.7차β 신설. 특정 테마에 속한 종목 목록 |
 | **GET** | **`/api/stock/:code/themes`** | 3.7차β 신설. 종목이 속한 테마 태그 |
@@ -198,11 +203,11 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ### 거래일지 (journal — 3개, `requireDeviceIdMiddleware`)
 
-`server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index 레지스트리), `roundtrip.js`(FIFO 매칭 + summarize + **openLots·evaluateOpenLots** — 미청산분 최근 종가 평가, C-2), `biases/`(disposition/overtrading/chasing/anchoring/**avgdown**[평단 하향 추가매수, C-3] — metrics·flag만), `service.js`(ingest[F1 교체 트랜잭션 + journal_imports upsert] + analyze[valueOpenLots DB 로드]), `router.js`.
+`server/domains/journal/` — CBD 분해. `parsers/`(Port&Adapter: detectBroker + parseKiwoom/Toss/Samsung + normalize + index 레지스트리), `universe.js`(**T2** — 종목명→코드 인덱스, 정확·유일 매핑만·순수·단위테스트), `roundtrip.js`(FIFO 매칭 + summarize + **openLots·evaluateOpenLots** — 미청산분 최근 종가 평가, C-2), `biases/`(disposition/overtrading/chasing/anchoring/**avgdown**[평단 하향 추가매수, C-3] — metrics·flag만), `promote.js`(**T3** — 보유·거래 종목 stocks 승격: 동기 현재가[동시성3·예산8s] + 비동기 12개월 backfill, upsert-only·실패 격리), `service.js`(ingest[F1 교체 + T2 디렉토리 매핑 + T3 promoteCodes] + analyze[valueOpenLots DB 로드]), `router.js`.
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| **POST** | **`/api/journal/upload`** | 4.5b차 — body `{csvText, broker?}`(csvText는 프론트 EUC-KR 디코드). 파싱→정규화→종목코드 해석(6자리 우선/종목명 폴백)→적재. `{broker, imported, skipped, dateRange, coverage}`. 유니버스 밖은 skip. **원본 CSV·PII 미저장** |
+| **POST** | **`/api/journal/upload`** | 4.5b차 — body `{csvText, broker?}`(csvText는 프론트 EUC-KR 디코드). 파싱→정규화→종목코드 해석(**T2**: 6자리 코드 우선 / 종목명→`stocks_directory`(~2,650) 매핑, 동명은 오매핑 대신 skip)→적재→**T3 승격**(`promoteCodes`: 보유분 현재가 동기 + 미등록 코드 12개월 이력 비동기 backfill). `{broker, imported, skipped, dateRange, coverage}`. 유니버스 밖은 skip. **원본 CSV·PII 미저장** |
 | **GET** | **`/api/journal/analysis`** | 4.5b차 — FIFO 라운드트립→요약(승률·손익비·평균보유·MDD, 실현손익 기준) + 편향(수치·flag, provisional). **C-2**: 미청산 openLots를 최근 종가로 평가 → summary에 `openLossCount/openLossAvgHoldDays/asOfDate/unvaluedCount/realizedLossCount`(가격=stock_history 최신 종가→stocks.price 폴백, **asOfDate 필수·"지금" 아님**). **C-1**: coverage에 적재 메타(`total/imported/skipped/skippedNames`) 병합. **C-3**: biases에 `avgdown`(평단 하향 추가매수) 추가 + code→name 부착. `{available, summary, biases[], coverage}`, 데이터 없으면 `available:false` |
 | **DELETE** | **`/api/journal`** | 4.5b차 — 해당 device 거래 전량 삭제 `{deleted}`. 재업로드는 append라 재분석 전 리셋용 |
 
@@ -289,7 +294,8 @@ WHERE device_id = $1 AND code = $2
 | 작업 | 주기 |
 |------|------|
 | syncAllStocks() | 서버 시작 후 5초(실패 시 30초 backoff 1회) + 매일 08:00 |
-| syncDirectoryIfEmpty() | 서버 시작 후 10초 (3.6차, `stocks_directory` 비어 있을 때만 1회). Phase 6에서 일 1회 cron으로 승격 예정 |
+| syncDirectoryIfEmpty() | 서버 시작 후 10초 — **D1**: `stocks_directory` < 1000행이면 재동기화 |
+| syncDirectory() (일 1회) | **D4**: 매일 07:30 강제 재동기화(상장/상폐 반영, 08:00 `syncAllStocks` 앞) |
 | cleanupOldData() | 서버 시작 + 24시간마다 |
 
 **cleanupOldData 범위**: `stock_analysis`, `recommended_stocks` 20일+ 삭제.
@@ -347,8 +353,9 @@ app.listen(PORT);
 
 | 스크립트 | 용도 |
 |---------|------|
-| `scripts/backfill-history.js` | 등록 종목의 3년치 일봉 히스토리 적재 (배치 3, ~6시간) |
+| `scripts/backfill-history.js` | 등록 종목의 3년치 일봉 히스토리 적재 (배치 3, ~6시간). 2A — 조회/적재는 `server/domains/stock/history.js` 공용 함수 사용 |
 | `scripts/sync-directory.js` | KRX 상장법인목록 → `stocks_directory` 수동 동기화 |
+| `scripts/cleanup-directory-junk.js` | 1C — `stocks_directory`의 `000000`(파서 붕괴 잔재)·`999999`(진단 센티넬) 삭제. `--dry-run` 지원 |
 | `scripts/expand-stocks.js` | 3.7차 감마 — TARGET_CODES(~86) 중 미등록 코드만 네이버 크롤링으로 `stocks`에 추가 (배치 3 × 3초 간격). 테마 매핑은 다음 서버 재시작 시 `CATEGORY_TO_THEMES` 폴백으로 자동 처리 |
 | `scripts/sync-index-history.js` | 3.14차 — KOSPI/KOSDAQ 지수 일봉 → `market_index_history` 적재 (네이버 siseJson, ON CONFLICT 멱등). 벤치마크(초과수익·IR) 데이터 공급. 미실행 시 `/holdings/benchmark`는 `available:false` |
 | `scripts/sync-dart-corpcodes.js` | 4.5a차 — DART 전 상장사 corp_code↔stock_code 매핑 적재(~10만 건, 월 1회). `DART_API_KEY` 필요. `--dry-run` 지원. 재무·공시 선행 |

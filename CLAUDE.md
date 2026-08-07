@@ -101,14 +101,15 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── db/                       # 스키마·마이그레이션 (stocks_directory, ai_report 포함)
 │   ├── helpers/                  # deviceId(requireDeviceIdMiddleware), cache, sma
 │   ├── scrapers/                 # 네이버 증권
-│   ├── domains/                  # analysis·alert·portfolio·watchlist·system·dart(4.5a)·journal(4.5b) — 아래는 발췌
+│   ├── domains/                  # analysis·alert·portfolio·watchlist·system·dart(4.5a)·journal(4.5b·T2·T3) — 아래는 발췌
 │   │   ├── stock/
 │   │   │   ├── service.js        # getStockData + syncAllStocks
 │   │   │   ├── data.js           # registerInitialData (97 + 20 + 10테마)
-│   │   │   ├── directory.js      # 3.6차 — KRX stocks_directory 동기화
+│   │   │   ├── directory.js      # 3.6차 — KRX stocks_directory 동기화 + self-heal 하드닝(D1~D4)
+│   │   │   ├── history.js        # 2A — fetchHistory/upsertHistory 공용(backfill·승격 공유)
 │   │   │   └── router.js
-│   │   └── journal/              # 4.5b·C차 — parsers/·biases/·roundtrip·service (상세는 docs/BACKEND.md)
-│   ├── scheduler.js              # setupScheduler + syncDirectoryIfEmpty 10s 지연
+│   │   └── journal/              # 4.5b·C·T2·T3 — parsers/·biases/·universe·roundtrip·promote·service (상세는 docs/BACKEND.md)
+│   ├── scheduler.js              # setupScheduler + 디렉토리 D1(부팅 재동기화)·D4(일 07:30)
 │   └── package.json              # 별도 의존성 — `cd server && npm install` 필요
 │   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
 │
@@ -117,6 +118,7 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
     ├── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
     ├── expand-stocks.js          # 3.7차 감마 — 종목 96→~180 확대 (배치 3 × 3초)
     ├── cleanup-delisted.js       # 상장폐지 종목 정리 (Cleanup-1)
+    ├── cleanup-directory-junk.js # 1C — stocks_directory 000000/999999 정리 (--dry-run)
     ├── sync-index-history.js     # 3.14차 — KOSPI/KOSDAQ 지수 일봉 적재 (벤치마크용, 운영자 수동)
     ├── sync-dart-corpcodes.js    # 4.5a차 — DART 고유번호↔종목 매핑 (--dry-run)
     ├── sync-dart-financials.js   # 4.5a차 — DART 재무제표 (--dry-run/--save-sample)
@@ -183,6 +185,12 @@ DATABASE_URL=postgres://... node scripts/backfill-history.js
 # KRX 상장법인목록 → stocks_directory 수동 동기화 (name↔code 매핑)
 DATABASE_URL=postgres://... node scripts/sync-directory.js
 
+# stocks_directory 쓰레기 정리 (000000 붕괴 잔재 · 999999 진단 센티넬) — 1C, --dry-run 먼저
+DATABASE_URL=postgres://... node scripts/cleanup-directory-junk.js --dry-run
+
+# 디렉토리 강제 재동기화 (무료 Render — Shell 불가, 재배포 없이 재적재) — D3
+curl -X POST "https://<render-api>/api/stocks/directory/sync" -H "x-admin-token: $ADMIN_SYNC_TOKEN"
+
 # 종목 확대 — TARGET_CODES에 정의된 ~86개 코드를 네이버 크롤링으로 stocks 테이블에 추가
 # (배치 3 × 3초 간격, 전체 ~10~15분)
 DATABASE_URL=postgres://... node scripts/expand-stocks.js
@@ -211,6 +219,8 @@ API_BASE_URL=https://your-render-api.onrender.com/api
 DATABASE_URL=postgres://...
 FRONTEND_URL=https://your-vercel-app.vercel.app   # CORS 허용
 PORT=3001
+ADMIN_SYNC_TOKEN=...   # D3 — POST /stocks/directory/sync 관리 레버 보호 (미설정 시 401·기능 비활성)
+DART_API_KEY=...       # 4.5a — DART 적재/조회 (미설정 시 DART 기능 비활성, 에러 아님)
 ```
 
 ---
@@ -475,7 +485,23 @@ PC (md: 이상):
 - 검증: tsc 0 · next build ✓(/journal) · **npm test 114** · 금지어 grep(출력) 0 · 방향색 0
 - **어드버서리얼 리뷰(8에이전트/4렌즈)**: 4 CONFIRMED 수정 — ① 미실현 보유일 전역 asOfDate→종목별 날짜+음수 클램프(순수 `evaluateOpenLots` 추출·단위테스트), ② "전부 이익"을 winCount===roundtripCount로 게이트(본전 pnl=0 과장 방지), ③ FORBIDDEN 스윕에 물타기/편향 추가(전 브랜치 커버)
 - ⚠️ **운영 대기/검증**: ① ingest 메타 upsert·`valueOpenLots`(DB 로드부)는 DB 통합이라 실DB는 운영자 검증(F1 동일 — 계산은 순수 `evaluateOpenLots`로 단위테스트됨). ② 미실현 평가는 **"업로드하신 내역 기준"**(부분 히스토리면 open-lot 과대 가능 — 미매칭 매도 캐비엇과 짝) + "최근 종가(asOfDate) 기준". ③ 추격 0/N 1종목 손계산 스팟체크
-- **후속(로드맵)**: 유니버스 확장(§A 선행) → A 주목 레이어(트리아지) → B 포지션 앵커 해석 → D 성과 귀인
+- **후속(로드맵)**: 유니버스 확장(§A 선행) ✅ **완료**(T1~T3 + 디렉토리 self-heal, 아래 차수) → A 주목 레이어(트리아지) → B 포지션 앵커 해석 → D 성과 귀인
+
+---
+
+**유니버스 확장 + 디렉토리 self-heal (매핑 커버리지 60%→~100%, 2026-08-07)**
+
+실계좌 75건 중 40%가 187 `stocks` 유니버스 밖으로 제외되던 사각 해소. **진짜 병목은 KRX 신규 적재가 아니라 journal이 187 `stocks`에 매핑하던 것** — ~2,650행 `stocks_directory`로 전환. Phase 1(KIND 보통주 ~100%) 우선, ETF/우선주 잔여는 Phase 2(KRX Open API)로 전방 호환.
+
+- [x] **[T1]** `stocks_directory.type` 컬럼(common/preferred/etf/etn/reit/spac, 기본 common). KIND 적재분은 전부 common, Phase 2에서 태깅. CHECK 미부여(신규/기존 DB 정합 + Phase 2 값 확장 회피). `migrate.addColumnIfNotExists`로 기존 DB 멱등 보강
+- [x] **[T2]** journal 매핑 대상 `stocks`(187) → `stocks_directory`(~2,650). 종목명→코드는 **정확·유일 매핑만**(동명은 오매핑 대신 skip) — 순수 `universe.buildNameIndex` 추출 + 단위테스트. avgdown 종목명도 디렉토리 조회
+- [x] **[Part 1]** parseRow 알파뉴메릭 코드 복구(`stripped[2]` 우선 + 끝자리 영문 `/^[0-9A-Z]{6}$/` — 우선주/스팩 `00088K`류 ~90행이 000000 붕괴하던 것 복구) + 진단 라우트(debug/parsepreview) 제거 + `cleanup-directory-junk.js`(000000/999999 정리)
+- [x] **[D1~D4]** 디렉토리 self-heal 하드닝(무료 Render, Shell 불가 → 부팅 self-heal): **D1** under-threshold 재동기화(`count<1000`, 실패로 남은 1행이 auto-sync 영구 skip시키던 고착 해소) / **D2** `fetchMarketWithRetry`(3회 선형 백오프 + Referer) / **D3** `POST /stocks/directory/sync`(토큰 보호 수동 레버) / **D4** 매일 07:30 강제 재동기화
+- [x] **[E1]** `fetchMarket` 머리글 sniff 오탐 제거 — KRX 엑셀이 `<html>` 래퍼로 시작해도 유효한데 에러 페이지로 오탐하던 것. **파싱된 종목 행 수가 유일 게이트** + 임계값 미달 시 진단 로그(content-type·len·head)
+- [x] **[T3 승격]** **2A** `fetchHistory`/`upsertHistory` → `server/domains/stock/history.js` 공용화(backfill·승격 공유) / **2B** `promote.js`(§4 A안: 보유분 현재가 동기[동시성3·예산8s] + 미등록 코드 12개월 이력 비동기 backfill, upsert-only·실패 격리) / **2C** ingest에서 `promoteCodes` 연동(try/catch로 업로드 무손상, `unvaluedCount` 캐비엇 유지). 네이버 개별 호출 `timeout: 4000`으로 동기 예산 hard budget화
+- **환경변수**: `ADMIN_SYNC_TOKEN`(Render) — D3 관리 레버 보호(미설정 시 401)
+- 검증: node --check · tsc 0 · **npm test 118**(+universe 4) · 운영자 실계좌 재업로드로 커버리지 확인
+- ⚠️ **운영 대기**: ① 재적재 후 `cleanup-directory-junk.js`로 000000/999999 정리 ② 실계좌 재업로드 재검증(승격 후 킬러 한 줄 최신 종가) ③ ETF/우선주 잔여는 Phase 2(KRX Open API)
 
 ---
 
@@ -769,7 +795,7 @@ DART 파서 정합성 대조·KRX 데이터 크로스체크에 활용
 
 | 파일 | 내용 |
 |------|------|
-| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마 18테이블, API 42개, 알고리즘, 스케줄링) |
+| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마 18테이블, API 43개, 알고리즘, 스케줄링) |
 | `docs/FRONTEND.md` | 프론트엔드 상세 (페이지별 스펙, 컴포넌트, 스토어 인터페이스) |
 | `docs/FRONTEND_UX.md` | UX 원칙 (온보딩, 면책, 디자인 시스템, 초보자 안내) |
 | `docs/NEXTJS.md` | Next.js 전환 상세 (Server/Client 경계, ISR 패턴, 라우팅) |
