@@ -6,6 +6,7 @@ import { parseTrades } from './parsers/index.js';
 import { computeRoundtrips, summarize, evaluateOpenLots } from './roundtrip.js';
 import { computeBiases } from './biases/index.js';
 import { norm, buildNameIndex } from './universe.js';
+import { promoteCodes } from './promote.js';
 
 // deviceId, csvText, brokerHint → { broker, imported, skipped, dateRange, coverage, replaced }
 //
@@ -54,6 +55,15 @@ export async function ingest(deviceId, csvText, brokerHint) {
             );
         });
         replaced = true;
+
+        // T3(2C): 새로 매핑됐지만 stocks에 없는 보유·거래 종목 승격 — 킬러 한 줄·추격 판정이 값을 얻도록.
+        // 보유분 현재가는 동기(await), 이력 backfill은 promote 내부 fire-and-forget.
+        // 승격 실패가 업로드를 깨지 않게 try/catch. unvaluedCount 캐비엇은 analyze에서 그대로 유지.
+        try {
+            await promoteCodes({ resolvedTrades: resolved });
+        } catch (e) {
+            console.error('[journal] promoteCodes failed (업로드는 정상):', e.message);
+        }
     }
 
     const dates = resolved.map(t => t.tradedAt).sort();
