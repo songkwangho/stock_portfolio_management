@@ -4,7 +4,7 @@ import { query, withTransaction } from '../../db/connection.js';
 import { getDeviceId } from '../../helpers/deviceId.js';
 import { invalidateCache } from '../../helpers/cache.js';
 import { getStockData } from './service.js';
-import { syncDirectory } from './directory.js';
+import { syncDirectory, parseMarketPreview } from './directory.js';
 
 const router = express.Router();
 
@@ -124,6 +124,20 @@ router.get('/stocks/directory/debug', async (req, res) => {
             `SELECT code, name, market FROM stocks_directory ORDER BY code LIMIT 5`
         )).rows;
         res.json({ who, total: counts.total, sentinel: counts.sentinel, sample });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 확인용 임시(B) — GET /api/stocks/directory/parsepreview : KOSPI 파싱 중간값(upsert 없음).
+// parseRow가 KRX 실포맷과 맞는지 눈으로 확인. 확인 후 debug/sentinel과 함께 제거.
+router.get('/stocks/directory/parsepreview', async (req, res) => {
+    const provided = req.get('x-admin-token') || req.query.token || '';
+    if (!safeTokenEqual(String(provided), process.env.ADMIN_SYNC_TOKEN || '')) {
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+        res.json(await parseMarketPreview('KOSPI'));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

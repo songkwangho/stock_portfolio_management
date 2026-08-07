@@ -26,8 +26,11 @@ const MIN_EXPECTED_ROWS = {
 // 정상 ~2,600의 안전 하한. 성공 후엔 >1000이라 매 부팅마다 KRX를 두드리지 않는다.
 const MIN_DIRECTORY_TOTAL = 1000;
 
+const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+
 // HTML 테이블 1행을 { code, name, listedAt } 으로 파싱.
-// <tr> 내 <td> 순서대로 회사명, 종목코드, ..., 상장일, ... 이므로 간단 정규식으로 추출한다.
+// A(E2) — 코드/날짜를 인덱스 고정(tds[1]/tds[4])이 아니라 **값 패턴으로 스캔**한다.
+// KRX가 컬럼 순서를 바꿔도(코드가 tds[1]이 아니어도) 6자리 숫자 셀·날짜 셀을 찾아 견고하게 매핑.
 function parseRow(trHtml) {
     const tds = [];
     const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
@@ -37,21 +40,21 @@ function parseRow(trHtml) {
     }
     if (tds.length < 5) return null;
 
-    const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
-
-    const name = stripTags(tds[0]);
-    const rawCode = stripTags(tds[1]);
-    const code = rawCode.replace(/\D/g, '').padStart(6, '0');
-    const rawListed = stripTags(tds[4] || '');
-    const listedAt = /^\d{4}[-/]\d{2}[-/]\d{2}$/.test(rawListed)
-        ? rawListed.replace(/\//g, '-')
-        : null;
+    const stripped = tds.map(stripTags);
+    const name = stripped[0];
+    // 종목코드 = 전 셀 중 정확히 6자리 숫자인 칸(상장일·결산월과 안 겹침). 없으면 기존 tds[1] 숫자추출 폴백.
+    let code = stripped.find(t => /^\d{6}$/.test(t));
+    if (!code) code = stripped[1].replace(/\D/g, '').padStart(6, '0');
+    // 상장일 = 날짜 패턴 셀 스캔(인덱스 고정 대신). 구분자 -, /, . 허용 → '-'로 정규화.
+    const rawListed = stripped.find(t => /^\d{4}[-/.]\d{2}[-/.]\d{2}$/.test(t));
+    const listedAt = rawListed ? rawListed.replace(/[/.]/g, '-') : null;
 
     if (!name || !/^\d{6}$/.test(code)) return null;
     return { code, name, listedAt };
 }
 
-async function fetchMarket(market) {
+// fetch + EUC-KR decode + tbody의 <tr> 추출까지(파싱 전 원자료). fetchMarket과 parsepreview가 공유.
+async function fetchMarketRaw(market) {
     const url = KRX_URLS[market];
     const response = await axios.get(url, {
         responseType: 'arraybuffer',
@@ -71,22 +74,27 @@ async function fetchMarket(market) {
 
     // E1 — 머리글 문자열 기반 "HTML error page" 판정 제거. KRX 엑셀 export가 유효하면서도
     // MS Office HTML 래퍼(<html ...>)로 시작하는 케이스가 있어 정상 데이터를 오탐했다(sync 0건).
-    // 진짜 유효성 기준은 "파싱된 종목 행 수"(아래 MIN_EXPECTED_ROWS) — 그게 유일한 게이트다.
+    // 진짜 유효성 기준은 "파싱된 종목 행 수"(fetchMarket의 MIN_EXPECTED_ROWS) — 그게 유일한 게이트다.
 
     // tbody 내부 행만 매칭 — header/footer 오염 방지.
     const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
     const scope = tbodyMatch ? tbodyMatch[1] : html;
-    const rows = scope.match(/<tr[\s\S]*?<\/tr>/g) || [];
+    const trRows = scope.match(/<tr[\s\S]*?<\/tr>/g) || [];
+    const ct = response.headers['content-type'] || '';
+    return { html, trRows, ct };
+}
+
+async function fetchMarket(market) {
+    const { html, trRows, ct } = await fetchMarketRaw(market);
 
     const parsed = [];
-    for (const tr of rows) {
+    for (const tr of trRows) {
         const row = parseRow(tr);
         if (row) parsed.push({ ...row, market });
     }
 
     // 파싱된 종목 수가 최소 임계값 미달이면 KRX 응답 이상으로 간주하고 upsert 스킵.
     // (0건 조용히 성공 처리로 디렉토리가 공백으로 유지되는 문제 방지)
-    const ct = response.headers['content-type'] || '';
     const minExpected = MIN_EXPECTED_ROWS[market];
     if (parsed.length < minExpected) {
         // E1 — 실패 시 다음 진단(포맷 변경 vs IP 차단)이 가능하도록 응답 메타를 남긴다.
@@ -181,4 +189,18 @@ export async function syncDirectoryIfEmpty() {
         console.error('[directory] syncDirectoryIfEmpty failed:', e.message);
         return null;
     }
+}
+
+// 확인용 임시(B) — KOSPI 응답 파싱 중간값(upsert 없음). parsepreview 라우트 전용. 확인 후 제거.
+export async function parseMarketPreview(market = 'KOSPI') {
+    const { html, trRows } = await fetchMarketRaw(market);
+    const firstRowTds = trRows.length
+        ? [...trRows[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => stripTags(m[1]))
+        : [];
+    const parsedSample = [];
+    for (const tr of trRows) {
+        const row = parseRow(tr);
+        if (row) { parsedSample.push(row); if (parsedSample.length >= 3) break; }
+    }
+    return { htmlHead: html.slice(0, 600), firstRowTds, parsedSample };
 }
