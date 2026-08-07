@@ -16,7 +16,7 @@ export async function fetchHistory(code, days) {
     const res = await axios.get(NAVER_FINANCE_URL, {
         params: { symbol: code, requestType: 1, startTime: toYYYYMMDD(start), endTime: toYYYYMMDD(new Date()), timeframe: 'day' },
         headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/' },
-        timeout: 30000,
+        timeout: 4000,   // 개별 호출 상한(tail-risk 차단) — 동기 승격 예산 실효화. backfill은 --resume로 재시도 가능
     });
     const cleaned = res.data.trim().replace(/\s+/g, '');
     return [...cleaned.matchAll(/\["(\d+)","?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?([\d.]+)"?\]/g)];

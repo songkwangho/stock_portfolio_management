@@ -102,15 +102,18 @@ export async function getStockData(code, fallbackName = null) {
         const [response, investorResult, mainPageResult] = await Promise.allSettled([
             axios.get(NAVER_FINANCE_URL, {
                 params: { symbol: code, requestType: 1, startTime, endTime, timeframe: 'day' },
-                headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/' }
+                headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/' },
+                timeout: 4000   // 개별 네이버 호출 상한 — 동기 승격 8s 예산을 실질 hard budget으로(tail-risk만 차단, happy path 무영향)
             }),
             axios.get(`https://finance.naver.com/item/frgn.naver?code=${code}`, {
                 responseType: 'arraybuffer',
-                headers: { 'User-Agent': 'Mozilla/5.0' }
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 4000
             }),
             axios.get(`https://finance.naver.com/item/main.naver?code=${code}`, {
                 responseType: 'arraybuffer',
-                headers: { 'User-Agent': 'Mozilla/5.0' }
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 4000
             })
         ]);
 
