@@ -29,8 +29,10 @@ const MIN_DIRECTORY_TOTAL = 1000;
 const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
 
 // HTML 테이블 1행을 { code, name, listedAt } 으로 파싱.
-// A(E2) — 코드/날짜를 인덱스 고정(tds[1]/tds[4])이 아니라 **값 패턴으로 스캔**한다.
-// KRX가 컬럼 순서를 바꿔도(코드가 tds[1]이 아니어도) 6자리 숫자 셀·날짜 셀을 찾아 견고하게 매핑.
+// 1A — KRX 실컬럼: 회사명(0)·시장구분(1)·종목코드(2)·업종(3)·주요제품(4)·상장일(5)…
+// 종목코드는 stripped[2] 우선 채택하되 **끝자리 영문 허용**(우선주/스팩 00088K류 → /^[0-9A-Z]{6}$/).
+// 이전 /^\d{6}$/ 스캔은 알파뉴메릭 코드를 놓쳐 ~90행이 000000으로 붕괴했다. 날짜·코드 모두 값 패턴으로
+// 잡아 컬럼 순서 재변경(시장구분 삽입처럼)에도 견고. market은 fetchMarket 인자에서 오므로 tds[1]은 무시.
 function parseRow(trHtml) {
     const tds = [];
     const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
@@ -42,14 +44,14 @@ function parseRow(trHtml) {
 
     const stripped = tds.map(stripTags);
     const name = stripped[0];
-    // 종목코드 = 전 셀 중 정확히 6자리 숫자인 칸(상장일·결산월과 안 겹침). 없으면 기존 tds[1] 숫자추출 폴백.
-    let code = stripped.find(t => /^\d{6}$/.test(t));
-    if (!code) code = stripped[1].replace(/\D/g, '').padStart(6, '0');
+    // 종목코드 = stripped[2] 우선(알파뉴메릭 6자리). 실패 시 알파뉴메릭 6자리 셀 스캔 폴백.
+    let code = /^[0-9A-Z]{6}$/.test(stripped[2] || '') ? stripped[2] : null;
+    if (!code) code = stripped.find(t => /^[0-9A-Z]{6}$/.test(t));
     // 상장일 = 날짜 패턴 셀 스캔(인덱스 고정 대신). 구분자 -, /, . 허용 → '-'로 정규화.
     const rawListed = stripped.find(t => /^\d{4}[-/.]\d{2}[-/.]\d{2}$/.test(t));
     const listedAt = rawListed ? rawListed.replace(/[/.]/g, '-') : null;
 
-    if (!name || !/^\d{6}$/.test(code)) return null;
+    if (!name || !/^[0-9A-Z]{6}$/.test(code)) return null;
     return { code, name, listedAt };
 }
 
@@ -189,18 +191,4 @@ export async function syncDirectoryIfEmpty() {
         console.error('[directory] syncDirectoryIfEmpty failed:', e.message);
         return null;
     }
-}
-
-// 확인용 임시(B) — KOSPI 응답 파싱 중간값(upsert 없음). parsepreview 라우트 전용. 확인 후 제거.
-export async function parseMarketPreview(market = 'KOSPI') {
-    const { html, trRows } = await fetchMarketRaw(market);
-    const firstRowTds = trRows.length
-        ? [...trRows[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => stripTags(m[1]))
-        : [];
-    const parsedSample = [];
-    for (const tr of trRows) {
-        const row = parseRow(tr);
-        if (row) { parsedSample.push(row); if (parsedSample.length >= 3) break; }
-    }
-    return { htmlHead: html.slice(0, 600), firstRowTds, parsedSample };
 }

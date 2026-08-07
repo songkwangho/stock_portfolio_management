@@ -4,7 +4,7 @@ import { query, withTransaction } from '../../db/connection.js';
 import { getDeviceId } from '../../helpers/deviceId.js';
 import { invalidateCache } from '../../helpers/cache.js';
 import { getStockData } from './service.js';
-import { syncDirectory, parseMarketPreview } from './directory.js';
+import { syncDirectory } from './directory.js';
 
 const router = express.Router();
 
@@ -98,48 +98,6 @@ router.post('/stocks/directory/sync', async (req, res) => {
         res.json({ ok: true, ...result });
     } catch (e) {
         res.json({ ok: false, kospi: 0, kosdaq: 0, error: e.message });
-    }
-});
-
-// 진단용 임시 — GET /api/stocks/directory/debug : 연결 DB·쓰기 커밋 가시성 확인.
-// sync가 upsert하는데도 디렉토리가 비어 보이는 원인(연결 DB 불일치 vs 커밋 미가시)을 판별.
-// GET이지만 센티넬 쓰기(999999)를 포함(운영자 요청, 토큰 보호). 진단 종료 후 라우트·센티넬 제거 예정.
-router.get('/stocks/directory/debug', async (req, res) => {
-    const provided = req.get('x-admin-token') || req.query.token || '';
-    if (!safeTokenEqual(String(provided), process.env.ADMIN_SYNC_TOKEN || '')) {
-        return res.status(401).json({ error: 'unauthorized' });
-    }
-    try {
-        const who = (await query('SELECT current_database() AS db, current_user AS usr')).rows[0];
-        await query(
-            `INSERT INTO stocks_directory (code, name, market) VALUES ('999999', '__DEBUG__', 'KOSPI')
-             ON CONFLICT (code) DO UPDATE SET name = '__DEBUG__', updated_at = NOW()`
-        );
-        const counts = (await query(
-            `SELECT count(*)::int AS total,
-                    (SELECT count(*)::int FROM stocks_directory WHERE code = '999999') AS sentinel
-             FROM stocks_directory`
-        )).rows[0];
-        const sample = (await query(
-            `SELECT code, name, market FROM stocks_directory ORDER BY code LIMIT 5`
-        )).rows;
-        res.json({ who, total: counts.total, sentinel: counts.sentinel, sample });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// 확인용 임시(B) — GET /api/stocks/directory/parsepreview : KOSPI 파싱 중간값(upsert 없음).
-// parseRow가 KRX 실포맷과 맞는지 눈으로 확인. 확인 후 debug/sentinel과 함께 제거.
-router.get('/stocks/directory/parsepreview', async (req, res) => {
-    const provided = req.get('x-admin-token') || req.query.token || '';
-    if (!safeTokenEqual(String(provided), process.env.ADMIN_SYNC_TOKEN || '')) {
-        return res.status(401).json({ error: 'unauthorized' });
-    }
-    try {
-        res.json(await parseMarketPreview('KOSPI'));
-    } catch (e) {
-        res.status(500).json({ error: e.message });
     }
 });
 
