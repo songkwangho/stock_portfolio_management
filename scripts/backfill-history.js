@@ -22,9 +22,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import axios from 'axios';
-import pool, { withTransaction } from '../server/db/connection.js';
-import { NAVER_FINANCE_URL } from '../server/scrapers/naver.js';
+import pool from '../server/db/connection.js';
+// 2A — fetchHistory/upsertHistory는 server/domains/stock/history.js로 공용화(journal 승격과 공유).
+import { fetchHistory, upsertHistory } from '../server/domains/stock/history.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,39 +52,6 @@ function loadState() {
 
 function saveState(state) {
     fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-}
-
-function toYYYYMMDD(date) {
-    return date.toISOString().slice(0, 10).replace(/-/g, '');
-}
-
-async function fetchHistory(code, days) {
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    const res = await axios.get(NAVER_FINANCE_URL, {
-        params: { symbol: code, requestType: 1, startTime: toYYYYMMDD(start), endTime: toYYYYMMDD(new Date()), timeframe: 'day' },
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.naver.com/' },
-        timeout: 30000,
-    });
-    const cleaned = res.data.trim().replace(/\s+/g, '');
-    return [...cleaned.matchAll(/\["(\d+)","?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?(\d+)"?,"?([\d.]+)"?\]/g)];
-}
-
-async function upsertHistory(code, matches) {
-    if (matches.length === 0) return 0;
-    await withTransaction(async (client) => {
-        for (const m of matches) {
-            // match groups: [1]=date, [2]=open, [3]=high, [4]=low, [5]=close, [6]=volume
-            await client.query(`
-                INSERT INTO stock_history (code, date, price, open, high, low, volume)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT(code, date) DO UPDATE SET
-                    price = EXCLUDED.price, open = EXCLUDED.open,
-                    high = EXCLUDED.high, low = EXCLUDED.low, volume = EXCLUDED.volume
-            `, [code, m[1], parseInt(m[5]), parseInt(m[2]), parseInt(m[3]), parseInt(m[4]), parseInt(m[6])]);
-        }
-    });
-    return matches.length;
 }
 
 async function main() {
