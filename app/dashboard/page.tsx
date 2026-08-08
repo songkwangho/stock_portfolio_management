@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import Card from '@/components/ui/Card';
 import ErrorBanner from '@/components/ui/ErrorBanner';
+import AttentionBlock from '@/components/dashboard/AttentionBlock';
 import { stockApi } from '@/lib/stockApi';
 import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import { formatWeight } from '@/lib/stockDetail/format';
@@ -162,6 +163,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* A차 — 주목 레이어(보유+관심 현저성 트리아지). 후보 없으면 스스로 null을 렌더한다. */}
+      <AttentionBlock />
       {holdings.length === 0 && (
         <Card variant="primary" padding="emphasis">
           <h2 className="text-xl font-bold mb-2 text-center text-ink">무엇부터 시작해 볼까요?</h2>

@@ -374,3 +374,30 @@ export interface JournalAnalysis {
     total?: number; imported?: number; skipped?: number; skippedNames?: string[];
   };
 }
+
+// A차(주목 레이어) — 보유+관심 종목을 현저성으로 정렬한 트리아지.
+// 서버는 **원시 사실(숫자)**만 준다. 판단·신호·목표가 없음(R1/R2) — 배지 문구는 lib/attention/interpret.ts.
+// 퍼센트 필드는 전부 퍼센트 수치(3.2 = 3.2%).
+export interface AttentionItem {
+  code: string;
+  name: string;
+  source: 'holding' | 'watchlist';
+  held: boolean;
+  weightPct: number | null;        // 보유만. 자동 계산된 정수 비중
+  unrealizedPct: number | null;    // 보유만. 최근 종가 기준
+  ret5d: number | null;            // 5거래일 수익률(%)
+  volSurge: number | null;         // 최신 거래량 ÷ 직전 20거래일 평균 (배수)
+  priced: boolean;                 // 현재가 확보 여부(승격 전 종목은 false)
+  discCount: number;
+  discLatestDaysAgo: number | null;
+  discCategories: string[];        // 중립 표시 라벨(호재/악재 아님)
+  score: number;                   // 현저성. 정렬용이며 화면에 노출하지 않는다
+  components?: { disc: number; move: number; unrl: number; stake: number };
+}
+export interface AttentionResult {
+  available: boolean;
+  reason?: 'empty' | 'error';
+  items?: AttentionItem[];
+  asOfDate?: string | null;        // 최근 종가 날짜 (YYYY-MM-DD)
+  constants?: { windowTradingDays: number; discLookbackDays: number };
+}

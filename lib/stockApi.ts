@@ -54,6 +54,7 @@ function ensureInterceptors() {
         url.includes('/signals') ||
         url.includes('/dart/') ||
         url.includes('/journal/analysis') ||
+        url.includes('/attention') ||
         url.includes('/news');
       if (!silent) {
         try {
@@ -134,6 +135,9 @@ export const stockApi = {
     (await axios.get(`${API_BASE_URL}/journal/analysis`)).data,
   deleteJournal: async (): Promise<{ deleted: number }> =>
     (await axios.delete(`${API_BASE_URL}/journal`)).data,
+  // A차 — 주목 레이어(보유+관심 현저성 트리아지). 보조 블록이라 실패는 silent.
+  getAttention: async (): Promise<import('@/types/stock').AttentionResult> =>
+    (await axios.get(`${API_BASE_URL}/attention`)).data,
   getHealth: async () => {
     // 25s: Render free-tier cold start(30~50s) 대응. HealthGate는 fetch+AbortController 직접 사용.
     const r = await axios.get(`${API_BASE_URL}/health`, { timeout: 25000 });
