@@ -55,7 +55,7 @@ function parseRow(trHtml) {
     return { code, name, listedAt };
 }
 
-// fetch + EUC-KR decode + tbody의 <tr> 추출까지(파싱 전 원자료). fetchMarket과 parsepreview가 공유.
+// fetch + EUC-KR decode + tbody의 <tr> 추출까지(파싱 전 원자료). fetchMarket이 사용.
 async function fetchMarketRaw(market) {
     const url = KRX_URLS[market];
     const response = await axios.get(url, {
