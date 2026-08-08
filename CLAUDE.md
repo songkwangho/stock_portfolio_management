@@ -70,6 +70,8 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   │                             #   (ChartSection·ConclusionCard·InterpretationPanel·DartFinancials 등)
 │   ├── portfolio/
 │   │   └── WatchlistContent.tsx
+│   ├── dashboard/
+│   │   └── AttentionBlock.tsx    # A차 — 주목 레이어 블록 (대시보드 최상단)
 │   └── ui/
 │       ├── ErrorBanner.tsx
 │       ├── HelpBottomSheet.tsx
@@ -90,7 +92,8 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── deviceId.ts               # SSR-safe
 │   ├── dataFreshness.ts
 │   ├── stockDetail/              # 3.12차 — summary·format·helpTexts + 4.5c interpret (순수)
-│   └── journal/                  # 4.5b·C차 — interpret.ts (서버 metrics → 관찰형 한국어, 순수)
+│   ├── journal/                  # 4.5b·C차 — interpret.ts (서버 metrics → 관찰형 한국어, 순수)
+│   └── attention/                # A차 — interpret.ts (원시 사실 → 중립 배지, 순수)
 │
 ├── types/
 │   └── stock.ts
@@ -101,14 +104,15 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   ├── db/                       # 스키마·마이그레이션 (stocks_directory, ai_report 포함)
 │   ├── helpers/                  # deviceId(requireDeviceIdMiddleware), cache, sma
 │   ├── scrapers/                 # 네이버 증권
-│   ├── domains/                  # analysis·alert·portfolio·watchlist·system·dart(4.5a)·journal(4.5b·T2·T3) — 아래는 발췌
+│   ├── domains/                  # analysis·alert·portfolio·watchlist·system·dart(4.5a)·journal(4.5b·T2·T3)·attention(A차) — 아래는 발췌
 │   │   ├── stock/
 │   │   │   ├── service.js        # getStockData + syncAllStocks
 │   │   │   ├── data.js           # registerInitialData (97 + 20 + 10테마)
 │   │   │   ├── directory.js      # 3.6차 — KRX stocks_directory 동기화 + self-heal 하드닝(D1~D4)
 │   │   │   ├── history.js        # 2A — fetchHistory/upsertHistory 공용(backfill·승격 공유)
 │   │   │   └── router.js
-│   │   └── journal/              # 4.5b·C·T2·T3 — parsers/·biases/·universe·roundtrip·promote·service (상세는 docs/BACKEND.md)
+│   │   ├── journal/              # 4.5b·C·T2·T3 — parsers/·biases/·universe·roundtrip·promote·service (상세는 docs/BACKEND.md)
+│   │   └── attention/            # A차 — 주목 레이어. score·facts(순수) + service(DB 로드) + router
 │   ├── scheduler.js              # setupScheduler + 디렉토리 D1(부팅 재동기화)·D4(일 07:30)
 │   └── package.json              # 별도 의존성 — `cd server && npm install` 필요
 │   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
@@ -485,7 +489,7 @@ PC (md: 이상):
 - 검증: tsc 0 · next build ✓(/journal) · **npm test 114** · 금지어 grep(출력) 0 · 방향색 0
 - **어드버서리얼 리뷰(8에이전트/4렌즈)**: 4 CONFIRMED 수정 — ① 미실현 보유일 전역 asOfDate→종목별 날짜+음수 클램프(순수 `evaluateOpenLots` 추출·단위테스트), ② "전부 이익"을 winCount===roundtripCount로 게이트(본전 pnl=0 과장 방지), ③ FORBIDDEN 스윕에 물타기/편향 추가(전 브랜치 커버)
 - ⚠️ **운영 대기/검증**: ① ingest 메타 upsert·`valueOpenLots`(DB 로드부)는 DB 통합이라 실DB는 운영자 검증(F1 동일 — 계산은 순수 `evaluateOpenLots`로 단위테스트됨). ② 미실현 평가는 **"업로드하신 내역 기준"**(부분 히스토리면 open-lot 과대 가능 — 미매칭 매도 캐비엇과 짝) + "최근 종가(asOfDate) 기준". ③ 추격 0/N 1종목 손계산 스팟체크
-- **후속(로드맵)**: 유니버스 확장(§A 선행) ✅ **완료**(T1~T3 + 디렉토리 self-heal, 아래 차수) → A 주목 레이어(트리아지) → B 포지션 앵커 해석 → D 성과 귀인
+- **후속(로드맵)**: 유니버스 확장(§A 선행) ✅ **완료**(T1~T3 + 디렉토리 self-heal, 아래 차수) → A 주목 레이어(트리아지) ✅ **완료**(아래 차수) → B 포지션 앵커 해석 → D 성과 귀인
 
 ---
 
@@ -502,6 +506,23 @@ PC (md: 이상):
 - **환경변수**: `ADMIN_SYNC_TOKEN`(Render) — D3 관리 레버 보호(미설정 시 401)
 - 검증: node --check · tsc 0 · **npm test 118**(+universe 4) · 운영자 실계좌 재업로드로 커버리지 확인
 - ⚠️ **운영 대기**: ① 재적재 후 `cleanup-directory-junk.js`로 000000/999999 정리 ② 실계좌 재업로드 재검증(승격 후 킬러 한 줄 최신 종가) ③ ETF/우선주 잔여는 Phase 2(KRX Open API)
+
+---
+
+**A차 — 주목 레이어 / 트리아지 (2026-08-08)**
+
+유니버스 확장으로 사각이 해소돼 착수. **보유+관심 종목을 객관적 현저성으로 정렬해 상위 몇 개만** 보여주는 대시보드 최상단 블록. 조언이 아니라 **주의 환기** — 판단·신호·목표가 없음. 신규 수집 0(기존 테이블 조립). 운영자 결정: 창=5거래일 · 스코프=보유+관심 · 표면=대시보드 상단 · 공시 type=중립(최신성+건수만).
+
+- [x] **[A-1]** 신규 도메인 `server/domains/attention/` — D-Repo only(External/LLM 없음). `score.js`(순수: 정규화·곱 결합·바닥 컷·상위 K·dedupe) + `facts.js`(순수: 5거래일 수익률·거래량 배수·공시 집계·날짜 헬퍼) + `service.js`(DB 로드만) + `router.js`(`requireDeviceIdMiddleware`)
+- [x] **[A-2]** `GET /api/attention` — `holding_stocks ∪ watchlist` × `stock_history` × `dart_disclosures` 조립 → **원시 사실(숫자) 배열**만 반환. 보유·관심 0이면 `available:false`, 전부 바닥 미만이면 `items:[]`(500 금지 — journal/dart 폴백 패턴). 가격은 히스토리 최신 종가 → `stocks.price` 폴백, 승격 전 종목은 `priced:false`
+- [x] **[A-3]** **R1 현저성 점수** — 네 컴포넌트 각 0~1 정규화 후 `Π(0.1 + 0.9·c)`: 공시 최신성×건수(`exp(-d/7)` 블렌드·14일 룩백) · \|5거래일 수익률\|(15% 캡) · \|미실현\|(30% 캡) · 비중(30% 캡). **방향은 점수에서 배제(크기만)**. 관심은 미실현·비중 baseline 0.3. 상위 K=5, 바닥 미달 컷, 보유·관심 중복은 보유 우선
+- [x] **[A-4]** **R2 이벤트 배지** `lib/attention/interpret.ts`(순수) — 공시(건수·최신성) / 분류(중립 라벨 나열) / `5일 ±N%` / `거래량 평소의 N배` / `미실현 ±N%`(보유만) / `시세 정보 없음`. **배지는 나란히만 — 인과 문장 미생성.** 부호는 텍스트+색, 방향색은 가격·미실현에만
+- [x] **[A-5]** 대시보드 최상단 `components/dashboard/AttentionBlock.tsx` — 구분선 목록(카드 나열 아님), 무채색 기본, provisional 뱃지, 면책 + `asOfDate` 고지. 클릭 시 `/stock/[code]?from=holding|watchlist`. 후보 없으면 스스로 미표시(빈 상태 CTA와 중복 회피)
+- **판단 — `scoreFloor` 0.12 → 0.006 조정**: 곱 형태에서 disc=0이면 그 항이 0.1로 고정돼 **공시 없는 종목의 이론 최대가 보유 0.1 / 관심 0.0137**. 0.12는 사실상 '공시 필수' 필터라 DART 적재 대기 중(4.5a ⚠️)엔 블록이 상시 빈 상태가 된다. 0.006은 조용한 보유(≈0.001)는 컷하고 5거래일 ±6%(관심)·±8%+비중(보유)은 통과시키는 값 — **실데이터 튜닝 1순위**
+- **판단 — 공시 룩백 14일**: 가격 창(5거래일)과 별개 상수. 5거래일(≈7일)로 맞추면 7일 반감 감쇠가 사실상 무의미해져, 넓게 잡고 최신성 감쇠로 자연 정렬시켰다(provisional)
+- 검증: node --check · tsc 0 · next build ✓ · **npm test 158**(+attention 40: score 12·facts 10·interpret 10·service 8) · 금지어 스윕(`FORBIDDEN_ATTENTION` = BASE + 호재/악재/기회/추천/목표가) 전 브랜치 · 방향색은 가격·미실현 배지에만
+- ⚠️ **운영 대기/검증**: ① `service.js`의 실DB 경로는 운영자 검증(로컬 DATABASE_URL 부재 — 조립은 스텁 쿼리로 단위테스트, 계산은 순수 모듈로 커버) ② **DART 미적재 상태에선 공시 컴포넌트가 상시 0** → 현재 현저성은 사실상 가격·거래량·미실현·비중만으로 결정됨. 적재 후 정렬이 크게 바뀌므로 상수 재튜닝 필요 ③ 프론트 시각 확인은 운영자 스크린샷(대시보드 상단)
+- **후속**: 52주 고가 근접 배지(≈250거래일 이력 필요) · R2 심화(공시 카테고리 세분) · B 포지션 앵커 해석 · D 성과 귀인
 
 ---
 
@@ -795,7 +816,7 @@ DART 파서 정합성 대조·KRX 데이터 크로스체크에 활용
 
 | 파일 | 내용 |
 |------|------|
-| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마 18테이블, API 43개, 알고리즘, 스케줄링) |
+| `docs/BACKEND.md` | 백엔드 상세 (DB 스키마 18테이블, API 44개, 알고리즘, 스케줄링) |
 | `docs/FRONTEND.md` | 프론트엔드 상세 (페이지별 스펙, 컴포넌트, 스토어 인터페이스) |
 | `docs/FRONTEND_UX.md` | UX 원칙 (온보딩, 면책, 디자인 시스템, 초보자 안내) |
 | `docs/NEXTJS.md` | Next.js 전환 상세 (Server/Client 경계, ISR 패턴, 라우팅) |

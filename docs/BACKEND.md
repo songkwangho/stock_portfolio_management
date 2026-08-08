@@ -62,6 +62,11 @@ server/
 │   │   ├── promote.js    # T3 — 보유·거래 종목 stocks 승격(동기 현재가 + 비동기 12개월 backfill)
 │   │   ├── service.js    # ingest(F1 교체 + T2 디렉토리 매핑 + T3 promoteCodes) + analyze
 │   │   └── router.js     # 3 endpoints
+│   ├── attention/        # A차 — 주목 레이어(보유+관심 현저성 트리아지). 신규 수집 0, 조립만
+│   │   ├── score.js      # 순수 — 현저성 정규화·곱 결합·바닥 컷·상위 K·dedupe (단위테스트)
+│   │   ├── facts.js      # 순수 — 5거래일 수익률·거래량 배수·공시 집계·날짜 헬퍼 (단위테스트)
+│   │   ├── service.js    # DB 로드만 (holdings ∪ watchlist × history × disclosures)
+│   │   └── router.js     # 1 endpoint
 │   └── system/
 │       └── router.js     # health, market/indices, fear-greed
 └── scheduler.js          # setupScheduler + setupCleanup
@@ -74,6 +79,7 @@ app.use('/api/alerts',    alertRouter);
 app.use('/api/watchlist', watchlistRouter);
 app.use('/api/holdings',  portfolioRouter);
 app.use('/api/journal',   journalRouter);   // 4.5b — 거래일지 (prefix 전용, 충돌 없음)
+app.use('/api/attention', attentionRouter); // A차 — 주목 레이어 (prefix 전용, 충돌 없음)
 app.use('/api', systemRouter);    // /health, /market/indices, /market/fear-greed
 app.use('/api', analysisRouter);  // /stock/:code/indicators 등
 app.use('/api', dartRouter);      // /stock/:code/dart/* — stockRouter의 /stock/:code보다 먼저
@@ -141,7 +147,7 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 
 ---
 
-## API 엔드포인트 (43개)
+## API 엔드포인트 (44개)
 
 ### 종목 (stock — 12개)
 
@@ -214,6 +220,20 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 > 편향 텍스트(한국어 관찰형 풀이)는 백엔드에 없음 — 서버는 수치·flag만, 풀이는 프론트 `lib/journal/interpret.ts`(4.5c와 동일 구조 + 금지어 테스트 재사용).
 > 추격매수는 `stock_history` 가격조회 포트 주입 — 히스토리 없으면 coverage로 skip. `express.json` limit 4mb(CSV 텍스트).
 > **키움 실헤더 확정(✅ 2026-07-31 실파일 대조)**: 프리앰블 1행(`[키움증권]주식 거래내역`) + 실헤더 22컬럼. 종목코드 컬럼 없음(종목명→코드 매핑), 매매구분='거래구분'(bare '구분'은 '매체구분'에 greedy 매칭돼 제거), 단가='거래단가', 수량='거래수량', 일자='거래일자'(YYYY.MM.DD). `detectBroker`는 프리앰블 마커 + 실토큰(거래수량/거래단가/매체구분/정산금액/거래세) 시그니처로 판별. **토스·삼성 헤더는 여전히 추정 — 실파일 대조 대기.**
+
+### 주목 레이어 (attention — 1개, `requireDeviceIdMiddleware`)
+
+`server/domains/attention/` — 신규 수집 0(기존 테이블 조립). DB 로드는 `service.js`, 판정은 순수 모듈 2종:
+`score.js`(현저성 정규화·곱 결합·바닥 컷·상위 K·dedupe), `facts.js`(5거래일 수익률·거래량 배수·공시 집계).
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| **GET** | **`/api/attention`** | A차 — 보유(`holding_stocks`) ∪ 관심(`watchlist`)을 **현저성**으로 정렬해 상위 5개. 컴포넌트 4종을 각 0~1로 정규화 후 `Π(0.1 + 0.9·c)`: 공시 최신성×건수(`exp(-d/7)` 블렌드, 14일 룩백) · \|5거래일 수익률\|(15% 캡) · \|미실현\|(30% 캡) · 비중(30% 캡). 관심은 미실현·비중이 없어 baseline 0.3. 응답은 **원시 사실만** `{available, items:[{code,name,source,held,weightPct,unrealizedPct,ret5d,volSurge,priced,discCount,discLatestDaysAgo,discCategories,score}], asOfDate, constants}`. 보유·관심 0이면 `available:false`, 전부 바닥 미만이면 `items:[]` |
+
+> **R1(현저성만)**: 방향(상승/하락)은 점수에 넣지 않는다 — 크기만. 절대 임계 라벨(위험/기회/우량) 없음.
+> **R2(배지 O·해석 X)**: 서버는 숫자만 주고 문구는 프론트 `lib/attention/interpret.ts`(금지어 전수 스윕 `FORBIDDEN_ATTENTION`). 인과 서술 금지.
+> 임계·캡 상수는 전부 **provisional**. 특히 `scoreFloor`는 지시문 예시 0.12에서 **0.006으로 조정** — 곱 형태에서 공시 없는 종목의 이론 최대가 보유 0.1 / 관심 0.0137이라 0.12는 사실상 '공시 필수' 필터가 된다(DART 적재 대기 중이면 블록이 상시 빈 상태). 실데이터 튜닝 1순위.
+> 가격은 `stock_history` 최신 종가 → `stocks.price` 폴백. 승격 전 종목은 `priced:false`로 투명 처리("시세 정보 없음").
 
 ### 알림/관심종목/시스템
 
