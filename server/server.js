@@ -23,6 +23,7 @@ import stockRouter from './domains/stock/router.js';
 import systemRouter from './domains/system/router.js';
 import dartRouter from './domains/dart/router.js';
 import journalRouter from './domains/journal/router.js';
+import attentionRouter from './domains/attention/router.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -108,6 +109,7 @@ app.use('/api/alerts', alertRouter);
 app.use('/api/watchlist', watchlistRouter);
 app.use('/api/holdings', portfolioRouter);
 app.use('/api/journal', journalRouter);   // 4.5b — 거래일지 업로드/분석/삭제 (prefix 전용, 충돌 없음)
+app.use('/api/attention', attentionRouter); // A차 — 주목 레이어(보유+관심 현저성 트리아지, prefix 전용)
 app.use('/api', systemRouter);   // owns /health, /market/indices (no /stock/* conflict)
 app.use('/api', analysisRouter); // owns /stock/:code/{indicators,volatility,financials,news,chart}, /screener, /sector
 app.use('/api', dartRouter);     // owns /stock/:code/dart/{financials,disclosures} — stockRouter의 /stock/:code보다 먼저
