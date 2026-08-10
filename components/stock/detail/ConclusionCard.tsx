@@ -21,31 +21,20 @@ export default function ConclusionCard({ stockDetail, isHolding, holdingMatch }:
         stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
       }
     >
-      {/* 요약문 + 판정 뱃지(우상단). 데스크톱: 좌 요약문 / 우 뱃지. 모바일: 뱃지가 아래로 wrap (3.13 판정 뱃지 이동) */}
+      {/* 요약문 + 시장 분석 뱃지(우상단). 데스크톱: 좌 요약문 / 우 뱃지. 모바일: 뱃지가 아래로 wrap.
+          N3 — 내 종목 상태(holding_opinion) 판정 뱃지(주의 필요/추가 검토/관망)는 제거했다.
+          라벨 자체가 방향 지시라, 5·20일 평균 가격 위치를 푼 요약문(generateStockSummary)이 그 자리를 대신한다.
+          market_opinion "시장 분석" 뱃지는 별 축이라 이번 범위 밖 — 그대로 둔다. */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 lg:gap-4 mb-3">
         <p className="text-base font-bold text-ink leading-relaxed lg:flex-1 lg:min-w-0">
           {generateStockSummary(stockDetail, isHolding, holdingMatch)}
         </p>
         <div className="flex flex-wrap gap-2 shrink-0">
-          {/* 시장 분석 판정 (미보유·보유 공통) */}
           <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
             stockDetail.market_opinion === '긍정적' ? 'bg-rise/10 text-rise border-rise/20' :
             stockDetail.market_opinion === '부정적' ? 'bg-fall/10 text-fall border-fall/20' :
             'bg-inset text-muted border-line'
           }`}>{stockDetail.market_opinion || '분석 중'}</span>
-          {/* 내 종목 상태 (보유 시). holding_opinion 없으면 '보유' 기본값 — 분석 대기 중에도 뱃지 노출 (버그 수정) */}
-          {isHolding && (() => {
-            const ho = stockDetail.holding_opinion || '보유';
-            const display = ho === '매도' ? '주의 필요' : ho === '추가매수' ? '추가 검토' : ho;
-            return (
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-                ho === '매도' ? 'bg-fall/10 text-fall border-fall/20' :
-                ho === '관망' ? 'bg-caution/10 text-caution border-caution/20' :
-                ho === '추가매수' ? 'bg-rise/10 text-rise border-rise/20' :
-                'bg-inset text-muted border-line'
-              }`}>{display}</span>
-            );
-          })()}
         </div>
       </div>
       <div className="border-t border-line pt-3">

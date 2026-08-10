@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
 import { formatWeight } from '@/lib/stockDetail/format';
+import { describeHoldingState } from '@/lib/stockDetail/summary';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { stockApi } from '@/lib/stockApi';
@@ -317,9 +318,8 @@ function PortfolioContent() {
                   <p className={`text-xl font-extrabold tabular-nums ${parseFloat(profitRate) >= 0 ? 'text-rise' : 'text-fall'}`}>
                     {parseFloat(profitRate) >= 0 ? '+' : ''}{profitRate}%
                   </p>
-                  {/* 6-3: holding_opinion='매도'일 땐 [주의 필요] 뱃지 + 설명이 이미 아래에 나오므로
-                      수익률 행동 유도 텍스트는 숨겨서 중복 경고를 피한다. */}
-                  {stock.holding_opinion !== '매도' && (
+                  {/* 내 손익 서술 — 판정 뱃지가 사라졌으므로 '매도'일 때 숨기던 가드도 제거(N2).
+                      아래 관찰 문장은 평균 가격 위치를, 이 줄은 내 손익을 말한다(축이 달라 중복 아님). */}
                   <p className={`text-xs mt-0.5 ${
                     parseFloat(profitRate) >= 0 ? 'text-rise' :
                     parseFloat(profitRate) >= -3 ? 'text-muted' :
@@ -333,7 +333,6 @@ function PortfolioContent() {
                      parseFloat(profitRate) >= -7 ? '손실이 나고 있어요. 시장 상황을 지켜봐요' :
                      '손실이 커지고 있어요. 해당 종목의 분석을 다시 확인해보세요'}
                   </p>
-                  )}
                 </div>
               </div>
 
@@ -353,76 +352,19 @@ function PortfolioContent() {
                       </div>
                     );
                   })() : stock.holding_opinion && (() => {
-                    const displayLabel =
-                      stock.holding_opinion === '매도' ? '주의 필요' :
-                      stock.holding_opinion === '추가매수' ? '추가 검토' :
-                      stock.holding_opinion;
-                    const cautionLike = stock.holding_opinion === '매도' || stock.holding_opinion === '추가매수';
+                    // N1 — 판정 뱃지([주의 필요]/[추가 검토]/[관망])와 opinion 기반 색 배정 제거.
+                    // 5·20일 평균 가격 대비 위치를 푼 중립 관찰 한 줄 + 분석 안내로 대체(방향 지시 없음).
+                    // 손절 규칙(-7%)으로 상태가 정해진 경우 describeHoldingState는 null → 위 손익 줄이 이미 말한다.
                     const lossRate = (stock.avgPrice && stock.currentPrice) ? ((stock.currentPrice - stock.avgPrice) / stock.avgPrice * 100) : null;
-                    const reason =
-                      stock.holding_opinion === '매도' && lossRate !== null
-                        ? lossRate <= -7 ? '손실이 커지고 있어요. 해당 종목의 분석을 다시 확인해보세요' : '5일·20일 평균 모두 아래로 내려갔어요. 하락 추세예요.'
-                        : stock.holding_opinion === '관망' ? '5일 평균 아래지만 20일 평균이 지지 중이에요. 조금 기다려봐요.'
-                        : stock.holding_opinion === '추가매수' ? '5일 평균 부근에서 지지받고 있어요.'
-                        : '5일 평균 위, 이평선 정배열이에요. 상승 흐름이 이어지고 있어요.';
+                    const observation = describeHoldingState(stock.holding_opinion, lossRate, { smaAvailable: stock.sma_available });
+                    if (!observation) return null;
                     return (
                       <div className="w-full">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-block text-xs font-bold px-2.5 py-1.5 rounded-lg border ${
-                            stock.holding_opinion === '매도' ? 'bg-fall/10 text-fall border-fall/20' :
-                            stock.holding_opinion === '관망' ? 'bg-caution/10 text-caution border-caution/20' :
-                            stock.holding_opinion === '추가매수' ? 'bg-rise/10 text-rise border-rise/20' :
-                            'bg-inset text-muted border-line'
-                          }`}>[{displayLabel}]</span>
+                        <p className="text-xs text-muted leading-relaxed">{observation}</p>
+                        <div className="mt-1.5 flex items-center gap-3 flex-wrap">
                           <button onClick={() => onDetailClick({ ...stock, category: '보유 종목' })} className="text-xs text-ink font-medium hover:underline">상세 보기 →</button>
+                          <span className="text-xs text-faint leading-relaxed">참고용 관찰이에요. 판단은 본인이 해주세요.</span>
                         </div>
-                        <p className="mt-1.5 text-xs font-normal text-muted leading-relaxed">{reason}</p>
-                        {cautionLike && <p className="mt-1 text-xs text-faint italic leading-relaxed">이 신호는 참고용이에요. 판단은 본인이 해주세요. 실제 거래는 증권사 앱에서 직접 진행해 주세요.</p>}
-                        {/* 3.9차 — 매도/관망 상태에 행동 가이드 스텝 추가 */}
-                        {stock.holding_opinion === '매도' && (
-                          <div className="mt-4 pt-4 border-t border-line">
-                            <p className="text-xs font-bold text-ink mb-2">지금 할 수 있는 것</p>
-                            <div className="space-y-2">
-                              <div className="flex items-start gap-2">
-                                <span className="text-faint text-xs shrink-0 mt-0.5 tabular-nums">1.</span>
-                                <button
-                                  onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
-                                  className="text-xs text-ink font-medium hover:underline text-left leading-relaxed min-h-[44px] flex items-center"
-                                >
-                                  종목 상세에서 최근 이평선·거래량 변화 확인하기 →
-                                </button>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="text-faint text-xs shrink-0 mt-0.5 tabular-nums">2.</span>
-                                <p className="text-xs text-muted leading-relaxed">손실 허용 범위 스스로 결정하기 (예: "이 이상 내려가면 정리")</p>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="text-faint text-xs shrink-0 mt-0.5 tabular-nums">3.</span>
-                                <p className="text-xs text-muted leading-relaxed">결정했다면 실제 매도는 증권사 앱에서 직접 진행</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {stock.holding_opinion === '관망' && (
-                          <div className="mt-4 pt-4 border-t border-line">
-                            <p className="text-xs font-bold text-ink mb-2">지금 할 수 있는 것</p>
-                            <div className="space-y-1.5">
-                              <div className="flex items-start gap-2">
-                                <span className="text-faint text-xs shrink-0 mt-0.5 tabular-nums">1.</span>
-                                <button
-                                  onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
-                                  className="text-xs text-ink font-medium hover:underline text-left leading-relaxed min-h-[44px] flex items-center"
-                                >
-                                  20일 평균선(중기 이동평균)이 차트에서 지지하는지 확인해보세요 →
-                                </button>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <span className="text-faint text-xs shrink-0 mt-0.5 tabular-nums">2.</span>
-                                <p className="text-xs text-muted leading-relaxed">추가 하락 시 어디서 정리할지 미리 생각해두세요</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })()}

@@ -28,26 +28,29 @@ export default function SectorCompare({ sectorData, currentCode }: SectorCompare
   const perPct = computePercentile('per', true);
   const pbrPct = computePercentile('pbr', true);
   const roePct = computePercentile('roe', false);
-  const interpret = (pct: number | null, label: string) => {
+  // 판정 라벨('우수한 편'/'주의 필요') 제거 — 백분위는 사실이지만, 위 computePercentile이
+  // 지표별 선호 방향(lowerIsBetter)으로 순위를 뒤집어 놓아 '상위/하위'만 남기면 방향이 모호해진다.
+  // 그래서 '낮은 쪽/높은 쪽'으로 축을 명시한다(사실 서술, 좋다/나쁘다 판정 없음).
+  const interpret = (pct: number | null, label: string, betterSide: '낮은' | '높은') => {
     if (pct === null) return null;
-    const tier = pct <= 25 ? '상위 25%' : pct <= 50 ? '상위 50%' : pct <= 75 ? '하위 50%' : '하위 25%';
-    const tone = pct <= 50 ? '우수한 편' : '주의 필요';
-    return `${label}: 업종 내 ${tier} (${tone})`;
+    const band = pct <= 25 ? 25 : pct <= 50 ? 50 : pct <= 75 ? 50 : 25;
+    const side = pct <= 50 ? betterSide : betterSide === '낮은' ? '높은' : '낮은';
+    return `${label}: 업종에서 ${side} 쪽 ${band}% 안에 있어요`;
   };
   return (
     <div className="bg-surface border border-line rounded-xl p-6">
       <h3 className="text-lg font-semibold text-ink mb-2">같은 업종 비교</h3>
       <p className="text-xs text-muted mb-3">
         <span className="text-ink font-bold">{sectorData.category}</span> 업종 중앙값과 비교해요.
-        PER이 중앙값보다 낮고 ROE가 높으면 좋아요!
+        PER이 중앙값보다 낮으면 이익 대비 값이 싼 편, ROE가 높으면 자본 대비 이익이 큰 편이에요.
       </p>
       {/* 업종 내 백분위 요약 — 평균값 비교보다 직관적 */}
       {(perPct !== null || pbrPct !== null || roePct !== null) && (
         <div className="mb-4 p-3 bg-inset border border-line rounded-xl space-y-1">
           <p className="text-xs font-bold text-ink mb-1">이 종목의 업종 내 위치</p>
-          {perPct !== null && <p className="text-xs text-muted">{interpret(perPct, 'PER')}</p>}
-          {pbrPct !== null && <p className="text-xs text-muted">{interpret(pbrPct, 'PBR')}</p>}
-          {roePct !== null && <p className="text-xs text-muted">{interpret(roePct, 'ROE')}</p>}
+          {perPct !== null && <p className="text-xs text-muted">{interpret(perPct, 'PER', '낮은')}</p>}
+          {pbrPct !== null && <p className="text-xs text-muted">{interpret(pbrPct, 'PBR', '낮은')}</p>}
+          {roePct !== null && <p className="text-xs text-muted">{interpret(roePct, 'ROE', '높은')}</p>}
         </div>
       )}
       <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-inset border border-line rounded-xl">
