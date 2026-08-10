@@ -45,7 +45,8 @@ export default function DashboardPage() {
   const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const marketIndices = useMarketStore(s => s.indices);
+  // indices 값 자체는 대시보드가 렌더하지 않는다(HeaderBar 담당) — fetch만 호출해 공용 TTL 스토어를 데운다.
+  // 모바일 대시보드 KOSPI/KOSDAQ 노출(Sprint 3 [M4]) 때 구독을 다시 추가하면 된다.
   const fetchMarketIndices = useMarketStore(s => s.fetchIndices);
   const unreadCount = useAlertStore(s => s.unreadCount);
   const fetchUnreadCount = useAlertStore(s => s.fetchUnreadCount);
@@ -144,7 +145,7 @@ export default function DashboardPage() {
   const weightPct = (avg?: number, qty?: number) => totalCost > 0 ? (avg || 0) * (qty || 0) / totalCost * 100 : 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* A차 — 주목 레이어(보유+관심 현저성 트리아지). 후보 없으면 스스로 null을 렌더한다. */}
       <AttentionBlock />
       {holdings.length === 0 && (
@@ -180,30 +181,85 @@ export default function DashboardPage() {
         return (
           <div>
             {/* 히어로 — 카드 없이 페이지 위에 직접. 숫자 색이 방향을 말하므로 accentBar/상자 불필요 (TASK 1).
-                "확인이 필요한 종목"(holding_opinion·신호 판단 라벨) 은퇴 후 우측 컬럼이 알림 하나만
-                남아 2컬럼이 비어 보이므로 단일 컬럼으로 재균형. 먼저 볼 종목은 상단 주목 띠가 맡는다. */}
-            <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
-            <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
-              {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
-            </p>
-            <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
-              {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
-            </p>
-            <p className="text-[13px] text-muted tabular-nums mt-3">
-              ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
-            </p>
+                좌: 포트폴리오 숫자·알림 / 우: 자산 배분 도넛(본문 우측 1/3에서 이동).
+                2열은 **xl부터** — lg(사이드바 272 + 패딩 80 제외 시 본문 ≈672px)에서 2열로 쪼개면
+                우측 컬럼이 ~220px가 되어 도넛(180) + 범례가 들어가지 않는다. 그 아래 폭에선
+                단일 컬럼으로 쌓여 도넛이 본문 폭을 다 쓰므로 빈 공간도 생기지 않는다. */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(0,420px)] gap-x-8 gap-y-6">
+              <div>
+                <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
+                <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
+                  {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
+                </p>
+                <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
+                  {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
+                </p>
+                <p className="text-[13px] text-muted tabular-nums mt-3">
+                  ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
+                </p>
 
-            {/* 알림 진입점 — 큰 숫자 아래 작은 링크. 없으면 아무것도 띄우지 않는다. */}
-            {unreadCount > 0 && (
-              <button onClick={() => router.push('/alerts')}
-                className="mt-4 -ml-2 inline-flex items-center gap-2 px-2 min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
-                <span className="text-sm font-semibold text-ink">읽지 않은 알림 {unreadCount}개</span>
-                <span className="text-xs text-muted font-bold">확인 →</span>
-              </button>
-            )}
+                {/* 알림 진입점 — 큰 숫자 아래 작은 링크. 없으면 아무것도 띄우지 않는다. */}
+                {unreadCount > 0 && (
+                  <button onClick={() => router.push('/alerts')}
+                    className="mt-4 -ml-2 inline-flex items-center gap-2 px-2 min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
+                    <span className="text-sm font-semibold text-ink">읽지 않은 알림 {unreadCount}개</span>
+                    <span className="text-xs text-muted font-bold">확인 →</span>
+                  </button>
+                )}
+              </div>
+
+              {/* 자산 배분 — 본문 우측 1/3에서 히어로로 이동. 내용·팔레트·집중 뱃지·1종목 안내 불변.
+                  컬럼 상한 420px은 옮기기 전 1/3 컬럼과 같은 폭이라 도넛/범례 비율이 유지된다. */}
+              <div className="bg-surface border border-line rounded-xl p-6">
+                <h3 className="text-lg font-semibold mb-6 text-ink">자산 배분 현황</h3>
+                {holdings.length === 1 ? (
+                  <div className="space-y-4">
+                    <div className="bg-inset border border-line rounded-lg p-5 text-center">
+                      <p className="text-sm font-bold text-ink mb-1">{holdings[0].name}</p>
+                      <p className="text-xs text-muted tabular-nums">비중 100%</p>
+                    </div>
+                    <div className="bg-caution/5 border border-caution/20 rounded-lg p-4">
+                      <p className="text-xs text-caution leading-relaxed">
+                        종목을 2개 이상 추가하면 자산 배분 그래프를 볼 수 있어요. 한 종목에 집중하면 그 종목 하락 시 손실이 커져요.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  // 도넛 180px + 범례는 우측 세로 배치. 2~5조각에 400px는 과하다 (TASK 6).
+                  <div className="flex items-center gap-6">
+                    <div className="w-[180px] h-[180px] shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={54} outerRadius={90} paddingAngle={2} dataKey="value">
+                            {portfolioData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {portfolioData.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }}></span>
+                            <span className="text-sm text-muted truncate">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {holdings.length >= 2 && item.value > CONCENTRATION_THRESHOLD && (
+                              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution">집중</span>
+                            )}
+                            <span className="text-sm font-semibold text-ink tabular-nums">{formatWeight(item.pct)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* 면책 — 히어로 내용과 구분선으로만 분리 (TASK 1). */}
-            <p className="text-xs text-faint mt-8 pt-4 border-t border-line leading-relaxed">
+            <p className="text-xs text-faint mt-6 pt-4 border-t border-line leading-relaxed">
               ※ 위 정보는 알고리즘 분석이에요. 실제 투자 결정은 본인이 직접 해주세요.
               {stale && <span className="text-caution"> · 데이터가 오늘 갱신되지 않았어요</span>}
             </p>
@@ -259,193 +315,143 @@ export default function DashboardPage() {
 
       <ErrorBanner error={historyError} kind="server" onRetry={fetchHistory} autoRetryMs={3000} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-surface border border-line rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-ink">포트폴리오 수익률 추이</h3>
-              <span className="text-xs text-faint tabular-nums">최근 {portfolioHistory.length}거래일 기준</span>
+      {/* 본문 — 도넛이 히어로로 갔으므로 3열 해제. 차트·원장 모두 풀폭(차트는 넓을수록 유리). */}
+      <div className="bg-surface border border-line rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-ink">포트폴리오 수익률 추이</h3>
+          <span className="text-xs text-faint tabular-nums">최근 {portfolioHistory.length}거래일 기준</span>
+        </div>
+        {chartData.length > 1 && (
+          <p className="text-xs text-faint mb-1 tabular-nums">
+            {chartData[0].fullDate} ~ {chartData[chartData.length - 1].fullDate}
+          </p>
+        )}
+        {holdings.length > 0 && chartData.length > 0 && (
+          <p className="text-xs text-muted mb-3">평가금액(실선)이 투자원금(파선) <span className="text-rise font-bold">위</span>에 있으면 수익 중, <span className="text-fall font-bold">아래</span>면 손실 중이에요.</p>
+        )}
+        <div className="h-80 w-full">
+          {historyLoading ? (
+            <div className="flex items-center justify-center h-full text-muted">
+              <RefreshCw className="animate-spin mr-2" size={20} />
+              <span>데이터 로딩 중...</span>
             </div>
-            {chartData.length > 1 && (
-              <p className="text-xs text-faint mb-1 tabular-nums">
-                {chartData[0].fullDate} ~ {chartData[chartData.length - 1].fullDate}
-              </p>
-            )}
-            {holdings.length > 0 && chartData.length > 0 && (
-              <p className="text-xs text-muted mb-3">평가금액(실선)이 투자원금(파선) <span className="text-rise font-bold">위</span>에 있으면 수익 중, <span className="text-fall font-bold">아래</span>면 손실 중이에요.</p>
-            )}
-            <div className="h-80 w-full">
-              {historyLoading ? (
-                <div className="flex items-center justify-center h-full text-muted">
-                  <RefreshCw className="animate-spin mr-2" size={20} />
-                  <span>데이터 로딩 중...</span>
-                </div>
-              ) : holdings.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted text-center px-6">
-                  <p className="text-sm font-bold mb-2 text-ink">종목을 추가하면 수익률 그래프를 볼 수 있어요</p>
-                  <button
-                    onClick={() => router.push('/portfolio')}
-                    className="mt-3 px-4 py-2.5 bg-ink hover:opacity-90 text-surface text-xs font-bold rounded-lg transition-opacity"
-                  >
-                    포트폴리오에 추가하기 →
-                  </button>
-                </div>
-              ) : chartData.length > 0 ? (() => {
-                const isLoss = avgProfitRate < 0;
-                const lineColor = isLoss ? '#1B5FD0' : '#D91C1C'; // 손실=fall(파랑), 수익=rise(빨강)
-                // 평가금액·투자원금 두 라인이 모두 들어가는 범위로 Y축 자동 계산 (TASK 7).
-                // 0부터 시작하지 않음 — 금액 추이지 절대량 비교가 아님.
-                const yVals = chartData.flatMap(d => [d.value, d.cost]);
-                const yMin = Math.min(...yVals);
-                const yMax = Math.max(...yVals);
-                const yPad = (yMax - yMin) * 0.1 || Math.max(yMax * 0.05, 1);
-                const yLo = yMin - yPad, yHi = yMax + yPad;
-                // 눈금은 딱 떨어지는 값으로 — domain은 데이터 기준, ticks만 nice 반올림 (Fix 3).
-                const rawStep = (yHi - yLo) / 5;
-                const stepMag = Math.pow(10, Math.floor(Math.log10(rawStep)));
-                const stepNorm = rawStep / stepMag;
-                const niceStep = (stepNorm <= 1 ? 1 : stepNorm <= 2 ? 2 : stepNorm <= 2.5 ? 2.5 : stepNorm <= 5 ? 5 : 10) * stepMag;
-                const yTicks: number[] = [];
-                for (let t = Math.ceil(yLo / niceStep) * niceStep; t <= yHi; t += niceStep) yTicks.push(t);
-                return (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
-                        <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
-                    <XAxis dataKey="date" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[yLo, yHi]} ticks={yTicks} tickFormatter={(v) => formatKoreanWon(Number(v))} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }}
-                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-                      formatter={(value, name) => [`₩${Number(value ?? 0).toLocaleString()}`, name === 'value' ? '평가금액' : '투자원금']}
-                    />
-                    <Legend
-                      verticalAlign="top" height={28} iconType="line" iconSize={14}
-                      formatter={(v) => v === 'value' ? '평가금액 (현재 가치)' : '투자원금 (산 가격 합계)'}
-                    />
-                    <Area type="monotone" dataKey="value" stroke={lineColor} strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                    <Line type="monotone" dataKey="cost" stroke="#D4D4CE" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-                );
-              })() : (
-                <div className="flex items-center justify-center h-full text-faint">
-                  <p className="text-sm">보유 종목을 추가하면 수익률 추이가 표시됩니다.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-surface border border-line rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-ink">내 보유 종목</h3>
+          ) : holdings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted text-center px-6">
+              <p className="text-sm font-bold mb-2 text-ink">종목을 추가하면 수익률 그래프를 볼 수 있어요</p>
               <button
                 onClick={() => router.push('/portfolio')}
-                className="text-xs text-ink font-bold flex items-center space-x-1 transition-colors px-4 py-3 min-h-[44px]"
+                className="mt-3 px-4 py-2.5 bg-ink hover:opacity-90 text-surface text-xs font-bold rounded-lg transition-opacity"
               >
-                <span>포트폴리오 관리</span>
-                <ArrowRight size={14} />
+                포트폴리오에 추가하기 →
               </button>
             </div>
-            <div className="max-h-64 overflow-auto space-y-2 pr-2 custom-scrollbar">
-              {holdings.map((stock) => {
-                const pnlRate = stock.avgPrice ? ((stock.currentPrice - stock.avgPrice) / stock.avgPrice * 100) : 0;
-                return (
-                  <div
-                    key={stock.code}
-                    onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
-                    className="p-3 bg-inset rounded-lg border border-line hover:border-ink cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="text-sm font-bold text-ink">{stock.name}</p>
-                      <p className="text-xs text-faint tabular-nums">{stock.code}</p>
-                      <p className="text-xs text-muted tabular-nums">{formatWeight(weightPct(stock.avgPrice, stock.quantity))}</p>
-                      {/* 원장은 사실만 — holding_opinion 판단 뱃지(주의 필요/관망/추가 검토)는 제거.
-                          '분석 중'은 판단이 아니라 데이터 상태라 유지한다. */}
-                      {stock.sma_available === false && (
-                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-inset border border-line text-muted">분석 중</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap tabular-nums">
-                      <p className="text-xs text-muted">
-                        평단 ₩{stock.avgPrice?.toLocaleString()}
-                        <span className="text-faint mx-1">→</span>
-                        <span className="text-ink">현재 ₩{stock.currentPrice?.toLocaleString()}</span>
-                      </p>
-                      {stock.quantity > 0 && <p className="text-xs text-muted">x {stock.quantity}주</p>}
-                      <p className={`text-xs font-bold ${pnlRate >= 0 ? 'text-rise' : 'text-fall'}`}>
-                        {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(1)}%
-                      </p>
-                      {stock.quantity > 0 && (
-                        <p className="text-xs text-muted">평가 ₩{(stock.currentPrice * stock.quantity).toLocaleString()}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {holdings.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-faint text-sm mb-3">아직 보유 종목이 없습니다.</p>
-                  <button
-                    onClick={() => router.push('/portfolio')}
-                    className="text-xs text-ink font-bold transition-colors px-4 py-3 min-h-[44px]"
-                  >
-                    내 포트폴리오에서 종목 추가하기 →
-                  </button>
-                </div>
-              )}
+          ) : chartData.length > 0 ? (() => {
+            const isLoss = avgProfitRate < 0;
+            const lineColor = isLoss ? '#1B5FD0' : '#D91C1C'; // 손실=fall(파랑), 수익=rise(빨강)
+            // 평가금액·투자원금 두 라인이 모두 들어가는 범위로 Y축 자동 계산 (TASK 7).
+            // 0부터 시작하지 않음 — 금액 추이지 절대량 비교가 아님.
+            const yVals = chartData.flatMap(d => [d.value, d.cost]);
+            const yMin = Math.min(...yVals);
+            const yMax = Math.max(...yVals);
+            const yPad = (yMax - yMin) * 0.1 || Math.max(yMax * 0.05, 1);
+            const yLo = yMin - yPad, yHi = yMax + yPad;
+            // 눈금은 딱 떨어지는 값으로 — domain은 데이터 기준, ticks만 nice 반올림 (Fix 3).
+            const rawStep = (yHi - yLo) / 5;
+            const stepMag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+            const stepNorm = rawStep / stepMag;
+            const niceStep = (stepNorm <= 1 ? 1 : stepNorm <= 2 ? 2 : stepNorm <= 2.5 ? 2.5 : stepNorm <= 5 ? 5 : 10) * stepMag;
+            const yTicks: number[] = [];
+            for (let t = Math.ceil(yLo / niceStep) * niceStep; t <= yHi; t += niceStep) yTicks.push(t);
+            return (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
+                <XAxis dataKey="date" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[yLo, yHi]} ticks={yTicks} tickFormatter={(v) => formatKoreanWon(Number(v))} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
+                  formatter={(value, name) => [`₩${Number(value ?? 0).toLocaleString()}`, name === 'value' ? '평가금액' : '투자원금']}
+                />
+                <Legend
+                  verticalAlign="top" height={28} iconType="line" iconSize={14}
+                  formatter={(v) => v === 'value' ? '평가금액 (현재 가치)' : '투자원금 (산 가격 합계)'}
+                />
+                <Area type="monotone" dataKey="value" stroke={lineColor} strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                <Line type="monotone" dataKey="cost" stroke="#D4D4CE" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+            );
+          })() : (
+            <div className="flex items-center justify-center h-full text-faint">
+              <p className="text-sm">보유 종목을 추가하면 수익률 추이가 표시됩니다.</p>
             </div>
-          </div>
+          )}
         </div>
+      </div>
 
-        <div className="bg-surface border border-line rounded-xl p-6">
-          <h3 className="text-lg font-semibold mb-6 text-ink">자산 배분 현황</h3>
-          {holdings.length === 1 ? (
-            <div className="space-y-4">
-              <div className="bg-inset border border-line rounded-lg p-5 text-center">
-                <p className="text-sm font-bold text-ink mb-1">{holdings[0].name}</p>
-                <p className="text-xs text-muted tabular-nums">비중 100%</p>
+      <div className="bg-surface border border-line rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-ink">내 보유 종목</h3>
+          <button
+            onClick={() => router.push('/portfolio')}
+            className="text-xs text-ink font-bold flex items-center space-x-1 transition-colors px-4 py-3 min-h-[44px]"
+          >
+            <span>포트폴리오 관리</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+        <div className="max-h-64 overflow-auto space-y-2 pr-2 custom-scrollbar">
+          {holdings.map((stock) => {
+            const pnlRate = stock.avgPrice ? ((stock.currentPrice - stock.avgPrice) / stock.avgPrice * 100) : 0;
+            return (
+              <div
+                key={stock.code}
+                onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}
+                className="p-3 bg-inset rounded-lg border border-line hover:border-ink cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <p className="text-sm font-bold text-ink">{stock.name}</p>
+                  <p className="text-xs text-faint tabular-nums">{stock.code}</p>
+                  <p className="text-xs text-muted tabular-nums">{formatWeight(weightPct(stock.avgPrice, stock.quantity))}</p>
+                  {/* 원장은 사실만 — holding_opinion 판단 뱃지(주의 필요/관망/추가 검토)는 제거.
+                      '분석 중'은 판단이 아니라 데이터 상태라 유지한다. */}
+                  {stock.sma_available === false && (
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-inset border border-line text-muted">분석 중</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap tabular-nums">
+                  <p className="text-xs text-muted">
+                    평단 ₩{stock.avgPrice?.toLocaleString()}
+                    <span className="text-faint mx-1">→</span>
+                    <span className="text-ink">현재 ₩{stock.currentPrice?.toLocaleString()}</span>
+                  </p>
+                  {stock.quantity > 0 && <p className="text-xs text-muted">x {stock.quantity}주</p>}
+                  <p className={`text-xs font-bold ${pnlRate >= 0 ? 'text-rise' : 'text-fall'}`}>
+                    {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(1)}%
+                  </p>
+                  {stock.quantity > 0 && (
+                    <p className="text-xs text-muted">평가 ₩{(stock.currentPrice * stock.quantity).toLocaleString()}</p>
+                  )}
+                </div>
               </div>
-              <div className="bg-caution/5 border border-caution/20 rounded-lg p-4">
-                <p className="text-xs text-caution leading-relaxed">
-                  종목을 2개 이상 추가하면 자산 배분 그래프를 볼 수 있어요. 한 종목에 집중하면 그 종목 하락 시 손실이 커져요.
-                </p>
-              </div>
-            </div>
-          ) : (
-            // 도넛 180px + 범례는 우측 세로 배치. 2~5조각에 400px는 과하다 (TASK 6).
-            <div className="flex items-center gap-6">
-              <div className="w-[180px] h-[180px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={54} outerRadius={90} paddingAngle={2} dataKey="value">
-                      {portfolioData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex-1 min-w-0 space-y-2">
-                {portfolioData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }}></span>
-                      <span className="text-sm text-muted truncate">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {holdings.length >= 2 && item.value > CONCENTRATION_THRESHOLD && (
-                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution">집중</span>
-                      )}
-                      <span className="text-sm font-semibold text-ink tabular-nums">{formatWeight(item.pct)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            );
+          })}
+          {holdings.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-faint text-sm mb-3">아직 보유 종목이 없습니다.</p>
+              <button
+                onClick={() => router.push('/portfolio')}
+                className="text-xs text-ink font-bold transition-colors px-4 py-3 min-h-[44px]"
+              >
+                내 포트폴리오에서 종목 추가하기 →
+              </button>
             </div>
           )}
         </div>
