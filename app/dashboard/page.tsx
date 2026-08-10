@@ -11,12 +11,11 @@ import Card from '@/components/ui/Card';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import AttentionBlock from '@/components/dashboard/AttentionBlock';
 import { stockApi } from '@/lib/stockApi';
-import { getDataFreshnessShort } from '@/lib/dataFreshness';
 import { formatWeight } from '@/lib/stockDetail/format';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
-import type { StockSummary, SignalResult, BenchmarkResult } from '@/types/stock';
+import type { StockSummary, BenchmarkResult } from '@/types/stock';
 
 // 한국식 금액 단위 포매터 — Y축/툴팁 공용 (16차 5-2).
 // `₩35000k` 같은 영문 k 단위는 초보자가 직관적으로 이해하기 어려움.
@@ -60,11 +59,6 @@ export default function DashboardPage() {
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [showBenchmarkHelp, setShowBenchmarkHelp] = useState(false);
 
-  // 3.11차 — 보유 종목별 관찰 신호 (보유 5개 이하만 조회, N 병렬 호출 부담 제한)
-  const [holdingSignals, setHoldingSignals] = useState<Record<string, SignalResult>>({});
-  const holdingCodesKey = holdings.map(h => h.code).sort().join(',');
-
-
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=holding`);
   };
@@ -88,21 +82,9 @@ export default function DashboardPage() {
       .catch(() => setBenchmark(null));
   }, [holdings.length]);
 
-  // 보유 종목별 신호 조회 — 보유 1~5개일 때만. 그 이상은 호출 부담으로 생략.
-  useEffect(() => {
-    const codes = holdingCodesKey ? holdingCodesKey.split(',') : [];
-    if (codes.length === 0 || codes.length > 5) { setHoldingSignals({}); return; }
-    let cancelled = false;
-    Promise.all(codes.map(c =>
-      stockApi.getSignals(c).then(r => [c, r] as const).catch(() => null)
-    )).then(pairs => {
-      if (cancelled) return;
-      const map: Record<string, SignalResult> = {};
-      for (const p of pairs) { if (p) map[p[0]] = p[1]; }
-      setHoldingSignals(map);
-    });
-    return () => { cancelled = true; };
-  }, [holdingCodesKey]);
+  // 보유 종목별 신호(getSignals) 병렬 조회는 제거 — 유일한 소비처였던 "확인이 필요한 종목"이
+  // 은퇴하면서 쓰이지 않는다. 대시보드 로드 시 보유 수만큼의 병렬 호출이 사라진다.
+  // (신호 자체는 종목 상세 SignalPanel에 그대로 있다.)
 
   const fetchHistory = async () => {
     setHistoryError(null);
@@ -192,80 +174,33 @@ export default function DashboardPage() {
       )}
       {holdings.length > 0 && (() => {
         const gain = avgProfitRate >= 0;
-        const cautionHoldings = holdings.filter(h => h.holding_opinion === '매도' || h.holding_opinion === '관망');
-        const cautionOpinionCodes = new Set(cautionHoldings.map(h => h.code));
-        const signalCautionHoldings = holdings.filter(h => {
-          if (cautionOpinionCodes.has(h.code)) return false;
-          const sig = holdingSignals[h.code];
-          return !!sig && sig.consensus.caution > 0 && sig.consensus.caution >= sig.consensus.positive;
-        });
-        const cautionCount = cautionHoldings.length + signalCautionHoldings.length;
         const dates = holdings.map(h => h.last_updated).filter((d): d is string => !!d);
         const latestTs = dates.length ? Math.max(...dates.map(d => new Date(d).getTime())) : null;
         const stale = latestTs !== null && (Date.now() - latestTs) / 3600000 >= 24;
         return (
           <div>
-            {/* 히어로 — 카드 없이 페이지 위에 직접. 숫자 색이 방향을 말하므로 accentBar/상자 불필요 (TASK 1). */}
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_1fr] gap-x-16 gap-y-10">
-              {/* 상태 블록 — 이 페이지의 답. 큰 숫자가 화면을 지배한다 (TASK 3/4). */}
-              <div>
-                <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
-                <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
-                  {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
-                </p>
-                <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
-                  {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
-                </p>
-                <p className="text-[13px] text-muted tabular-nums mt-3">
-                  ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
-                </p>
-              </div>
+            {/* 히어로 — 카드 없이 페이지 위에 직접. 숫자 색이 방향을 말하므로 accentBar/상자 불필요 (TASK 1).
+                "확인이 필요한 종목"(holding_opinion·신호 판단 라벨) 은퇴 후 우측 컬럼이 알림 하나만
+                남아 2컬럼이 비어 보이므로 단일 컬럼으로 재균형. 먼저 볼 종목은 상단 주목 띠가 맡는다. */}
+            <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
+            <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
+              {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
+            </p>
+            <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
+              {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
+            </p>
+            <p className="text-[13px] text-muted tabular-nums mt-3">
+              ₩{totalCost.toLocaleString()} → ₩{totalAsset.toLocaleString()}
+            </p>
 
-              {/* 액션 블록 — 확인이 필요한 종목·알림. 데스크톱에서 숫자 top에 맞춰 내려 좌우 무게 균형 (Fix 2). */}
-              <div className="lg:pt-6">
-                {(cautionCount > 0 || unreadCount > 0) ? (
-                  <>
-                    {cautionCount > 0 && (
-                      <p className="text-base font-bold text-ink mb-3">확인이 필요한 종목 {cautionCount}개</p>
-                    )}
-                    <div className="space-y-2">
-                      {cautionHoldings.map(h => (
-                        <button key={h.code} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
-                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
-                          <span className="flex items-baseline gap-2 min-w-0">
-                            <span className="text-sm font-semibold text-ink truncate">{h.name}</span>
-                            <span className="text-[13px] text-muted tabular-nums shrink-0">{h.code}</span>
-                          </span>
-                          <span className={`text-xs font-bold px-2 py-1 rounded shrink-0 ${h.holding_opinion === '매도' ? 'bg-fall/10 text-fall' : 'bg-caution/10 text-caution'}`}>{h.holding_opinion === '매도' ? '주의 필요' : '관망'}</span>
-                        </button>
-                      ))}
-                      {signalCautionHoldings.map(h => (
-                        <button key={`sig-${h.code}`} onClick={() => router.push(`/stock/${h.code}?from=holding`)}
-                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
-                          <span className="flex items-baseline gap-2 min-w-0">
-                            <span className="text-sm font-semibold text-ink truncate">{h.name}</span>
-                            <span className="text-[13px] text-muted tabular-nums shrink-0">{h.code}</span>
-                          </span>
-                          <span className="text-xs font-bold px-2 py-1 rounded shrink-0 bg-fall/10 text-fall">주의 신호</span>
-                        </button>
-                      ))}
-                      {unreadCount > 0 && (
-                        <button onClick={() => router.push('/alerts')}
-                          className="w-full flex items-center justify-between gap-2 px-2 text-left min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
-                          <span className="text-sm font-semibold text-ink">읽지 않은 알림 {unreadCount}개</span>
-                          <span className="text-xs text-muted font-bold shrink-0">확인 →</span>
-                        </button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-bold text-ink">보유 종목 모두 양호해요</p>
-                    <p className="text-xs text-muted mt-0.5">특별히 확인이 필요한 종목이 없어요.</p>
-                  </>
-                )}
-              </div>
-            </div>
+            {/* 알림 진입점 — 큰 숫자 아래 작은 링크. 없으면 아무것도 띄우지 않는다. */}
+            {unreadCount > 0 && (
+              <button onClick={() => router.push('/alerts')}
+                className="mt-4 -ml-2 inline-flex items-center gap-2 px-2 min-h-[44px] lg:min-h-[40px] hover:bg-surface rounded-lg transition-colors">
+                <span className="text-sm font-semibold text-ink">읽지 않은 알림 {unreadCount}개</span>
+                <span className="text-xs text-muted font-bold">확인 →</span>
+              </button>
+            )}
 
             {/* 면책 — 히어로 내용과 구분선으로만 분리 (TASK 1). */}
             <p className="text-xs text-faint mt-8 pt-4 border-t border-line leading-relaxed">
@@ -430,19 +365,10 @@ export default function DashboardPage() {
                       <p className="text-sm font-bold text-ink">{stock.name}</p>
                       <p className="text-xs text-faint tabular-nums">{stock.code}</p>
                       <p className="text-xs text-muted tabular-nums">{formatWeight(weightPct(stock.avgPrice, stock.quantity))}</p>
-                      {stock.sma_available === false ? (
+                      {/* 원장은 사실만 — holding_opinion 판단 뱃지(주의 필요/관망/추가 검토)는 제거.
+                          '분석 중'은 판단이 아니라 데이터 상태라 유지한다. */}
+                      {stock.sma_available === false && (
                         <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-inset border border-line text-muted">분석 중</span>
-                      ) : stock.holding_opinion && (
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                          stock.holding_opinion === '매도' ? 'bg-fall/10 text-fall' :
-                          stock.holding_opinion === '관망' ? 'bg-caution/10 text-caution' :
-                          stock.holding_opinion === '추가매수' ? 'bg-rise/10 text-rise' :
-                          'bg-inset border border-line text-muted'
-                        }`}>
-                          {stock.holding_opinion === '매도' ? '주의 필요' :
-                           stock.holding_opinion === '추가매수' ? '추가 검토' :
-                           stock.holding_opinion}
-                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap tabular-nums">
