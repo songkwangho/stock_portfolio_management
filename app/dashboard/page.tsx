@@ -157,7 +157,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {[
               { path: '/portfolio?focus=add-holding', title: '내 주식 관리', desc: '보유 종목을 등록해 수익률·의견을 받아요.' },
-              { path: '/recommendations', title: '살 종목 찾기', desc: '알고리즘 점수 기반 추천 종목을 살펴봐요.' },
+              // D4 — '살 종목 찾기'는 매수 전제 프레이밍이고, '알고리즘 점수 기반 추천'은
+              // D1 이후 사실이 아니다(긍정-필터 소스·점수 노출 모두 은퇴, 목록은 에디터 큐레이션).
+              { path: '/recommendations', title: '살펴볼 종목', desc: '에디터가 고른 종목과 조건별 렌즈로 살펴봐요.' },
               { path: '/themes', title: '테마별 종목 탐색', desc: '2차전지·AI·방산 등 관심 테마 모아보기.' },
               { path: '/stocks', title: '주식 공부', desc: '주요 종목과 용어로 기본기를 익혀요.' },
             ].map(c => (

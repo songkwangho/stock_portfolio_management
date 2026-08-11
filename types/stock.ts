@@ -42,22 +42,20 @@ export interface AddHoldingPayload {
 
 export type UpdateHoldingPayload = AddHoldingPayload;
 
+// D1 — "종목 탐색"(구 추천) 응답. 매수 소재를 타입에서부터 없앴다:
+//   fairPrice / targetPrice / probability(적정가 파생 점수) / market_opinion / analysis / advice.
+//   필드가 남아 있으면 언젠가 다시 렌더된다 — 타입이 방어선이다.
+// score는 큐레이션 정렬용으로만 남긴다(서버가 이미 정렬해 보내므로 화면은 쓰지 않는다).
 export interface Recommendation {
   code: string;
   name: string;
   category: string;
   reason: string;
   score: number;
-  fairPrice: number;
   currentPrice: number;
   per?: number;
   pbr?: number;
   roe?: number;
-  targetPrice?: number;
-  probability?: number;
-  analysis?: string;
-  advice?: string;
-  market_opinion?: MarketOpinion;
   source?: 'manual' | 'algorithm';
   tossUrl?: string;
 }

@@ -40,7 +40,7 @@ export default function RecommendationsPage() {
     return (
       <div className="flex items-center justify-center h-64 text-muted">
         <RefreshCw className="animate-spin mr-2" size={20} />
-        <span>유망 종목 분석 중...</span>
+        <span>종목 불러오는 중...</span>
       </div>
     );
   }
@@ -49,9 +49,12 @@ export default function RecommendationsPage() {
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-ink mb-2">오늘의 유망 종목</h2>
-          <p className="text-muted text-sm">시장 데이터를 분석해 적정가 대비 저평가된 종목을 선별했어요.</p>
-          <p className="text-xs text-faint mt-1">아래 종목들은 알고리즘이 분석한 참고 정보예요. 투자 결정은 항상 본인이 직접 판단해주세요.</p>
+          {/* D3 — "오늘의 유망 종목"·"적정가 대비 저평가된 종목을 선별" 프레이밍 제거.
+              알고리즘 긍정-필터 소스가 D1에서 은퇴했으므로 "알고리즘이 분석한"도 이제 거짓이다
+              (목록은 에디터 큐레이션만). 설명을 실제 소스와 일치시킨다. */}
+          <h2 className="text-2xl font-bold text-ink mb-2">살펴볼 종목</h2>
+          <p className="text-muted text-sm">에디터가 골라본 종목이에요. 어디서부터 볼지 막막할 때 출발점으로 쓰세요.</p>
+          <p className="text-xs text-faint mt-1">추천이 아니라 살펴볼 후보예요. 종목을 열어 관점별 풀이를 확인하고, 판단은 본인이 직접 해주세요.</p>
         </div>
         <button
           onClick={() => {
@@ -71,15 +74,42 @@ export default function RecommendationsPage() {
         </button>
       </div>
 
-      {/* 3.9차 — 이 종목들이 왜 추천됐는지 결론형 안내 */}
+      {/* D3 — "왜 추천됐나요?"(추천 프레이밍) → "어떻게 골랐나요"(선정 과정 공개). */}
       <div className="bg-surface border border-line rounded-xl p-4">
-        <p className="text-sm font-bold text-ink mb-1">이 종목들은 왜 추천됐나요?</p>
+        <p className="text-sm font-bold text-ink mb-1">이 종목들은 어떻게 골랐나요</p>
         <p className="text-xs text-muted leading-relaxed">
-          지표상 저평가됐거나 상승 신호가 나타난 종목이에요.
-          <span className="text-ink font-medium"> 관심 있는 종목을 클릭해서 상세 분석을 확인해보세요.</span>
+          에디터가 사업 내용과 업종 흐름을 보고 목록에 담은 종목이에요. 점수나 순위로 좋고 나쁨을 매기지 않고,
+          지표 조건으로 걸러내지도 않았어요.
+          <span className="text-ink font-medium"> 추천이 아니라 살펴볼 출발점이에요 — 판단은 본인이 하시면 돼요.</span>
           <br />
-          마음에 드는 종목은 관심 종목에 추가하거나 포트폴리오에 등록할 수 있어요.
+          종목을 열면 밸류·성장·현금흐름·수급 등 관점별 풀이와 균형 요약을 볼 수 있어요.
         </p>
+      </div>
+
+      {/* D3 — 대표 렌즈 바로가기. 조건으로 직접 찾아보는 경로(스크리너)로 연결한다.
+          신규 계산 없이 딥링크만 — 수신부는 /screener 의 ?preset= 처리(같은 커밋). */}
+      <div className="bg-surface border border-line rounded-xl p-4">
+        <p className="text-sm font-bold text-ink mb-1">조건으로 직접 찾아보기</p>
+        <p className="text-xs text-muted leading-relaxed mb-3">
+          하나의 잣대가 아니라 여러 렌즈로 나눠 봐요. 각 렌즈는 관찰 가능한 조건일 뿐이고, 통과가 곧 매수 근거는 아니에요.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { slug: 'graham', label: '밸류 렌즈 — 자산·이익 대비 낮은 가격' },
+            { slug: 'high-roe', label: '수익성 렌즈 — 자기자본 대비 이익 큼' },
+            { slug: 'foreign-buy', label: '수급 렌즈 — 외국인 순매수' },
+            { slug: 'breakout-52w', label: '가격 위치 렌즈 — 52주 고점 근처' },
+            { slug: 'neglected', label: '거래량 렌즈 — 평소보다 조용함' },
+          ].map(lens => (
+            <button
+              key={lens.slug}
+              onClick={() => router.push(`/screener?preset=${lens.slug}`)}
+              className="px-3 py-2.5 min-h-[44px] bg-inset border border-line rounded-xl text-xs font-bold text-muted hover:text-ink hover:border-line-strong transition-colors text-left"
+            >
+              {lens.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구).
@@ -100,30 +130,18 @@ export default function RecommendationsPage() {
         </button>
       </div>
 
+      {/* D3 — "추천 종목 수" → "종목 수". '전문가 선정 평균 점수' 통계 제거(3열 → 2열):
+          카드에서 걷어낸 큐레이션 점수를 평균값으로 되살리는 지표였다. */}
       {recommendations.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="bg-inset rounded-lg p-4 text-center">
             <p className="text-2xl font-black text-ink tabular-nums">{recommendations.length}</p>
-            <p className="text-xs text-muted mt-1">추천 종목 수</p>
+            <p className="text-xs text-muted mt-1">종목 수</p>
           </div>
           <div className="bg-inset rounded-lg p-4 text-center">
             <p className="text-2xl font-black text-ink tabular-nums">{categories.length}</p>
             <p className="text-xs text-muted mt-1">업종 분야</p>
           </div>
-          {(() => {
-            const manual = recommendations.filter(r => r.source === 'manual');
-            const avg = manual.length > 0
-              ? Math.round(manual.reduce((a, r) => a + r.score, 0) / manual.length)
-              : null;
-            return (
-              <div className="bg-inset rounded-lg p-4 text-center">
-                <p className="text-2xl font-black text-ink tabular-nums">
-                  {avg !== null ? avg : '—'}
-                </p>
-                <p className="text-xs text-muted mt-1">전문가 선정 평균 점수</p>
-              </div>
-            );
-          })()}
         </div>
       )}
 
@@ -169,17 +187,18 @@ export default function RecommendationsPage() {
             new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).format(new Date()),
             10
         );
-        // M1 — 빈 상태 문구에서도 판정 축을 뺀다('매력적인'·'긍정적인' = 가치 판정).
-        // 사실은 "필터 조건에 맞은 종목이 오늘은 없다"까지다.
-        let headline = '오늘은 목록이 비어 있어요';
-        let body = '오늘 조건에 맞은 종목이 없어요. 내일 다시 확인해보세요.';
+        // D3 — 목록이 지표 필터가 아니라 에디터 큐레이션이 됐으므로 "조건에 맞은 종목이 없다"는
+        // 이제 사실이 아니다. 실제로 비는 경우는 둘뿐: 담긴 종목을 전부 보유 중이거나, 시세를
+        // 아직 못 불러온 경우(일 1회 갱신). 시간대 안내는 후자에만 해당한다.
+        let headline = '지금은 보여드릴 종목이 없어요';
+        let body = '목록에 담긴 종목을 이미 보유하고 있거나, 시세를 불러오지 못했어요. (보유 종목은 목록에서 빠져요.)';
         if (hour < 8) {
             const hoursUntil = 8 - hour;
-            headline = '오늘 분석은 오전 8시부터 시작해요';
-            body = `약 ${hoursUntil}시간 후 결과가 나와요.`;
+            headline = '오늘 시세 갱신은 오전 8시부터예요';
+            body = `약 ${hoursUntil}시간 후 다시 확인해주세요.`;
         } else if (hour < 10) {
-            headline = '지금 데이터를 분석 중이에요';
-            body = '전체 종목 분석이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
+            headline = '지금 시세를 불러오는 중이에요';
+            body = '전체 종목 갱신이 끝날 때까지 10~15분 정도 걸려요. 잠시 후 다시 확인해주세요.';
         }
         return (
           <div className="text-center py-16 bg-inset border border-dashed border-line-strong rounded-xl px-6">

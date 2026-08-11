@@ -80,10 +80,12 @@ export default function DisclaimerModal() {
         <div className="bg-surface border border-line rounded-xl p-6 max-w-md w-full space-y-4 shadow-lg">
           <h2 className="text-lg font-bold text-ink">투자 유의사항</h2>
           <div className="text-sm text-muted leading-relaxed space-y-2">
-            <p>이 앱의 분석과 추천은 <strong className="text-ink">투자 참고용 정보이며, 투자 결정의 책임은 본인에게 있습니다.</strong></p>
+            {/* D4 — 앱이 종목을 추천하지 않게 됐으므로 면책 문구의 '추천' 프레이밍도 정리한다. */}
+            <p>이 앱의 분석은 <strong className="text-ink">투자 참고용 정보이며, 투자 결정의 책임은 본인에게 있습니다.</strong></p>
             <p>이 앱은 <strong className="text-ink">정보 제공 도구로, 실제 주식 거래는 지원하지 않아요.</strong> 실제 매수·매도는 증권사 앱에서 직접 진행해 주세요.</p>
             <p>모든 투자에는 <strong className="text-caution">원금 손실 위험</strong>이 있으며, 과거 데이터 기반 분석이 미래 수익을 보장하지 않습니다.</p>
-            <p>종목 추천 점수와 의견은 알고리즘 자동 산출 결과이며, 전문 투자 조언이 아닙니다.</p>
+            {/* '종목 추천 점수와 의견'은 D1·M1에서 전부 제거됐다 — 실제 남은 것으로 고쳐 쓴다. */}
+            <p>지표 계산과 관점별 풀이는 알고리즘 자동 산출 결과이며, 전문 투자 조언이 아닙니다.</p>
           </div>
           <button onClick={finishDisclaimer} className="w-full py-3 bg-ink hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity">
             확인했습니다
@@ -101,8 +103,9 @@ export default function DisclaimerModal() {
       onClick: () => finishOnboarding('/portfolio?focus=add-holding'),
     },
     {
-      label: '어떤 종목 살지\n알아보기',
-      sub: '추천·테마·스크리너로 종목을 탐색해요',
+      // D4 — '어떤 종목 살지'는 매수 전제 프레이밍이라 '어떤 종목이 있는지'로. '추천' → '탐색'.
+      label: '어떤 종목이 있는지\n살펴보기',
+      sub: '탐색·테마·스크리너로 종목을 찾아봐요',
       onClick: () => finishOnboarding('/recommendations'),
     },
     {

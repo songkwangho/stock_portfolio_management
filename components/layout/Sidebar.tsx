@@ -1,13 +1,16 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, Star, Eye, Filter, Layers, Settings, Sparkles, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Compass, Eye, Filter, Layers, Settings, Sparkles, ClipboardList } from 'lucide-react';
 import NavButton from '@/components/ui/NavButton';
 
+// D4 — "유망 종목 추천" → "종목 탐색". 경로 /recommendations는 딥링크 호환으로 유지한다.
+// 아이콘도 Star(별 = 골라준 것/즐겨찾기) → Compass(탐색)로. 라벨만 바꾸고 별을 남기면
+// 시각적으로는 여전히 "추천"을 가리킨다.
 const MENU = [
   { path: '/dashboard', label: '대시보드', icon: LayoutDashboard },
   { path: '/portfolio', label: '내 포트폴리오', icon: TrendingUp },
-  { path: '/recommendations', label: '유망 종목 추천', icon: Star },
+  { path: '/recommendations', label: '종목 탐색', icon: Compass },
   { path: '/watchlist', label: '관심종목', icon: Eye },
   { path: '/themes', label: '테마 탐색', icon: Sparkles },
   { path: '/screener', label: '종목 스크리너', icon: Filter },

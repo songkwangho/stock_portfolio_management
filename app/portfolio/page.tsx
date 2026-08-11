@@ -434,7 +434,7 @@ function PortfolioContent() {
         <div className="text-center py-12 bg-inset border border-dashed border-line-strong rounded-xl">
           <p className="text-ink font-bold text-lg mb-2">아직 보유 종목이 없어요</p>
           <p className="text-muted text-sm mb-6">위 폼에서 가진 주식을 추가하면 수익률을 한눈에 볼 수 있어요</p>
-          <button onClick={() => router.push('/recommendations')} className="px-6 py-3 bg-ink hover:opacity-90 text-surface rounded-xl text-sm font-bold transition-opacity">추천 종목 보기</button>
+          <button onClick={() => router.push('/recommendations')} className="px-6 py-3 bg-ink hover:opacity-90 text-surface rounded-xl text-sm font-bold transition-opacity">살펴볼 종목 보기</button>
         </div>
       )}
       </>}

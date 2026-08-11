@@ -1,13 +1,14 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, Star, Bell, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Compass, Bell, Settings } from 'lucide-react';
 import { useAlertStore } from '@/stores/useAlertStore';
 
+// D4 — '추천' → '탐색' (Sidebar와 동일 이유, 아이콘도 Star → Compass).
 const TABS = [
   { path: '/dashboard', label: '대시보드', icon: LayoutDashboard },
   { path: '/portfolio', label: '포트폴리오', icon: TrendingUp },
-  { path: '/recommendations', label: '추천', icon: Star },
+  { path: '/recommendations', label: '탐색', icon: Compass },
   { path: '/alerts', label: '알림', icon: Bell, hasBadge: true },
   { path: '/settings', label: '설정', icon: Settings },
 ];

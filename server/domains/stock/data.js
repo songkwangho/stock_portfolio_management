@@ -130,7 +130,9 @@ const initialRecommendations = [
     { code: '090430', reason: '코스알엑스 실적 반영 및 서구권 매출 증대', fairPrice: 180000, score: 81 },
     { code: '139480', reason: '자회사 구조조정 및 본업 수익성 개선', fairPrice: 85000, score: 78 },
     { code: '051910', reason: '양극재 비중 확대에 따른 밸류에이션 재평가', fairPrice: 500000, score: 80 },
-    { code: '096770', reason: 'SK E&S 합병에 따른 재무 건전성 확보', fairPrice: 140000, score: 79 },
+    // D2 — '건전성'은 가치 판정어(FORBIDDEN_BASE)라 사실 서술로 교체. reason은 서버 재시작마다
+    // 이 코드값으로 덮어써지므로 여기서 고치면 DB에 반영된다.
+    { code: '096770', reason: 'SK E&S 합병에 따른 재무구조 변화', fairPrice: 140000, score: 79 },
     { code: '352820', reason: '위버스 플랫폼 수익화 및 아티스트 라인업 다변화', fairPrice: 250000, score: 83 },
     { code: '329180', reason: '조선 업황 슈퍼사이클 진입 및 선가 상승', fairPrice: 210000, score: 94 },
     { code: '012330', reason: '전동화 부품 매출 비중 확대', fairPrice: 270000, score: 84 },

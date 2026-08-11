@@ -67,7 +67,7 @@ function StockDetailContent({ code }: { code: string }) {
   // 진입 컨텍스트 → 초기 카테고리 결정 (보유 여부는 store로 재검증)
   const categoryFromContext =
     isHolding ? '보유 종목' :
-    from === 'recommendation' ? '추천 종목' :
+    from === 'recommendation' ? '살펴볼 종목' :   // D4 — 진입 컨텍스트 라벨도 개명
     from === 'watchlist' ? '관심 종목' :
     from === 'major' ? '주요 종목' :
     from === 'alerts' ? '알림 종목' :

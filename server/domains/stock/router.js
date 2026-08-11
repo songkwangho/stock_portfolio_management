@@ -265,36 +265,25 @@ router.get('/stock/:code/themes', async (req, res) => {
     }
 });
 
-// GET /api/recommendations - manual + analysis-based recommendations, excluding holdings
+// GET /api/recommendations — 에디터 큐레이션 목록(보유 종목 제외). 경로명은 딥링크 호환으로 유지.
+//
+// D1 — "유망 종목 추천" → "종목 탐색" 재구성. 세 개의 매수 엔진을 걷어냈다:
+//   ① 알고리즘 긍정-필터 소스: `stock_analysis WHERE opinion='긍정적'`로 "좋은 것만" 자동 선별하던
+//      두 번째 소스 제거. 최종 `filter(market_opinion==='긍정적')` 게이트도 함께.
+//      → 남는 소스는 **수동 큐레이션(recommended_stocks)만**. 알고리즘 발견은 스크리너 렌즈가 담당한다.
+//   ② 적정가 폴백 `fair_price || targetPrice || price*1.1`: 목표가가 이 경로로 재유입되고 있었다.
+//      `currentPrice >= fairPrice → null` 상승여력 게이트, `probability`(fairPrice 파생 매수 점수)도 제거.
+//   ③ 응답에서 판정·매수 소재 제거: market_opinion / targetPrice / analysis / advice.
+// market_opinion 내부 계산은 유지된다(다른 소비처) — 이 응답에서 **노출만** 끊는다.
 router.get('/recommendations', async (req, res) => {
     try {
-        const { rows: manualRecs } = await query(`
+        const { rows: curated } = await query(`
             SELECT r.*, s.name, s.category
             FROM recommended_stocks r
             JOIN stocks s ON r.code = s.code
         `);
 
-        const { rows: analysisRecs } = await query(`
-            SELECT a.code, s.name, s.category, a.analysis AS reason, 50 AS score
-            FROM stock_analysis a
-            JOIN stocks s ON a.code = s.code
-            WHERE a.opinion = '긍정적'
-        `);
-
-        const combined = [...manualRecs.map(r => ({ ...r, source: r.source || 'manual' }))];
-        for (const ar of analysisRecs) {
-            if (!combined.some(c => c.code === ar.code)) {
-                combined.push({
-                    code: ar.code,
-                    reason: ar.reason,
-                    fair_price: ar.fair_price || 0,
-                    score: ar.score,
-                    name: ar.name,
-                    category: ar.category,
-                    source: 'algorithm'
-                });
-            }
-        }
+        const combined = curated.map(r => ({ ...r, source: r.source || 'manual' }));
 
         const deviceId = getDeviceId(req);
         let holdingCodes = [];
@@ -314,28 +303,17 @@ router.get('/recommendations', async (req, res) => {
                 const stockData = await getStockData(rec.code, rec.name);
                 if (!stockData) return null;
 
-                const currentPrice = stockData.price;
-                // Prioritize: 1. Manual fair_price, 2. Analyst target_price, 3. Calculated 1.1x
-                const fairPrice = rec.fair_price || stockData.targetPrice || Math.round(currentPrice * 1.1);
-
-                if (currentPrice >= fairPrice) return null;
-
+                // 적정가·목표가·상승여력 게이트 없음(D1). 시세를 못 가져온 종목만 빠진다.
                 return {
                     code: rec.code,
                     name: rec.name,
                     category: rec.category,
                     reason: rec.reason,
-                    score: rec.score,
-                    fairPrice: fairPrice,
-                    currentPrice: currentPrice,
+                    score: rec.score,          // 큐레이션 순서용(정렬). 화면에는 노출하지 않는다.
+                    currentPrice: stockData.price,
                     per: stockData.per,
                     pbr: stockData.pbr,
                     roe: stockData.roe,
-                    targetPrice: stockData.targetPrice,
-                    probability: Math.min(100, Math.round((fairPrice / currentPrice) * 50 + (rec.score / 2))),
-                    analysis: stockData.analysis,
-                    advice: stockData.advice,
-                    market_opinion: stockData.market_opinion,
                     source: rec.source || 'manual',
                     tossUrl: stockData.tossUrl,
                 };
@@ -343,12 +321,10 @@ router.get('/recommendations', async (req, res) => {
             results.push(...chunkResults);
         }
 
-        // 정렬 분리: manual 추천은 의미 있는 score(78~95)로 우선 정렬, algorithm 추천은 score=50 placeholder라
-        // 정렬 기준이 의미 없음 → market_opinion 점수만 만족하면 manual 뒤에 그대로 추가 (버그-B 후속).
-        const filtered = results.filter(r => r !== null && r.market_opinion === '긍정적');
-        const manualSorted = filtered.filter(r => r.source === 'manual').sort((a, b) => b.score - a.score);
-        const algorithmTail = filtered.filter(r => r.source !== 'manual');
-        res.json([...manualSorted, ...algorithmTail]);
+        // 큐레이션 순서만 남는다 — 판정 게이트(market_opinion==='긍정적') 제거(D1).
+        const available = results.filter(r => r !== null);
+        available.sort((a, b) => b.score - a.score);
+        res.json(available);
     } catch (error) {
         console.error('Recommendations API Error:', error.message);
         res.status(500).json({ error: 'Failed to fetch recommendations' });

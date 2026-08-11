@@ -21,11 +21,6 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
   const reasonLong = (stock.reason?.length ?? 0) > 80;
   const inWatchlist = watchlistItems.some(w => w.code === stock.code);
 
-  // 적정가 대비 현재가 괴리율 (양수: 현재가가 적정가보다 낮음)
-  const priceGapPct = stock.currentPrice && stock.fairPrice && stock.currentPrice < stock.fairPrice
-    ? Math.round((stock.fairPrice - stock.currentPrice) / stock.currentPrice * 100)
-    : null;
-
   // 3.9차 — 원스텝 관심 추가 + 알림 안내 토스트
   const onAddWatchlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,28 +45,31 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
       onClick={() => onDetailClick(stock)}
       className="bg-surface border border-line rounded-xl p-4 hover:border-line-strong transition-colors cursor-pointer flex flex-col"
     >
-      {/* Header: Name + Score */}
-      <div className="flex items-start justify-between mb-3">
+      {/* Header: 종목명·코드·업종 + 현재가.
+          D2 — 큐레이션 점수 배지 제거. "100점 만점으로, 높을수록 매력적이라고 판단한 종목"이라는
+          단일 점수 통보였다(B1에서 걷어낸 Signal Score와 같은 형태). score는 서버 정렬에만 쓴다.
+          점수 자리에 현재가를 둔다 — 종목 카드에 가격이 없던 상태를 메우고, 방향색은 쓰지 않는다
+          (등락률이 아니라 절대 가격이라 rise/fall 대상이 아니다). */}
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div className="min-w-0">
           <h4 className="font-bold text-base text-ink truncate">{stock.name}</h4>
-          <p className="text-xs text-faint tabular-nums mt-0.5">{stock.code}</p>
+          <p className="text-xs text-faint tabular-nums mt-0.5 truncate">{stock.code} · {stock.category}</p>
         </div>
-        {stock.source === 'manual' && stock.score > 0 && (
-          <div
-            className="flex items-center gap-1 bg-inset border border-line text-ink px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 ml-3 cursor-help tabular-nums"
-            title="편집팀이 매긴 종목 추천 점수예요. 100점 만점으로, 높을수록 매력적이라고 판단한 종목이에요."
-          >
-            <span>{stock.score}</span>
-            <span className="text-faint ml-0.5">?</span>
-          </div>
+        {stock.currentPrice > 0 && (
+          <p className="text-sm font-bold text-ink tabular-nums shrink-0">
+            ₩{stock.currentPrice.toLocaleString()}
+          </p>
         )}
       </div>
 
-      {/* 3.9차 — '왜 지금?' 결론형 이유 + 가격 차이 */}
+      {/* 선정 이유(에디터 작성).
+          D2 — "가격 차이"(적정가 대비 N% 낮아요) 블록 전체 제거. 적정가는 fair_price ‖ 애널리스트
+          목표가 ‖ 현재가×1.1 폴백이었고, 그 괴리를 rise색 상승여력으로 제시하던 앱의 마지막
+          매수 신호였다(R2). 라벨도 '왜 지금?'(타이밍 암시) → '고른 이유'로 바꿨다. */}
       <div className="mb-4 flex-grow space-y-2">
         <div className="flex items-start space-x-2">
           <span className="text-xs font-bold text-ink bg-inset px-2 py-0.5 rounded shrink-0 mt-0.5">
-            왜 지금?
+            고른 이유
           </span>
           <div className="min-w-0">
             <p className={`text-xs text-ink leading-relaxed ${reasonExpanded ? '' : 'line-clamp-3'}`}>
@@ -88,24 +86,6 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
           </div>
         </div>
 
-        {priceGapPct !== null && (
-          <div className="flex items-start space-x-2">
-            <span className="text-xs font-bold text-rise bg-rise/10 px-2 py-0.5 rounded shrink-0 mt-0.5">
-              가격 차이
-            </span>
-            <p className="text-xs text-muted leading-relaxed tabular-nums">
-              적정가(₩{stock.fairPrice!.toLocaleString()}) 대비 현재가가{' '}
-              <span className="text-rise font-bold">{priceGapPct}% 낮아요</span>
-              {' '}— 아직 반영이 덜 됐을 수 있어요.
-              <span className="block text-xs text-faint mt-0.5">
-                ※ 실제 수익률이 아니에요. 참고용 수치예요.
-                {stock.targetPrice && stock.fairPrice === stock.targetPrice
-                  ? ' 애널리스트 목표가는 6~12개월 기준이라 현재 시세와 차이가 있을 수 있어요.'
-                  : ''}
-              </span>
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Footer: Source Badge.
@@ -120,17 +100,19 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
                 stock.source === 'manual' ? 'text-ink' : 'text-muted'
               }`}
             >
-              {stock.source === 'manual' ? '전문가 선정' : '알고리즘'}
+              {stock.source === 'manual' ? '에디터 선정' : '알고리즘'}
             </span>
           )}
         </div>
       </div>
       {showSourceInfo && (
         <div className="text-xs mb-3 p-3 bg-inset rounded-lg leading-relaxed space-y-1.5">
+          {/* D2 — '전문가' → '에디터'. 알고리즘 소스는 D1에서 은퇴해 이제 이 목록에 나오지 않는다
+              (기존 DB 행이 source='algorithm'인 경우만 대비해 분기는 남긴다). */}
           <p className="text-muted">
             {stock.source === 'manual'
-              ? '전문가가 직접 분석하여 선정한 종목이에요. 투자 결정은 본인이 하세요.'
-              : '10가지 지표를 자동 분석한 결과예요. 과거 성과가 미래를 보장하지 않아요.'}
+              ? '에디터가 직접 살펴보고 고른 종목이에요. 추천이 아니라 살펴볼 출발점이고, 판단은 본인이 하시면 돼요.'
+              : '지표를 자동 분석해 담긴 종목이에요. 과거 성과가 미래를 보장하지 않아요.'}
           </p>
         </div>
       )}

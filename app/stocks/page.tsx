@@ -35,7 +35,7 @@ const LEARN_TIPS = [
   {
     title: '어떤 종목이 좋은 건가요?',
     desc: '정답은 없어요. 실적이 좋고(ROE 높음), 적정 가격이고(PER 중간), 상승 추세이면(이평선 정배열) 좋은 신호들이에요.',
-    action: '추천 종목 보기 →',
+    action: '살펴볼 종목 보기 →',   // D4 — '추천' 프레이밍 제거
     href: '/recommendations',
   },
 ];
