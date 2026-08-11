@@ -366,7 +366,9 @@ export async function getStockData(code, fallbackName = null) {
             analysis = `현재 주가는 5일선(${sma5?.toLocaleString() || '-'}원) ${trendDir}에 위치하고 있으며, 이평선은 ${alignment} 상태입니다. `;
             analysis += `이격도 ${distance}%(${parseFloat(distance) > 5 ? '과열' : '안정'}). `;
             analysis += `PER ${per || '-'}, PBR ${pbr || '-'}, ROE ${roe || '-'}%. `;
-            analysis += `[종합점수 ${totalScore}/10] 밸류에이션 ${valuation.total}/3, 기술지표 ${technical.total}/3, 수급 ${supplyDemand.total}/2, 추세 ${trend.total}/2.`;
+            // B1 — 사용자에게 보이는 상세분석 문구에서 합산 점수([종합점수 N/10]) 제거.
+            // 항목별 점수는 재료로 남긴다. totalScore 계산 자체는 추천·스크리너 랭킹이 쓰므로 유지.
+            analysis += `항목별 점수 — 밸류에이션 ${valuation.total}/3, 기술지표 ${technical.total}/3, 수급 ${supplyDemand.total}/2, 추세 ${trend.total}/2.`;
 
             // 임시 임계값 — Phase 4 백테스팅 후 데이터 기반 최적화 예정
             // advice 문구는 앱스토어 심사 대비 중립/서술형으로 작성 (투자 권유로 해석되지 않도록).

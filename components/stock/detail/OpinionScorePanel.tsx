@@ -3,8 +3,9 @@
 import ScoringBreakdownPanel from '@/components/stock/ScoringBreakdownPanel';
 import type { StockDetail } from '@/types/stock';
 
-// 종합점수 카드 — 종합점수 N/10 + 4대 지표바 (3.13 판정 뱃지 이동: 상단 "보유" 줄은 결론 카드로 이관).
-// 점수 우측 등급 라벨(중립적 등)은 ScoringBreakdownPanel 내부에 유지 — 점수 등급이지 판정 뱃지가 아님.
+// 항목별 점수 카드 — 밸류에이션/기술지표/수급/추세 4개 지표바.
+// B1에서 총점(N/10)과 등급 라벨(긍정적/중립적/부정적)을 제거했다 — 하나로 합친 판정을 통보하지 않는다.
+// 남은 건 항목별 재료 분포이고, 종합은 InterpretationPanel의 균형 요약이 담당한다.
 interface OpinionScorePanelProps {
   stockDetail: StockDetail | null;
 }

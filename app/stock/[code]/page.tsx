@@ -174,19 +174,9 @@ function StockDetailContent({ code }: { code: string }) {
   const trend = (latest.sma5 !== null && latestPrice > latest.sma5) ? '상승' : '하락';
   const profitRate = isHolding && stock.avgPrice ? ((latestPrice - stock.avgPrice) / stock.avgPrice * 100).toFixed(2) : null;
 
-  const computeProbability = (): number => {
-    let score = 50;
-    const tp = stockDetail?.targetPrice;
-    if (tp && latestPrice > 0) {
-      const upside = (tp - latestPrice) / latestPrice;
-      score += Math.min(20, Math.max(-20, Math.round(upside * 100)));
-    }
-    if (latest.sma5 !== null && latest.sma20 !== null && latest.sma5 > latest.sma20) score += 10;
-    if (latest.sma5 !== null && latestPrice > latest.sma5) score += 5;
-    if (latest.price > prev.price) score += 5;
-    if (volatility !== null && volatility < 3) score += 5;
-    return Math.max(10, Math.min(99, score));
-  };
+  // B1 — computeProbability(Signal Score 0~100) 제거. 목표가 괴리·이평선·변동성을 하나로 뭉쳐
+  // 단일 점수로 결론을 통보하던 지표라, 여러 관점을 스스로 저울질하게 하는 방향과 정면으로 어긋난다.
+  // 대신 InterpretationPanel의 균형 요약(우호/비우호/중립 분포)이 그 자리를 대신한다.
 
   // 4.5c차 — 초보자 해석. 기존 계산값(per/pbr/roe·sector 중앙값·sma·투자자 net·DART 재무상태표)만
   // 재사용, 신규 계산 없음. 순수 함수(interpret.ts)로 위임. 데이터 없는 항목은 available:false.
@@ -263,36 +253,13 @@ function StockDetailContent({ code }: { code: string }) {
           {stockDetail && <ConclusionCard stockDetail={stockDetail} isHolding={isHolding} holdingMatch={holdingMatch} />}
           {/* 해석 패널 — 결론 카드(한 줄 결론)와 종합점수(수치) 사이. 왜 그런지 근거를 초보자 언어로. */}
           <InterpretationPanel interps={interps} />
-          {/* 데스크톱 2열: 좌 종합점수(높음) / 우 신호+요약(스택으로 높이 균형). 모바일 1열 */}
-          {/* items-stretch: 좌우 컬럼 같은 높이. 우측 마지막 카드(Signal Score) flex-1로 슬랙 흡수 → 하단 정렬 */}
+          {/* 데스크톱 2열: 좌 항목별 점수(재료) / 우 신호 요약. 모바일 1열.
+              B1 — Signal Score 카드와 "AI 추천 매수 적정가" 블록 제거.
+              (적정가 블록은 stock.fairPrice가 이 화면에서 채워진 적 없어 렌더된 적도 없는 죽은 코드였다.) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
             <OpinionScorePanel stockDetail={stockDetail} />
-            <div className="flex flex-col gap-4">
-              <SignalPanel signals={signals} />
-              {/* Signal Score — 가로 배치(높이 축소): 좌 라벨+숫자 / 우 설명. 경고는 설명에 흡수 (3.13 밀도 3차 TASK 2/3) */}
-              {/* flex-1: 우측 컬럼에서 남는 높이 흡수 → 좌측 종합점수 카드 바닥과 정렬. items-center로 내용은 세로 중앙 */}
-              <div className="bg-surface border border-line rounded-xl p-4 flex items-center gap-4 flex-1">
-                <div className="shrink-0">
-                  <p className="text-xs text-faint">Signal Score</p>
-                  <p className="tabular-nums leading-none mt-1">
-                    <span className="text-3xl font-black text-ink">{computeProbability()}</span>
-                    <span className="text-sm text-faint"> /100</span>
-                  </p>
-                </div>
-                <p className="text-xs text-muted leading-relaxed flex-1">
-                  위 시장 분석 10점 점수에 목표가 괴리·이평선·변동성을 더해 0~100으로 환산한 보조 지표예요. 실제 상승 확률이 아니에요.
-                </p>
-              </div>
-            </div>
+            <SignalPanel signals={signals} />
           </div>
-          {!isHolding && stock.fairPrice && (
-            <div className="flex justify-between items-center p-4 bg-inset rounded-xl border border-line">
-              <div>
-                <p className="text-xs text-muted mb-0.5">AI 추천 매수 적정가</p>
-                <p className="text-xl font-black text-ink tabular-nums">₩{stock.fairPrice.toLocaleString()}</p>
-              </div>
-            </div>
-          )}
           {!isHolding && (
             <PortfolioAddForm
               code={stock.code}

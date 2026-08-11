@@ -110,7 +110,7 @@ export async function generateAlerts(pool, code, name, price, sma5, targetPrice)
                 && !(await hasDuplicate(pool, device_id, code, 'undervalued'))
                 && !(await dailyLimitReached(pool, device_id, code))) {
                 await insertAlert(pool, device_id, code, name, 'undervalued', source,
-                    `${name}(${code}) 현재가가 목표가 대비 30% 이상 낮은 수준이에요. 분석 결과를 확인해보세요.`
+                    `${name}(${code}) 현재가가 애널리스트 목표가보다 30% 이상 낮아요. 목표가는 타인의 전망이라 그대로 맞지는 않아요. 분석 결과를 확인해보세요.`
                 );
             }
         }

@@ -289,22 +289,49 @@ export function interpretSectorPosition(
   return { text: `업종 내에서 ${parts.join(', ')}이에요.`, available: true };
 }
 
-// ── 종합 — 상충을 짚고 결론 유보 ──
+// ── 균형 요약 (B2) — 판정이 아니라 **재료 분포** ──
+//
+// 단일 점수/등급으로 결론을 통보하지 않는다. 관찰한 관점이 어느 쪽으로 몇 개인지 세어주고,
+// 어느 쪽이 더 중요한지는 사용자가 저울질하게 남긴다. "우호 우세 → 매수" 같은 결론 문장 금지.
+// tone은 색이 아니라 이 집계를 위한 논리 구분이다(UI는 무채색).
+export interface BalanceSummary {
+  available: boolean;
+  favorable: string[];    // 우호 쪽 관점 라벨
+  unfavorable: string[];  // 비우호 쪽 관점 라벨
+  neutral: string[];      // 어느 쪽도 아닌 맥락 관점(변동성·위치 등)
+  total: number;
+  text: string;
+}
+
+export function summarizeBalance(interps: Interpretation[]): BalanceSummary {
+  const avail = (interps || []).filter(x => x && x.available);
+  const favorable = avail.filter(x => x.tone === 'positive').map(x => x.label);
+  const unfavorable = avail.filter(x => x.tone === 'caution').map(x => x.label);
+  const neutral = avail.filter(x => x.tone === 'neutral').map(x => x.label);
+  const base: Omit<BalanceSummary, 'text'> = { available: avail.length > 0, favorable, unfavorable, neutral, total: avail.length };
+
+  if (avail.length === 0) return { ...base, text: '아직 풀이할 정보가 부족해요.' };
+
+  // 1) 분포를 사실로 제시
+  const counts: string[] = [];
+  if (favorable.length) counts.push(`우호 ${favorable.length}개(${favorable.join('·')})`);
+  if (unfavorable.length) counts.push(`비우호 ${unfavorable.length}개(${unfavorable.join('·')})`);
+  if (neutral.length) counts.push(`중립 ${neutral.length}개(${neutral.join('·')})`);
+  let text = `관찰한 ${avail.length}개 관점 중 ${counts.join(' · ')}예요.`;
+
+  // 2) 상충이면 그 사실을 짚되 결론은 내지 않는다
+  if (favorable.length > 0 && unfavorable.length > 0) {
+    text += ' 관점끼리 서로 엇갈려요.';
+  }
+
+  // 3) 저울질은 사용자 몫 + 미검증 캐비엇
+  text += ' 어느 쪽이 더 중요한지는 직접 저울질해 주세요. 개수가 많은 쪽이 정답은 아니고, 아직 백테스팅으로 검증된 기준도 아니에요.';
+  return { ...base, text };
+}
+
+// 하위 호환 — 기존 호출부(텍스트만 필요한 곳)용 얇은 래퍼.
 export function synthesize(interps: Interpretation[]): string {
-  const avail = interps.filter(x => x.available);
-  if (avail.length === 0) return '아직 풀이할 정보가 부족해요.';
-  const pos = avail.filter(x => x.tone === 'positive').map(x => x.label);
-  const cau = avail.filter(x => x.tone === 'caution').map(x => x.label);
-  if (pos.length > 0 && cau.length > 0) {
-    return `${pos.join('·')} 쪽은 긍정적이지만 ${cau.join('·')} 쪽은 주의가 필요해요. 서로 엇갈려 판단이 애매한 구간이에요.`;
-  }
-  if (pos.length > 0) {
-    return `${pos.join('·')} 쪽이 대체로 긍정적인 편이에요. 다만 지표만으로 단정하긴 이르고, 아직 백테스팅으로 검증된 기준은 아니에요.`;
-  }
-  if (cau.length > 0) {
-    return `${cau.join('·')} 쪽은 주의가 필요한 편이에요. 다만 지표만으로 단정하긴 이르고, 아직 백테스팅으로 검증된 기준은 아니에요.`;
-  }
-  return '지표들이 뚜렷한 방향을 보이지 않아요. 판단이 애매한 구간이에요.';
+  return summarizeBalance(interps).text;
 }
 
 // ── 연속 순매수(+)/순매도(-) 스트릭 계산 (오래된→최신 순 배열, 마지막이 최신) ──

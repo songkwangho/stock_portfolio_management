@@ -271,7 +271,7 @@ function PortfolioContent() {
           <div className="text-sm text-muted leading-relaxed mb-4 space-y-2">
             <p className="font-bold text-ink">지금 할 수 있는 것:</p>
             <ul className="space-y-1.5 pl-1">
-              <li>· <span className="font-bold text-ink">종목 분석 보기</span> — {firstStockGuide.name}의 10점 종합점수, 기술지표, 업종 비교 확인하기</li>
+              <li>· <span className="font-bold text-ink">종목 분석 보기</span> — {firstStockGuide.name}의 항목별 점수, 기술지표, 업종 비교 확인하기</li>
               <li>· 지표가 어렵게 느껴진다면 각 항목의 <span className="font-bold text-ink">?</span> 버튼으로 용어 설명 보기</li>
               <li>· <span className="text-ink font-medium">추천 탭</span>에서 다른 종목도 살펴보기</li>
             </ul>
@@ -326,12 +326,14 @@ function PortfolioContent() {
                     parseFloat(profitRate) >= -7 ? 'text-caution' :
                     'text-fall'
                   }`}>
-                    {parseFloat(profitRate) >= 20 ? '목표 수익 달성!' :
-                     parseFloat(profitRate) >= 10 ? '잘 하고 계세요! 추세를 유지해 보세요' :
-                     parseFloat(profitRate) >= 0 ? '소폭 수익 중이에요. 지켜보세요' :
-                     parseFloat(profitRate) >= -3 ? '소폭 손실이에요. 주식은 단기 등락이 있어요. 조금 더 지켜볼까요?' :
-                     parseFloat(profitRate) >= -7 ? '손실이 나고 있어요. 시장 상황을 지켜봐요' :
-                     '손실이 커지고 있어요. 해당 종목의 분석을 다시 확인해보세요'}
+                    {/* B3 — 방향 넛지("목표 수익 달성!"·"추세를 유지해 보세요"·"지켜보세요") 제거.
+                        내 손익이 어느 구간인지 사실로만 말한다. */}
+                    {parseFloat(profitRate) >= 20 ? '매수가보다 20% 넘게 올라 있어요' :
+                     parseFloat(profitRate) >= 10 ? '매수가보다 10% 넘게 올라 있어요' :
+                     parseFloat(profitRate) >= 0 ? '매수가보다 조금 올라 있어요' :
+                     parseFloat(profitRate) >= -3 ? '매수가보다 조금 내려 있어요. 주식은 단기 등락이 있어요' :
+                     parseFloat(profitRate) >= -7 ? '매수가보다 3% 넘게 내려 있어요' :
+                     '매수가보다 7% 넘게 내려 있어요. 해당 종목의 분석을 다시 확인해보세요'}
                   </p>
                 </div>
               </div>

@@ -11,26 +11,26 @@ const ALERT_GUIDES: Record<string, string> = {
   sell_signal: '종목 상세에서 이평선 위치와 지지 구간을 확인해보세요.',
   sma5_break: '단기 흐름이 꺾인 신호예요. 20일 평균선이 지지해주는지 확인해보세요.',
   sma5_touch: '5일 평균선 근처로 내려왔어요. 반등인지 추가 하락인지 거래량을 보세요.',
-  target_near: '목표가에 가까워졌어요. 실제 거래는 증권사 앱에서 직접 해주세요.',
+  target_near: '애널리스트 목표가에 가까워졌어요. 실제 거래는 증권사 앱에서 직접 해주세요.',
   undervalued: '지표상 저평가 구간이에요. 기업 뉴스도 함께 확인해보세요.',
 };
 
 const ALERT_TYPE_LABELS: Record<string, { label: string; color: string; description: string }> = {
   sell_signal: {
     label: '가격 하락 경고', color: 'bg-fall/10 text-fall',
-    description: '평단가 대비 -7% 이상 하락해 손절 기준에 닿았어요. 분석을 다시 확인해 보세요.',
+    description: '평단가 대비 7% 넘게 내려왔어요. 이 종목의 재무·수급 분석을 다시 확인해 보세요.',
   },
   sma5_break: {
     label: '단기 하락 알림', color: 'bg-fall/10 text-fall',
-    description: '5일 평균선 아래로 떨어졌어요. 단기 하락 흐름일 수 있으니 추세를 지켜보세요.',
+    description: '5일 평균 가격 아래로 내려왔어요. 단기 흐름이 약해진 구간이에요.',
   },
   sma5_touch: {
     label: '가격 지지 알림', color: 'bg-rise/10 text-rise',
-    description: '5일 평균선 근처에서 지지받고 있어요. 반등 가능 구간일 수 있어요.',
+    description: '5일 평균 가격 근처에서 움직이고 있어요. 단기 평균과 비슷한 수준이에요.',
   },
   target_near: {
     label: '목표가 근접 알림', color: 'bg-caution/10 text-caution',
-    description: '애널리스트 목표가에 가까워졌어요. 차익 실현 시점을 고민해 볼 때예요.',
+    description: '애널리스트 목표가에 가까워졌어요. 목표가는 타인의 전망이라 그대로 맞지는 않아요.',
   },
   undervalued: {
     label: '저평가 분석 결과', color: 'bg-rise/10 text-rise',

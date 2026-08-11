@@ -55,35 +55,26 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
 ];
 
 const ScoringBreakdownPanel = ({ breakdown, bare = false }: ScoringBreakdownPanelProps) => {
-  const { total, per_negative, low_confidence } = breakdown;
+  const { per_negative, low_confidence } = breakdown;
   const [showTempNote, setShowTempNote] = useState(false);
 
-  const scoreColor = total >= 7 ? 'text-rise' : total >= 4 ? 'text-ink' : 'text-fall';
-  const scoreLabel = total >= 7 ? '긍정적' : total >= 4 ? '중립적' : '부정적';
-
+  // B1 — 총점(N/10)과 등급 배지(긍정적/중립적/부정적) 제거.
+  // 네 항목을 하나로 합친 숫자와 등급은 "결론 통보"라, 여러 관점을 스스로 저울질하게 하는 방향과 어긋난다.
+  // 항목별 점수는 **재료 분포**로 남긴다(어느 항목이 세고 약한지 비교용).
+  // 서버의 total 계산 자체는 추천·스크리너의 내부 랭킹이 쓰고 있어 그대로 둔다(노출만 제거).
   return (
     <div className={bare ? undefined : 'bg-surface p-4 rounded-xl border border-line'}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <p className="text-xs text-muted font-bold">종합점수</p>
-          <button onClick={() => setShowTempNote(v => !v)} className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution" aria-label="점수 기준 안내">임시 기준</button>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className={`text-2xl font-black tabular-nums ${scoreColor}`}>{total}</span>
-          <span className="text-sm text-faint tabular-nums">/10</span>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-            total >= 7 ? 'bg-rise/10 text-rise' :
-            total >= 4 ? 'bg-inset border border-line text-muted' :
-            'bg-fall/10 text-fall'
-          }`}>{scoreLabel}</span>
-        </div>
+      <div className="flex items-center gap-1.5 mb-1">
+        <p className="text-xs text-muted font-bold">항목별 점수</p>
+        <button onClick={() => setShowTempNote(v => !v)} className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution" aria-label="점수 기준 안내">임시 기준</button>
       </div>
-      <p className="text-xs text-muted mb-3 leading-relaxed">10점에 가까울수록 긍정적인 신호예요. 높은 점수가 수익을 보장하지는 않아요.</p>
+      <p className="text-xs text-muted mb-3 leading-relaxed">네 항목을 따로 본 점수예요. 어느 쪽이 세고 약한지 비교하는 재료로만 봐주세요.</p>
 
       {/* 17차 P4-보완: 임계값 임시값 고지 — 큰 amber 박스 → '임시 기준' 뱃지 클릭 시 전문 (3.13 밀도 3차 TASK 3, 고지 텍스트 보존) */}
       {showTempNote && (
         <p className="text-xs text-caution mb-3 leading-relaxed">
           <span className="font-bold">이 점수 기준은 실증 검증 전이에요.</span> 과거 데이터로 최적화하기 전 임시 기준이니 참고용으로만 봐주세요.
+          점수가 높다고 오르는 것도, 낮다고 내리는 것도 아니에요.
         </p>
       )}
 

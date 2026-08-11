@@ -373,20 +373,16 @@ export async function computeSignals(code) {
     const positive = signals.filter(s => s.type === 'positive').length;
     const caution = signals.filter(s => s.type === 'caution').length;
 
+    // B3 — 신호 '등급' 통보("대체로 긍정적인 흐름이에요", "관망이 안전할 수 있어요") 제거.
+    // 개수는 사실이므로 남기고, 그 개수가 무엇을 뜻하는지 단정하지 않는다(저울질은 사용자 몫).
     let summary;
     if (signals.length === 0) {
-        summary = '특별한 신호가 없어요. 뚜렷한 방향성이 보이지 않아요.';
+        summary = '어제 종가 기준으로 잡힌 신호가 없어요.';
     } else if (positive === 0 && caution === 0) {
-        // 방향 중립 신호(스퀴즈 등)만 있는 경우 — 엇갈림이 아니라 관망 대기 상태.
-        summary = '방향을 정하기 어려운 중립 신호만 나타났어요. 돌파 방향과 거래량을 지켜보세요.';
-    } else if (positive > caution && caution === 0) {
-        summary = `긍정 신호 ${positive}개가 나타났어요. 대체로 긍정적인 흐름이에요.`;
-    } else if (positive > caution) {
-        summary = `긍정 신호 ${positive}개, 주의 신호 ${caution}개예요. 긍정 쪽이 우세하지만 주의 신호도 함께 살펴보세요.`;
-    } else if (caution > positive) {
-        summary = `주의 신호 ${caution}개, 긍정 신호 ${positive}개예요. 주의가 필요한 구간이에요.`;
+        // 방향 중립 신호(스퀴즈 등)만 있는 경우.
+        summary = `방향이 정해지지 않은 중립 신호만 ${signals.length}개 잡혔어요.`;
     } else {
-        summary = `신호가 엇갈리고 있어요 (긍정 ${positive} / 주의 ${caution}). 방향이 뚜렷하지 않으니 관망이 안전할 수 있어요.`;
+        summary = `우호 신호 ${positive}개, 주의 신호 ${caution}개가 잡혔어요. 개수가 많은 쪽이 정답은 아니니 각 신호를 직접 저울질해 주세요.`;
     }
 
     const result = {

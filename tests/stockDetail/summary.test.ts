@@ -92,27 +92,33 @@ describe('generateStockSummary', () => {
     expect(out).not.toContain('평균 가격보다');
   });
 
-  // market_opinion 축은 이번 범위 밖(N3) — 기존 문구를 그대로 고정한다.
-  it('미보유 + 긍정적 + targetPrice 있음(upside>0) → 괴리율 포함', () => {
+  // B1 — 목표가 괴리를 매수 신호처럼 제시하던 문장 제거. 어느 분기도 목표가를 언급하지 않는다.
+  it('미보유 + 긍정적 — targetPrice가 있어도 괴리율을 말하지 않는다', () => {
     const s = sd({ price: 10000, targetPrice: 12000, market_opinion: '긍정적' });
-    expect(generateStockSummary(s, false)).toContain('약 20% 낮아요');
+    const out = generateStockSummary(s, false);
+    expect(out).toContain('우호적인 신호가 더 많은 편');
+    expect(out).not.toContain('목표가');
+    expect(out).not.toContain('20%');
   });
-  it('미보유 + 긍정적 + targetPrice 없음 → 일반 긍정 문구', () => {
-    expect(generateStockSummary(sd({ market_opinion: '긍정적' }), false)).toContain('긍정적인 신호가 나타나고 있어요');
+  it('미보유 + 부정적 → 비우호 우세 사실 + 관점별 풀이 안내', () => {
+    const out = generateStockSummary(sd({ market_opinion: '부정적' }), false);
+    expect(out).toContain('비우호적인 신호가 더 많은 편');
+    expect(out).toContain('관점별 풀이');
   });
-  it('미보유 + 부정적 → 주의 문구', () => {
-    expect(generateStockSummary(sd({ market_opinion: '부정적' }), false)).toContain('주의가 필요한 상태예요');
-  });
-  it('미보유 + 중립적 → 중립 문구 + 분석 안내(지켜보세요 제거)', () => {
+  it('미보유 + 중립적 → 쏠림 없음 (지켜보세요 제거)', () => {
     const out = generateStockSummary(sd({ market_opinion: '중립적' }), false);
-    expect(out).toContain('중립적인 상태예요');
-    expect(out).toContain('함께 확인해보세요');
+    expect(out).toContain('한쪽으로 쏠리지 않은 상태');
     expect(out).not.toContain('지켜보세요');
+  });
+
+  it('종목명 뒤 조사는 이형태를 피해 "의 지표는"으로 고정', () => {
+    expect(generateStockSummary(sd({ name: '삼성전자', market_opinion: '부정적' }), false)).toContain('삼성전자의 지표는');
+    expect(generateStockSummary(sd({ name: '삼성물산', market_opinion: '부정적' }), false)).toContain('삼성물산의 지표는');
   });
 
   it('isHolding이지만 holding_opinion 없으면 opinion 분기로 폴백', () => {
     expect(generateStockSummary(sd({ market_opinion: '부정적' }), true, hold(10000)))
-      .toContain('주의가 필요한 상태예요');
+      .toContain('비우호적인 신호가 더 많은 편');
   });
 });
 
