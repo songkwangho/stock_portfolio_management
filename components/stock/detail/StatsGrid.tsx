@@ -54,7 +54,8 @@ export default function StatsGrid({ stockDetail, priceContext }: StatsGridProps)
           { label: 'PER',       value: perDisplay },
           { label: 'PBR',       value: stockDetail?.pbr ? `${stockDetail.pbr}배` : '---' },
           { label: 'ROE',       value: stockDetail?.roe ? `${stockDetail.roe}%` : '---' },
-          { label: '목표가',    value: stockDetail?.targetPrice ? `₩${stockDetail.targetPrice.toLocaleString()}` : '---' },
+          // M2 — 목표가 항목 제거(9지표 → 8지표). 애널리스트 목표가는 타인의 전망이고,
+          // 현재가와 나란히 두면 그 자체가 매수 신호로 읽힌다(R2). 내부 계산(밸류 점수 폴백)은 유지.
         ].map(item => (
           <div key={item.label} className="min-w-0">
             <p className="text-xs text-faint mb-0.5 truncate">{item.label}</p>

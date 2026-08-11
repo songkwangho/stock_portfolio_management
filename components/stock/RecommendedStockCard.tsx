@@ -108,7 +108,9 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
         )}
       </div>
 
-      {/* Footer: Source Badge + Opinion */}
+      {/* Footer: Source Badge.
+          M1 — market_opinion 판정 뱃지(긍정적/부정적) 제거(R2). 추천 목록에 이미 선별이라는
+          맥락이 있는데 판정 라벨까지 붙으면 매수 신호로 읽힌다. 선정 출처만 남긴다. */}
       <div className="flex items-center justify-between flex-wrap gap-y-1 mb-3">
         <div className="flex items-center space-x-1.5">
           {stock.source && (
@@ -119,15 +121,6 @@ const RecommendedStockCard = ({ stock, onDetailClick }: RecommendedStockCardProp
               }`}
             >
               {stock.source === 'manual' ? '전문가 선정' : '알고리즘'}
-            </span>
-          )}
-          {stock.market_opinion && (
-            <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
-              stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-              stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-              'bg-inset text-muted'
-            }`}>
-              {stock.market_opinion}
             </span>
           )}
         </div>

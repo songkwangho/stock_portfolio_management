@@ -164,13 +164,8 @@ function ThemesContent() {
                         <p className="text-sm font-bold text-ink tabular-nums">
                           {stock.price ? `₩${stock.price.toLocaleString()}` : '---'}
                         </p>
-                        {stock.market_opinion && (
-                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                            stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                            stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-                            'bg-inset text-muted'
-                          }`}>{stock.market_opinion}</span>
-                        )}
+                        {/* M1 — market_opinion 판정 뱃지 제거(R2). 테마 탐색은 "무엇이 이 테마에
+                            속하는지"까지만 — 그중 무엇이 좋은지는 말하지 않는다. */}
                       </div>
                       <button
                         onClick={(e) => onAddWatch(e, stock)}

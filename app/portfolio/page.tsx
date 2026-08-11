@@ -338,7 +338,7 @@ function PortfolioContent() {
                 </div>
               </div>
 
-              {(stock.holding_opinion || stock.market_opinion) && (
+              {stock.holding_opinion && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {stock.holding_opinion && stock.sma_available === false ? (() => {
                     const days = stock.last_updated
@@ -370,13 +370,8 @@ function PortfolioContent() {
                       </div>
                     );
                   })()}
-                  {stock.market_opinion && (
-                    <span className={`text-xs font-bold px-2 py-1.5 rounded-lg ${
-                      stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                      stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-                      'bg-inset text-muted'
-                    }`}>시장: {stock.market_opinion}</span>
-                  )}
+                  {/* M1 — "시장: 긍정적/부정적" 뱃지 제거(R2). 보유 종목 옆에 이 라벨이 붙으면
+                      추가매수/매도 방향 지시로 읽힌다. 위의 평균 가격 위치 관찰만 남긴다. */}
                 </div>
               )}
 

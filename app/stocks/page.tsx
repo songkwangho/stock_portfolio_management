@@ -235,11 +235,7 @@ export default function MajorStocksPage() {
                           );
                         })()}
                       </div>
-                      <span className={`text-xs font-bold px-2 py-1 rounded ${stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                        stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' : 'bg-inset border border-line text-muted'
-                        }`}>
-                        {stock.market_opinion || '중립적'}
-                      </span>
+                      {/* M1 — market_opinion 판정 뱃지 제거(R2). 목록은 사실(가격·등락률)만 나열한다. */}
                       <button
                         onClick={(e) => requestDelete(e, stock)}
                         className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted hover:text-ink transition-colors"

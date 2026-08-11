@@ -17,7 +17,8 @@ interface Preset {
 
 const PRESETS: Preset[] = [
   {
-    name: '저평가 우량주',
+    // M3 — '우량주'는 가치 판정어. 프리셋 이름은 걸러낸 조건을 그대로 부른다.
+    name: '저평가 고ROE주',
     description: 'PER↓ ROE↑ — 저평가 가능성',
     summary: 'PER < 15 + ROE > 10%',
     filters: { perMax: 15, roeMin: 10 },
@@ -342,18 +343,13 @@ export default function ScreenerPage() {
                 onClick={() => onDetailClick(stock)}
                 className="w-full text-left bg-surface border border-line rounded-xl p-4 hover:border-ink transition-colors"
               >
+                {/* M1 — market_opinion 판정 뱃지 제거(R2). 필터 결과에 판정까지 붙으면
+                    "조건에 맞은 종목"이 "사도 되는 종목"으로 읽힌다. PER/PBR/ROE 수치만 남긴다. */}
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="font-bold text-ink">{stock.name}</p>
                     <p className="text-xs text-faint tabular-nums">{stock.code} · {stock.category}</p>
                   </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded ${
-                    stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                    stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-                    'bg-inset text-muted'
-                  }`}>
-                    {stock.market_opinion || '중립적'}
-                  </span>
                 </div>
                 <p className="text-lg font-black mb-2 text-ink tabular-nums">₩{stock.price?.toLocaleString()}</p>
                 {renderPresetMetric(stock) && (
@@ -394,8 +390,9 @@ export default function ScreenerPage() {
                     <th className="text-right px-4 py-4 text-xs font-bold text-muted">현재가</th>
                     <th className="text-right px-4 py-4 text-xs font-bold text-muted">PER (낮을수록 저평가)</th>
                     <th className="text-right px-4 py-4 text-xs font-bold text-muted">PBR (1이하 저평가)</th>
-                    <th className="text-right px-4 py-4 text-xs font-bold text-muted">ROE (높을수록 우량)</th>
-                    <th className="text-center px-4 py-4 text-xs font-bold text-muted">의견</th>
+                    {/* M3 — '우량'은 가치 판정어라 사실 서술로 교체. */}
+                    <th className="text-right px-4 py-4 text-xs font-bold text-muted">ROE (자기자본 대비 이익)</th>
+                    {/* M1 — '의견'(market_opinion) 열 제거(R2). 정렬용 내부 계산은 서버에 그대로 남는다. */}
                   </tr>
                 </thead>
                 <tbody>
@@ -428,15 +425,6 @@ export default function ScreenerPage() {
                       <td className="text-right px-4 py-4">
                         <span className={`tabular-nums ${stock.roe && stock.roe >= 15 ? 'text-ink font-bold' : 'text-muted'}`}>
                           {stock.roe ? `${stock.roe}%` : '---'}
-                        </span>
-                      </td>
-                      <td className="text-center px-4 py-4">
-                        <span className={`text-xs font-bold px-4 py-3 rounded-lg ${
-                          stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                          stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-                          'bg-inset text-muted'
-                        }`}>
-                          {stock.market_opinion || '중립적'}
                         </span>
                       </td>
                     </tr>

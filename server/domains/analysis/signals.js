@@ -294,7 +294,8 @@ async function detectInvestorFlow(code) {
         const days = Math.min(fCount, iCount);
         out.push({
             id: 'investor_both', type: 'positive', label: '수급 동반',
-            description: `외국인과 기관이 ${days}일 연속 함께 사고 있어요. 수급이 좋은 편이에요. 단기 흐름만으로 판단하진 마세요.`,
+            // M3 — '수급이 좋은 편이에요' 제거(판단어). 며칠 연속 매수라는 사실만 말하고 판단은 넘긴다.
+            description: `외국인과 기관이 ${days}일 연속 함께 사고 있어요. 단기 흐름만으로 판단하진 마세요.`,
         });
     } else {
         if (fCount >= 3) {

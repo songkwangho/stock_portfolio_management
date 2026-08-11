@@ -33,13 +33,8 @@ const WatchlistContent = ({ onDetailClick }: WatchlistContentProps) => {
                 <p className="text-xs text-faint tabular-nums">{item.code}</p>
                 <p className="text-sm font-bold text-ink tabular-nums mt-1">{item.price ? `₩${item.price.toLocaleString()}` : '---'}</p>
               </div>
+              {/* M1 — market_opinion 판정 뱃지 제거(R2). 종목별 판단 근거는 상세 [요약] 탭이 제공한다. */}
               <div className="flex items-center gap-2 shrink-0">
-                {item.market_opinion && (
-                  <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
-                    item.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                    item.market_opinion === '부정적' ? 'bg-fall/10 text-fall' : 'bg-inset text-muted'
-                  }`}>{item.market_opinion}</span>
-                )}
                 <button onClick={() => removeFromWatchlist(item.code)}
                   className="p-2 text-muted hover:text-ink min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="관심종목에서 삭제">
                   <Trash2 size={16} />

@@ -18,19 +18,14 @@ export default function IndicatorPanel({ indicators, volatility, onHelp }: Indic
     <div className="bg-surface p-6 rounded-xl border border-line">
       <h3 className="text-lg font-semibold text-ink mb-4">기술적 지표 종합 분석</h3>
 
-      {/* 종합 신호 - 큰 카드 (패딩 base, 여백 축소) */}
-      <div className={`p-4 rounded-xl mb-4 border ${
-        indicators.summary.signal === '긍정적' ? 'bg-rise/5 border-rise/20' :
-        indicators.summary.signal === '주의' ? 'bg-caution/5 border-caution/20' :
-        'bg-inset border-line'
-      }`}>
-        <div className="flex items-center space-x-3 mb-2">
-          <span className={`text-2xl font-black ${
-            indicators.summary.signal === '긍정적' ? 'text-rise' :
-            indicators.summary.signal === '주의' ? 'text-caution' : 'text-ink'
-          }`}>{indicators.summary.signal}</span>
-          <span className="text-xs text-faint">종합 기술적 신호</span>
-        </div>
+      {/* M5 — "종합 기술적 신호" 판정 배지(긍정적/주의) 제거.
+          RSI·MACD·볼린저 세 지표를 하나로 뭉쳐 24px 굵은 글씨 + rise/fall 색으로 통보하던 것으로,
+          M1에서 앱 전역에서 걷어낸 market_opinion 배지와 형태가 같다(축만 다름).
+          같은 [차트·지표] 탭 안에 남으면 톤이 어긋난다.
+          설명문(description)은 개별 지표 관찰을 담고 있어 유지하고, 배지·방향색만 덜어냈다.
+          아래 개별 지표 카드가 이미 항목별 풀이를 제공한다 — 종합은 사용자가 한다. */}
+      <div className="p-4 rounded-xl mb-4 border bg-inset border-line">
+        <p className="text-xs text-faint mb-1.5">지표별 관찰</p>
         <p className="text-sm text-muted leading-relaxed">{indicators.summary.description}</p>
       </div>
 

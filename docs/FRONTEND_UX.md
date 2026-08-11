@@ -104,12 +104,13 @@ Tailwind v4 `@theme` 블록: [app/design-tokens.css](../app/design-tokens.css) �
 undefined   → [알림]       bg-inset text-muted  (레거시 폴백)
 ```
 
-**알림 타입 레이블** (이모지 제거, 색은 타입별 판단):
+**알림 타입 레이블** (이모지 제거, 색은 타입별 판단) — M4(a) 이후 3종, 전부 보유 종목 전용:
 ```
 sell_signal → 가격 하락 경고 (fall)     sma5_break  → 단기 하락 알림 (fall)
-sma5_touch  → 가격 지지 알림 (caution)  target_near → 목표가 근접 알림 (caution)
-undervalued → 저평가 분석 결과 (중립)
+sma5_touch  → 가격 지지 알림 (rise)
 ```
+`target_near`(목표가 근접) · `undervalued`(저평가 분석 결과)는 M4(a)에서 트리거 삭제.
+기존 DB 행이 원문 타입으로 새지 않게 `RETIRED_ALERT_TYPES`가 중립 라벨('지난 알림')만 렌더한다.
 
 ### 컬러 팔레트 (라이트, 3.13차 DESIGN.md 토큰)
 

@@ -292,8 +292,11 @@ app.use('/api', stockRouter);     // /stock/:code, /stocks 등
 | sell_signal | 48h | 중립·서술형 |
 | sma5_break | 24h | 중립·서술형 |
 | sma5_touch | 24h | 중립·서술형 |
-| target_near | 12h | 중립·서술형 |
-| undervalued | 24h | 중립·서술형 |
+
+**M4(a)** — 목표가 파생 2종(`target_near` 12h / `undervalued` 24h)은 트리거를 삭제했다.
+애널리스트 목표가 괴리를 근거로 푸시하던 것이라 근거 확인이 불가능한 매매 신호에 해당(R2).
+이 블록이 `watchlist`를 훑던 유일한 경로였으므로 **남은 3종은 보유 종목 전용**이다.
+기존 DB 행은 서버가 지우지 않는다 → `DELETE FROM alerts WHERE type IN ('target_near','undervalued');` (운영자 수동)
 
 일일 한도: `DAILY_ALERT_LIMIT_PER_STOCK = 2` (KST 기준)
 

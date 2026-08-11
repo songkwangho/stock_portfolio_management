@@ -13,30 +13,17 @@ interface ConclusionCardProps {
 
 export default function ConclusionCard({ stockDetail, isHolding, holdingMatch }: ConclusionCardProps) {
   return (
-    <Card
-      variant="primary"
-      padding="base"
-      accentBar={
-        stockDetail.market_opinion === '긍정적' ? 'positive' :
-        stockDetail.market_opinion === '부정적' ? 'negative' : 'neutral'
-      }
-    >
-      {/* 요약문 + 시장 분석 뱃지(우상단). 데스크톱: 좌 요약문 / 우 뱃지. 모바일: 뱃지가 아래로 wrap.
-          N3 — 내 종목 상태(holding_opinion) 판정 뱃지(주의 필요/추가 검토/관망)는 제거했다.
-          라벨 자체가 방향 지시라, 5·20일 평균 가격 위치를 푼 요약문(generateStockSummary)이 그 자리를 대신한다.
-          market_opinion "시장 분석" 뱃지는 별 축이라 이번 범위 밖 — 그대로 둔다. */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 lg:gap-4 mb-3">
-        <p className="text-base font-bold text-ink leading-relaxed lg:flex-1 lg:min-w-0">
-          {generateStockSummary(stockDetail, isHolding, holdingMatch)}
-        </p>
-        <div className="flex flex-wrap gap-2 shrink-0">
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-            stockDetail.market_opinion === '긍정적' ? 'bg-rise/10 text-rise border-rise/20' :
-            stockDetail.market_opinion === '부정적' ? 'bg-fall/10 text-fall border-fall/20' :
-            'bg-inset text-muted border-line'
-          }`}>{stockDetail.market_opinion || '분석 중'}</span>
-        </div>
-      </div>
+    <Card variant="primary" padding="base" accentBar="neutral">
+      {/* 요약문만. 판정 뱃지는 두 축 모두 제거됐다.
+          N3 — 내 종목 상태(holding_opinion) 뱃지(주의 필요/추가 검토/관망): 라벨 자체가 방향 지시.
+          M1 — market_opinion "시장 분석" 뱃지(긍정적/중립적/부정적): 여러 관점을 하나로 뭉친
+               매수 판정을 통보하는 것이라 제거(R2). 판단 근거는 [요약] 탭의 관점별 풀이와
+               균형 요약이 제공하고, 종합은 사용자가 한다.
+          accentBar도 opinion 색(rise/fall)을 쓰면 **색으로 같은 판정을 전달**하므로 neutral 고정.
+          카드 위계(primary)는 유지 — 강조는 하되 방향은 말하지 않는다. */}
+      <p className="text-base font-bold text-ink leading-relaxed mb-3">
+        {generateStockSummary(stockDetail, isHolding, holdingMatch)}
+      </p>
       <div className="border-t border-line pt-3">
         <p className="text-xs font-bold text-muted mb-2">지금 할 수 있는 것</p>
         <div className="space-y-1.5">

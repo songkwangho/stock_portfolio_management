@@ -233,8 +233,9 @@ interface ToastActions {
 **데이터**: `useAlertStore`
 
 **핵심 UI**:
-- 알림 카드 — 타입별 아이콘·색상·label·description (sell_signal/sma5_break/sma5_touch/target_near/undervalued)
+- 알림 카드 — 타입별 색상·label·description (sell_signal/sma5_break/sma5_touch) — M4(a)에서 목표가 파생 2종 제거
 - source 뱃지: `'holding'` → [보유 중] / `'watchlist'` → [관심 종목]
+  ※ M4(a) 이후 신규 알림은 전부 `'holding'` — watchlist를 훑던 경로가 목표가 블록뿐이었다. [관심 종목] 뱃지는 레거시 행에만 노출된다
 - **타입별 1줄 가이드 (3.7차 UX-ALERT, 2026-04-19)** — `ALERT_GUIDES` 맵으로 message 하단에 "💡 이런 경우 확인해보세요" 문구
 - 첫 진입 안내 카드 (`onboarding_alerts_explained` localStorage, 1회)
 - 빈 상태: 알림 트리거 조건(5일 평균선 이탈·목표가 근접·저평가) + 갱신 시각(매일 08:00) 명시

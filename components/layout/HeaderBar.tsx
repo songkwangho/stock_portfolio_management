@@ -98,14 +98,9 @@ export default function HeaderBar({ nickname }: Props) {
                     <p className="text-sm font-bold text-ink">{stock.name}</p>
                     <p className="text-xs text-faint tabular-nums">{stock.code}</p>
                   </div>
+                  {/* M1 — market_opinion 판정 뱃지 제거. 검색 결과에서 종목을 고르는 단계에
+                      "긍정적/부정적"을 붙이면 선택 자체를 유도한다(R2). 업종만 남긴다. */}
                   <div className="flex items-center space-x-1.5">
-                    {stock.market_opinion && (
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                        stock.market_opinion === '긍정적' ? 'bg-rise/10 text-rise' :
-                        stock.market_opinion === '부정적' ? 'bg-fall/10 text-fall' :
-                        'bg-inset text-muted'
-                      }`}>{stock.market_opinion}</span>
-                    )}
                     <span className="text-xs bg-inset text-muted border border-line px-2 py-0.5 rounded uppercase font-bold">
                       {stock.category}
                     </span>

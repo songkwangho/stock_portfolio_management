@@ -199,8 +199,10 @@ export interface TechnicalIndicators {
   rsi: number | null;
   macd: { macdLine: number; signal: number; histogram: number } | null;
   bollinger: { upper: number; middle: number; lower: number; percentB: number } | null;
+  // M5 — 뭉친 판정 필드 `signal`(긍정적/주의/중립) 제거. 프론트가 배지·방향색으로 쓰던
+  // 필드라 남기면 색으로 판정이 되살아난다. 대신 개수 균형(counts)만 넘긴다.
   summary: {
-    signal: string;
+    counts: { up: number; down: number; flat: number };
     description: string;
     details: IndicatorDetail[];
   } | null;

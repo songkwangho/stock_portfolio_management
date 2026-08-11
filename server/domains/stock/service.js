@@ -396,7 +396,9 @@ export async function getStockData(code, fallbackName = null) {
         const tossUrl = `https://tossinvest.com/stocks/${code}/order`;
 
         // Generate alerts for significant events
-        await generateAlerts(pool, code, nameToSave, latestPrice, sma5, targetPrice);
+        // M4(a) — targetPrice 인자 제거. 목표가 파생 알림(target_near/undervalued)이 사라져
+        // generateAlerts는 이동평균 위치만 본다. targetPrice는 여전히 아래 밸류 점수 계산에 쓰인다.
+        await generateAlerts(pool, code, nameToSave, latestPrice, sma5);
 
         // Save MarketOpinion to DB (공용, 비보유 기준)
         await query(`

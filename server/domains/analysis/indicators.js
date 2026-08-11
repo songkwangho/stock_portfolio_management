@@ -102,12 +102,25 @@ export async function calculateIndicators(pool, code) {
         else details.push({ indicator: '볼린저밴드', signal: '중간', description: '주가가 평균 부근에서 움직이고 있어요.', color: 'neutral' });
     }
 
-    const greenCount = details.filter(d => d.color === 'green').length;
-    const redCount = details.filter(d => d.color === 'red').length;
-    let summary;
-    if (greenCount > redCount) summary = { signal: '긍정적', description: '여러 지표가 긍정적인 신호를 보이고 있어요.', details };
-    else if (redCount > greenCount) summary = { signal: '주의', description: '일부 지표가 주의 신호를 보내고 있어요. 신중하게 판단하세요.', details };
-    else summary = { signal: '중립', description: '특별한 방향성 없이 안정적이에요.', details };
+    // M5 — 세 지표를 하나로 뭉친 판정(signal: 긍정적/주의/중립 + "여러 지표가 긍정적인 신호를
+    // 보이고 있어요")을 **개수 균형 요약**으로 바꾼다. 다수결로 방향을 통보하는 건 R2에서
+    // 걷어낸 market_opinion 배지와 같은 형태다 — 어느 지표가 세고 약한지는 아래 개별 카드가
+    // 이미 보여주고, 무엇을 더 무겁게 볼지는 사용자가 정한다.
+    // signal은 프론트가 방향색·배지로 쓰던 필드라 제거한다(남기면 색으로 판정이 되살아난다).
+    // 임계·색 분류(green/red/neutral)는 개별 카드용으로 그대로 유지 — provisional.
+    const upCount = details.filter(d => d.color === 'green').length;
+    const downCount = details.filter(d => d.color === 'red').length;
+    const flatCount = details.filter(d => d.color === 'neutral').length;
+    const parts = [];
+    if (upCount) parts.push(`상승 쪽 ${upCount}개`);
+    if (downCount) parts.push(`하락 쪽 ${downCount}개`);
+    if (flatCount) parts.push(`중립 ${flatCount}개`);
+    const description = details.length === 0
+        ? '지표를 계산할 데이터가 아직 부족해요.'
+        : `관찰한 지표 ${details.length}개 중 ${parts.join(' · ')}예요.`
+          + (upCount && downCount ? ' 지표끼리 서로 엇갈려요.' : '')
+          + ' 어느 지표를 더 무겁게 볼지는 직접 판단해 주세요. 아직 백테스팅으로 검증된 기준은 아니에요.';
+    const summary = { counts: { up: upCount, down: downCount, flat: flatCount }, description, details };
 
     return { rsi, macd, bollinger, summary, ...availability };
 }

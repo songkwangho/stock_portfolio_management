@@ -1,10 +1,14 @@
 // Alert cooldown per type (in milliseconds)
+//
+// M4(a) — 목표가 파생 트리거 2종(target_near · undervalued)을 제거했다. 알림 5종 → 3종.
+// 이유: 화면에서 목표가 표시를 전부 걷어낸 뒤(M2) 알림만 목표가로 발화하면, 사용자는 근거를
+// 확인할 수 없는 매수/매도 신호를 받는다 — 가장 나쁜 조합이다. 애널리스트 목표가는 타인의
+// 전망이고, 그 괴리를 알림으로 밀어 보내는 건 개인화 매매 신호에 해당한다(R2).
+// 남은 3종은 전부 **내 종목의 이동평균 위치**라는 관찰 사실에 근거한다.
 export const ALERT_COOLDOWNS = {
     sell_signal: 48 * 60 * 60 * 1000,  // 48h
     sma5_break: 24 * 60 * 60 * 1000,   // 24h
     sma5_touch: 24 * 60 * 60 * 1000,   // 24h
-    target_near: 12 * 60 * 60 * 1000,  // 12h
-    undervalued: 24 * 60 * 60 * 1000,  // 24h
 };
 
 // Push 빈도 제어: 동일 device_id × 동일 종목 × 같은 날짜(KST) 알림 ≤ N건
@@ -41,7 +45,8 @@ async function insertAlert(pool, device_id, code, name, type, source, message) {
     );
 }
 
-export async function generateAlerts(pool, code, name, price, sma5, targetPrice) {
+// M4(a) 이후 targetPrice는 쓰지 않는다 — 인자에서 제거했다(호출부도 함께 정리).
+export async function generateAlerts(pool, code, name, price, sma5) {
     const { rows: holders } = await pool.query(
         'SELECT DISTINCT device_id FROM holding_stocks WHERE code = $1',
         [code]
@@ -86,33 +91,10 @@ export async function generateAlerts(pool, code, name, price, sma5, targetPrice)
         }
     }
 
-    // Target price alerts for all watchers (holders + watchlist)
-    // source는 "동일 device가 보유 중이면 holding, 아니면 watchlist"로 결정.
-    if (targetPrice && price > 0) {
-        const { rows: watchers } = await pool.query(`
-            SELECT DISTINCT device_id FROM (
-                SELECT device_id FROM holding_stocks WHERE code = $1
-                UNION
-                SELECT device_id FROM watchlist WHERE code = $1
-            ) AS w
-        `, [code]);
-
-        for (const { device_id } of watchers) {
-            const source = holderSet.has(device_id) ? 'holding' : 'watchlist';
-            if (price >= targetPrice * 0.95
-                && !(await hasDuplicate(pool, device_id, code, 'target_near'))
-                && !(await dailyLimitReached(pool, device_id, code))) {
-                await insertAlert(pool, device_id, code, name, 'target_near', source,
-                    `${name}(${code}) 현재가(${price.toLocaleString()}원)가 목표가(${targetPrice.toLocaleString()}원)에 근접했어요.`
-                );
-            }
-            if (price < targetPrice * 0.7
-                && !(await hasDuplicate(pool, device_id, code, 'undervalued'))
-                && !(await dailyLimitReached(pool, device_id, code))) {
-                await insertAlert(pool, device_id, code, name, 'undervalued', source,
-                    `${name}(${code}) 현재가가 애널리스트 목표가보다 30% 이상 낮아요. 목표가는 타인의 전망이라 그대로 맞지는 않아요. 분석 결과를 확인해보세요.`
-                );
-            }
-        }
-    }
+    // M4(a) — 목표가 기반 알림 블록 제거.
+    //   target_near : price >= targetPrice * 0.95  (목표가 근접)
+    //   undervalued : price <  targetPrice * 0.7   (목표가 대비 30% 이상 낮음)
+    // 둘 다 애널리스트 목표가 괴리를 근거로 푸시하던 것이라 삭제했다.
+    // 이 블록이 watchlist까지 훑던 유일한 경로였다 → 남은 3종은 보유 종목 전용이 됐다.
+    // (기존 DB에 남은 target_near/undervalued 행은 서버가 지우지 않는다 — 운영자 수동 정리.)
 }

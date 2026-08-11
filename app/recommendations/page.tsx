@@ -169,8 +169,10 @@ export default function RecommendationsPage() {
             new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).format(new Date()),
             10
         );
-        let headline = '지금 매력적인 종목이 없어요';
-        let body = '오늘 시장 상황에서는 긍정적인 종목이 없어요. 내일 다시 확인해보세요.';
+        // M1 — 빈 상태 문구에서도 판정 축을 뺀다('매력적인'·'긍정적인' = 가치 판정).
+        // 사실은 "필터 조건에 맞은 종목이 오늘은 없다"까지다.
+        let headline = '오늘은 목록이 비어 있어요';
+        let body = '오늘 조건에 맞은 종목이 없어요. 내일 다시 확인해보세요.';
         if (hour < 8) {
             const hoursUntil = 8 - hour;
             headline = '오늘 분석은 오전 8시부터 시작해요';
