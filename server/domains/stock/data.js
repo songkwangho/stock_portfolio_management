@@ -112,20 +112,23 @@ const majorStockMap = new Map();
 topStocks.forEach(s => majorStockMap.set(s.code, s));
 const majorStocks = Array.from(majorStockMap.values());
 
-// Initial Recommendations (manual, 20 stocks)
-const initialRecommendations = [
-    { code: '005930', reason: '실적 턴어라운드 및 HBM 수요 기대', fairPrice: 85000, score: 92 },
-    { code: '000660', reason: 'HBM 시장 독점적 지위 및 메모리 단가 상승', fairPrice: 210000, score: 95 },
+// Initial Recommendations (manual, 20 stocks) — 에디터 큐레이션.
+// reason은 registerInitialData가 서버 재시작마다 이 값으로 DB를 덮어쓴다(코드가 SSOT).
+// 카드에 그대로 노출되는 문구라 판단어·최상급·픽 표현(수혜주/압도적/역대급/독점/기대)을 쓰지 않는다.
+// tests/curationReasons.test.ts가 전건을 금지어 스윕한다 → 그래서 export 한다.
+export const initialRecommendations = [
+    { code: '005930', reason: 'HBM 등 메모리 수요가 실적에 크게 작용하는 종목이에요', fairPrice: 85000, score: 92 },
+    { code: '000660', reason: 'HBM 공급 비중이 크고, 메모리 단가에 실적이 크게 움직이는 종목이에요', fairPrice: 210000, score: 95 },
     { code: '035420', reason: 'AI 검색 엔진 경쟁력 및 광고 수익 회복', fairPrice: 230000, score: 88 },
     { code: '035720', reason: '카카오톡 비즈니스 모델 고도화', fairPrice: 65000, score: 82 },
     { code: '005380', reason: '하이브리드/전기차 점유율 확대 및 고배당', fairPrice: 280000, score: 90 },
-    { code: '000270', reason: '역대급 수익성 지속 및 주주환원 강화', fairPrice: 140000, score: 91 },
-    { code: '373220', reason: '글로벌 수주 잔고 압도적 1위', fairPrice: 450000, score: 85 },
+    { code: '000270', reason: '수익성이 높은 편이고, 배당·자사주 등 주주환원을 늘려온 종목이에요', fairPrice: 140000, score: 91 },
+    { code: '373220', reason: '수주 잔고 기준 글로벌 상위 배터리 제조사예요', fairPrice: 450000, score: 85 },
     { code: '006400', reason: '차세대 배터리 수익성 위주 성장', fairPrice: 420000, score: 84 },
     { code: '005490', reason: '리튬 사업 가치 가시화', fairPrice: 480000, score: 83 },
-    { code: '207940', reason: '압도적인 CMO 생산 능력 및 수주', fairPrice: 1050000, score: 89 },
+    { code: '207940', reason: 'CMO(위탁생산) 생산능력과 수주 규모가 큰 바이오 기업이에요', fairPrice: 1050000, score: 89 },
     { code: '068270', reason: '짐펜트라 등 신약 매출 본격화', fairPrice: 220000, score: 87 },
-    { code: '105560', reason: '밸류업 프로그램 최대 수혜주', fairPrice: 95000, score: 93 },
+    { code: '105560', reason: '밸류업 프로그램(주주환원 확대 정책)의 영향을 받는 금융지주예요', fairPrice: 95000, score: 93 },
     { code: '055550', reason: '안정적 배당 및 자사주 소각', fairPrice: 62000, score: 86 },
     { code: '090430', reason: '코스알엑스 실적 반영 및 서구권 매출 증대', fairPrice: 180000, score: 81 },
     { code: '139480', reason: '자회사 구조조정 및 본업 수익성 개선', fairPrice: 85000, score: 78 },
