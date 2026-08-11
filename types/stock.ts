@@ -313,6 +313,36 @@ export interface DartFinancialsResult {
     balance: DartStatementRow[];
     cashflow: DartStatementRow[];
   };
+  derived?: DartDerived;       // Phase A — 성장·현금흐름 질 원시 사실
+}
+
+// Phase A — DART 손익·현금흐름에서 뽑은 관점 입력(숫자 사실만, 서술은 lib/stockDetail/interpret.ts).
+// 손익·현금흐름은 연초부터 누적(YTD)이라 비교는 항상 같은 분기 전년 동기(YoY).
+export interface DartGrowthMetric {
+  current: number;
+  previous: number;
+  changePct: number | null;                                  // 분모(전년) ≤ 0이면 null — 거짓 % 방지
+  turnaround: 'to_profit' | 'to_loss' | 'stay_loss' | null;
+  account?: string;
+  label?: string;
+}
+export interface DartDerived {
+  available: boolean;
+  fsDiv?: 'CFS' | 'OFS';
+  period?: string;             // 예: '2025 3Q'
+  prevPeriod?: string;         // 예: '2024 3Q'
+  growth?: { available: boolean; revenue?: DartGrowthMetric | null; profit?: DartGrowthMetric | null };
+  cashflow?: { available: boolean; operating?: number; netIncome?: number | null; ratio?: number | null };
+}
+
+// Phase A(A3) — 가격 변동·위치. days(표본 수)를 함께 받아 '1년'이라 부를지 프론트가 판단한다.
+export interface PriceContext {
+  volatility: { dailyPct: number; days: number } | null;
+  range: { high: number; low: number; days: number; positionPct: number | null } | null;
+}
+export interface VolatilityResult {
+  volatility: number | null;   // 기존 5일 표본 값(호환 유지)
+  priceContext?: PriceContext | null;
 }
 
 // 4.5a차 — DART 공시. category는 표시용(호재/악재 아님). rm '정'=정정, '철'=철회.

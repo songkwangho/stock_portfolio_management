@@ -105,7 +105,8 @@ export const stockApi = {
   addStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stocks`, { code })).data,
   deleteStock: async (code: string) => (await axios.delete(`${API_BASE_URL}/stocks/${code}`)).data,
   getHoldingsHistory: async () => (await axios.get(`${API_BASE_URL}/holdings/history`)).data,
-  getVolatility: async (code: string) => (await axios.get(`${API_BASE_URL}/stock/${code}/volatility`)).data,
+  getVolatility: async (code: string): Promise<import('@/types/stock').VolatilityResult> =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/volatility`)).data,
   refreshStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stock/${code}/refresh`)).data,
   getAlerts: async () => (await axios.get(`${API_BASE_URL}/alerts`)).data,
   getUnreadAlertCount: async () => (await axios.get(`${API_BASE_URL}/alerts/unread-count`)).data,

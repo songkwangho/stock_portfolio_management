@@ -5,6 +5,7 @@ import { query } from '../../db/connection.js';
 import { getCached, setCache } from '../../helpers/cache.js';
 import { TARGET_ACCOUNTS, SECTIONS } from '../../helpers/dartAccounts.js';
 import { categoryLabel } from '../../helpers/dartCategory.js';
+import { deriveFinancialTrends } from './derive.js';
 
 const router = express.Router();
 
@@ -59,6 +60,9 @@ router.get('/stock/:code/dart/financials', async (req, res) => {
             fsDiv,
             periods: periods.map(p => `${p.year} ${p.quarter}`),
             statements,
+            // Phase A — 성장·현금흐름 질 관점 입력. 위 rows(전 기간)를 그대로 재사용하므로 추가 쿼리 없음.
+            // periods는 표시용 4기간으로 잘려 전년 동기가 빠지지만, rows에는 남아 있어 YoY가 가능하다.
+            derived: deriveFinancialTrends(rows),
         };
         setCache(cacheKey, out);
         res.json(out);

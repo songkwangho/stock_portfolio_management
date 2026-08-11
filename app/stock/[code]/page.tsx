@@ -4,14 +4,14 @@ import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
-import type { StockSummary, StockDetail, Holding, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, StockThemeTag, SignalResult, DartFinancialsResult, DartDisclosuresResult } from '@/types/stock';
+import type { StockSummary, StockDetail, Holding, TechnicalIndicators, NewsItem, FinancialData, SectorComparison, StockThemeTag, SignalResult, DartFinancialsResult, DartDisclosuresResult, PriceContext } from '@/types/stock';
 import HelpBottomSheet, { type HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import InvestorChart from '@/components/stock/detail/InvestorChart';
 import DartFinancials from '@/components/stock/detail/DartFinancials';
 import DisclosureList from '@/components/stock/detail/DisclosureList';
 import InterpretationPanel from '@/components/stock/detail/InterpretationPanel';
 import NewsList from '@/components/stock/detail/NewsList';
-import { interpretValuation, interpretFinancial, interpretTechnical, interpretFlow, interpretSectorPosition, consecutiveStreak } from '@/lib/stockDetail/interpret';
+import { interpretValuation, interpretFinancial, interpretTechnical, interpretFlow, interpretSectorPosition, consecutiveStreak, interpretGrowth, interpretCashflowQuality, interpretPriceContext } from '@/lib/stockDetail/interpret';
 import ConclusionCard from '@/components/stock/detail/ConclusionCard';
 import StatsGrid from '@/components/stock/detail/StatsGrid';
 import SignalPanel from '@/components/stock/detail/SignalPanel';
@@ -81,6 +81,8 @@ function StockDetailContent({ code }: { code: string }) {
   const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [volatility, setVolatility] = useState<number | null>(null);
+  // Phase A(A3) — 20거래일 변동성 + 250거래일 고저·위치. 같은 /volatility 응답에 실려 온다.
+  const [priceContext, setPriceContext] = useState<PriceContext | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
   const [helpTerm, setHelpTerm] = useState<HelpTermKey | null>(null);
@@ -113,6 +115,7 @@ function StockDetailContent({ code }: { code: string }) {
         ]);
         setStockDetail(data);
         setVolatility(vol.volatility);
+        setPriceContext(vol.priceContext ?? null);
         setIndicators(ind);
 
         // Phase 2: 보조 데이터 지연 로딩 (뉴스 + 재무 + 섹터 + 테마)
@@ -143,7 +146,7 @@ function StockDetailContent({ code }: { code: string }) {
       const [data, vol, ind] = await Promise.all([
         stockApi.refreshStock(stock.code), stockApi.getVolatility(stock.code), stockApi.getIndicators(stock.code),
       ]);
-      setStockDetail(data); setVolatility(vol.volatility); setIndicators(ind);
+      setStockDetail(data); setVolatility(vol.volatility); setPriceContext(vol.priceContext ?? null); setIndicators(ind);
     } catch (error) { console.error('Refresh failed:', error); } finally { setRefreshing(false); }
   };
 
@@ -190,13 +193,19 @@ function StockDetailContent({ code }: { code: string }) {
   const balRows = dartFin?.available ? dartFin.statements?.balance : null;
   const balVal = (label: string) => balRows?.find(r => r.label === label)?.values?.[0] ?? null;
   const inv = stockDetail?.investorData || [];
+  // Phase A — 관점 3종 추가(성장·현금·변동). 입력은 서버가 계산한 원시 사실만 쓴다.
+  const derived = dartFin?.available ? dartFin.derived : null;
   const interps = [
     interpretValuation(stockDetail?.per, stockDetail?.pbr, stockDetail?.roe, sectorData?.medians?.per, sectorData?.medians?.pbr),
+    interpretGrowth(derived?.growth, derived?.period, derived?.prevPeriod),
     interpretFinancial(balVal('자산총계'), balVal('부채총계'), balVal('자본총계')),
+    interpretCashflowQuality(derived?.cashflow, derived?.period),
     interpretTechnical(latestPrice, latest.sma5, latest.sma20),
     interpretFlow(consecutiveStreak(inv.map(d => d.foreign)), consecutiveStreak(inv.map(d => d.institution))),
+    interpretPriceContext(priceContext),
   ];
-  const financialInterp = interps[1];
+  // [기업] 탭 재무제표 아래 한 줄 해석 — 인덱스가 아니라 key로 찾는다(관점 추가 시 어긋나지 않게).
+  const financialInterp = interps.find(i => i.key === 'financial')!;
   const sectorPos = interpretSectorPosition(stockDetail?.per, stockDetail?.roe, sectorData?.medians?.per, sectorData?.medians?.roe);
 
   return (

@@ -4,6 +4,7 @@ import pool, { query } from '../../db/connection.js';
 import { calculateIndicators } from './indicators.js';
 import { computeSignals } from './signals.js';
 import { median } from './scoring.js';
+import { computePriceContext, PRICE_CONTEXT_CONSTANTS } from './priceContext.js';
 import { buildWhereClause } from '../../helpers/queryBuilder.js';
 import { NAVER_FINANCE_URL } from '../../scrapers/naver.js';
 
@@ -39,28 +40,38 @@ router.get('/stock/:code/signals', async (req, res) => {
 });
 
 // GET /api/stock/:code/volatility - stddev of daily returns over recent N days
+//
+// Phase A(A3): 같은 왕복에 '가격 변동·위치' 관점 입력을 실어 보낸다(신규 엔드포인트 없이).
+//  - volatility  : **기존 값 그대로**(최근 6행 = 5수익률). 소비처(IndicatorPanel)의 회귀를 막으려고 유지.
+//  - priceContext: 20거래일 변동성 + 250거래일 고저·위치 + **표본 수(days)**.
+//    표본 수를 함께 주는 이유 — 40행짜리 데이터를 "52주"라 부르던 기존 오라벨을 반복하지 않기 위해.
 router.get('/stock/:code/volatility', async (req, res) => {
     const { code } = req.params;
     try {
+        // 한 번의 쿼리로 둘 다 계산(종목당 1회). DESC로 받아 시간순으로 뒤집는다.
         const { rows: history } = await query(
-            'SELECT price FROM stock_history WHERE code = $1 ORDER BY date DESC LIMIT 6',
+            `SELECT price FROM stock_history WHERE code = $1 ORDER BY date DESC LIMIT ${PRICE_CONTEXT_CONSTANTS.RANGE_WINDOW}`,
             [code]
         );
 
         if (history.length < 2) {
-            return res.json({ volatility: null });
+            return res.json({ volatility: null, priceContext: null });
         }
 
-        const prices = history.map(h => Number(h.price)).reverse();
-        const returns = [];
-        for (let i = 1; i < prices.length; i++) {
-            returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
-        }
-        const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-        const variance = returns.reduce((a, r) => a + Math.pow(r - mean, 2), 0) / returns.length;
-        const volatility = parseFloat((Math.sqrt(variance) * 100).toFixed(2));
+        const closesChrono = history.map(h => Number(h.price)).reverse();
 
-        res.json({ volatility });
+        // 기존 volatility — 마지막 6개 종가(=5수익률)로 계산. 값·의미 불변.
+        const legacy = closesChrono.slice(-6);
+        let volatility = null;
+        if (legacy.length >= 2) {
+            const returns = [];
+            for (let i = 1; i < legacy.length; i++) returns.push((legacy[i] - legacy[i - 1]) / legacy[i - 1]);
+            const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+            const variance = returns.reduce((a, r) => a + Math.pow(r - mean, 2), 0) / returns.length;
+            volatility = parseFloat((Math.sqrt(variance) * 100).toFixed(2));
+        }
+
+        res.json({ volatility, priceContext: computePriceContext(closesChrono) });
     } catch (error) {
         console.error('Volatility Error:', error.message);
         res.status(500).json({ error: 'Failed to calculate volatility' });
