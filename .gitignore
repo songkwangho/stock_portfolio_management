@@ -19,3 +19,20 @@ scripts/.dart-sample.json
 # Playwright 시각검증 스크린샷 (스냅샷 커밋 금지 — 기준 스냅샷만 별도 관리)
 artifacts/
 
+# ── 개발 전용 검증 도구 (제품·배포에 절대 미포함) ────────────────────────────
+# 원칙: 설치물·설정·크리덴셜·산출물은 전부 repo 밖 또는 여기서 차단한다.
+#   MCP 서버 설정(chrome-devtools / playwright / firecrawl)은 --scope local 로 등록해
+#   ~/.claude.json 에 저장된다 → 애초에 이 디렉토리에 파일이 생기지 않는다.
+#   .mcp.json 은 project scope(= 커밋 대상)라 실수로 생겨도 올라가지 않게 막아 둔다.
+# ※ gitignore는 패턴 뒤 같은 줄 주석을 지원하지 않는다(패턴의 일부로 먹힘) — 주석은 반드시 윗줄에.
+.mcp.json
+# dev 전용 검증 하네스 + 그 전용 node_modules
+tools/
+# playwright test 리포트
+playwright-report/
+# playwright test 실패 아티팩트(trace/video)
+test-results/
+# Playwright MCP 출력물(스냅샷·다운로드)
+.playwright-mcp/
+# dev 도구 크리덴셜(FIRECRAWL_API_KEY 등)은 .env.tools.local — 위 .env*.local 이 이미 차단
+
