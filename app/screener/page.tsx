@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { RefreshCw, Search } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, ScreenerResult } from '@/types/stock';
@@ -13,6 +13,10 @@ interface Preset {
   filters: Record<string, string | number>;
   caveat?: string;
   isNew?: boolean;
+  // D3 — /screener?preset=<slug> 딥링크 키. "종목 탐색"의 렌즈 칩이 이 값으로 연결된다.
+  // filters.preset(서버 키)과 별개다 — 정적 프리셋(서버 키 없음)도 링크할 수 있어야 하고,
+  // 서버 키가 바뀌어도 외부 링크가 깨지지 않게 하려면 표면 식별자를 분리해야 한다.
+  slug?: string;
 }
 
 const PRESETS: Preset[] = [
@@ -36,6 +40,7 @@ const PRESETS: Preset[] = [
     description: 'ROE↑ — 자기자본으로 돈 잘 버는 기업',
     summary: 'ROE ≥ 20%',
     filters: { roeMin: 20 },
+    slug: 'high-roe',
     caveat: '일시적 호황으로 ROE가 높을 수 있어요. 최근 분기 실적도 함께 봐주세요.',
   },
   {
@@ -51,6 +56,7 @@ const PRESETS: Preset[] = [
     description: '강한 상승 흐름',
     summary: '최근 1년 고점 대비 +0~N%',
     filters: { preset: 'breakout_52w' },
+    slug: 'breakout-52w',
     caveat: '고점 돌파 후 단기 조정이 올 수 있어요. 거래량과 함께 확인하세요.',
     isNew: true,
   },
@@ -59,6 +65,7 @@ const PRESETS: Preset[] = [
     description: '해외 큰손 매수 중',
     summary: '최근 5거래일 외국인 순매수 상위',
     filters: { preset: 'foreign_buy' },
+    slug: 'foreign-buy',
     caveat: '외국인 매수가 항상 좋은 신호는 아니에요. 단기 흐름만으로 판단하지 마세요.',
     isNew: true,
   },
@@ -75,15 +82,17 @@ const PRESETS: Preset[] = [
     description: '역발상 — 관심 줄어든 종목',
     summary: '30일 평균 대비 거래량 < 30%',
     filters: { preset: 'neglected' },
+    slug: 'neglected',
     caveat: '소외됐다고 무조건 좋은 종목이 아니에요. 하락 추세 중일 수도 있으니 지표를 함께 보세요.',
     isNew: true,
   },
   // 3.8차 — vibe-investing 접목
   {
     name: '그레이엄 저평가',
-    description: '내재가치 — 적정가 < 현재가',
+    description: '내재가치 — 기준가가 현재가보다 높은 종목',
     summary: 'Graham Number > 현재가',
     filters: { preset: 'graham' },
+    slug: 'graham',
     caveat: '그레이엄 공식은 안정적인 이익을 내는 기업에 적합해요. 적자·바이오·성장주에는 맞지 않아요.',
     isNew: true,
   },
@@ -102,8 +111,23 @@ const CATEGORIES = [
   '금융/지주', '소비재/서비스', '엔터테인먼트/미디어', '조선/기계/방산',
 ];
 
+// D3 — useSearchParams는 Suspense 경계가 필요하다(Next 15+ 빌드 차단 회피 — 3차 [P2]와 동일 패턴).
 export default function ScreenerPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64 text-muted">
+        <RefreshCw className="animate-spin mr-2" size={20} />
+        <span>스크리너를 불러오는 중...</span>
+      </div>
+    }>
+      <ScreenerContent />
+    </Suspense>
+  );
+}
+
+function ScreenerContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [results, setResults] = useState<ScreenerResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -140,6 +164,20 @@ export default function ScreenerPage() {
     handleSearch(preset.filters);
   };
 
+  // D3 — "종목 탐색"의 렌즈 칩(/screener?preset=<slug>) 수신. 링크만 걸면 죽은 링크가 되므로
+  // 여기서 slug를 프리셋으로 해석해 1회 자동 실행한다. ref 가드 — 재실행되면 사용자가 바꾼
+  // 프리셋을 URL 값으로 되돌려버린다(useEffect가 매 렌더 재평가되는 상황 방지).
+  const presetSlug = searchParams.get('preset');
+  const appliedSlugRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!presetSlug || appliedSlugRef.current === presetSlug) return;
+    const target = PRESETS.find(p => p.slug === presetSlug);
+    if (!target) return;         // 알 수 없는 slug는 무시 — 빈 화면 대신 기본 상태 유지
+    appliedSlugRef.current = presetSlug;
+    handlePreset(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetSlug]);
+
   // 활성 프리셋에 따라 종목별로 표시할 보조 지표 문구 생성.
   // 정적 프리셋(저평가/자산/성장/소액)은 null 반환 → 기존 표시 유지.
   const activePresetKey = PRESETS.find(p => p.name === activePreset)?.filters?.preset;
@@ -165,11 +203,12 @@ export default function ScreenerPage() {
       return `30일 평균의 ${stock.vol_ratio}% 거래량`;
     }
     if (activePresetKey === 'graham') {
-      if (stock.graham_upside === null || stock.graham_upside === undefined) return null;
+      // Part 2 — "적정가 ₩X (+N%)" 상승여력 표기 제거. '적정가'는 그 값이 옳다는 뉘앙스를 주고
+      // (+N%)는 upside = 매수 근거로 읽힌다(R2). 계산식 이름을 그대로 부르고 차이는 말하지 않는다.
+      // 캐비엇은 아래 preset.caveat이 이미 담당한다.
       const fair = stock.graham_number;
-      return fair
-        ? `적정가 ₩${fair.toLocaleString()} (+${stock.graham_upside}%)`
-        : `그레이엄 적정가 +${stock.graham_upside}%`;
+      if (!fair) return null;
+      return `그레이엄 기준가 ₩${fair.toLocaleString()}`;
     }
     if (activePresetKey === 'momentum_3m') {
       if (stock.momentum_3m === null || stock.momentum_3m === undefined) return null;
