@@ -242,7 +242,37 @@ export function interpretCashflowQuality(
 // 임계값(3%/1.5%, 70%/30%)은 provisional. 표본 수(days)를 문구에 반영해 거짓 라벨을 막는다.
 const VOL_HIGH_PCT = 3;
 const VOL_LOW_PCT = 1.5;
-const RANGE_YEAR_MIN_DAYS = 200;
+
+// F2 — StatsGrid 게이지와 **공유**하는 기준. 같은 priceContext.range를 두 표면이 소비하는데
+// 기준이 갈리면 한쪽이 반드시 거짓이 된다(40행을 "52주"라 부르던 사고의 재발 경로).
+export const RANGE_YEAR_MIN_DAYS = 200;   // 이보다 적은 표본은 '52주'/'1년'이라 부르지 않는다
+export const RANGE_POS_HIGH = 70;
+export const RANGE_POS_LOW = 30;
+
+// 위치 임계 단일 구현 — 게이지 문구와 '변동' 관점 문구가 어긋나지 않게 한다.
+// 방향 판단이 아니라 위치 서술이다(위쪽 ≠ 비싸다/팔아라).
+export function rangePositionWord(positionPct: number): '위쪽' | '아래쪽' | '가운데' {
+    if (positionPct >= RANGE_POS_HIGH) return '위쪽';
+    if (positionPct <= RANGE_POS_LOW) return '아래쪽';
+    return '가운데';
+}
+
+// 기간 명사. 표본이 1년에 못 미치면 실제 표본 수로 부른다.
+export function rangeSpanLabel(days: number): string {
+    return days >= RANGE_YEAR_MIN_DAYS ? '52주' : `${days}거래일`;
+}
+
+// F3 — StatsGrid 위치 게이지 캡션. 순수 함수로 둬서 금지어 스윕이 이 표면을 덮게 한다.
+// 위치 사실 + 표본 수까지만. 방향 단정('상승 흐름')·명령형 경고('주의하세요') 금지.
+export function describeRangePosition(days: number, positionPct: number): string {
+    return `${rangeSpanLabel(days)} 범위에서 ${rangePositionWord(positionPct)}에 있어요 (범위의 ${positionPct}% 지점)`;
+}
+
+// range.high/low는 **종가 기준**이다 — 서버 /volatility 쿼리가 price(종가)만 SELECT 한다.
+// 장중 고저(stock_history.high/low)와 다른 값이므로 화면에서 기준을 밝힌다.
+export function rangeBasisNote(days: number): string {
+    return `종가 기준 ${days}거래일 표본`;
+}
 
 export function interpretPriceContext(p: PriceContextFacts | null | undefined): Interpretation {
   if (!p || (!p.volatility && !p.range)) return NA('priceContext', '변동');
@@ -259,7 +289,7 @@ export function interpretPriceContext(p: PriceContextFacts | null | undefined): 
     const { high, low, days, positionPct } = p.range;
     // 표본이 1년에 못 미치면 '1년'이라 부르지 않는다(기존 40행 → "52주" 오라벨 재발 방지).
     const spanLabel = days >= RANGE_YEAR_MIN_DAYS ? '최근 1년' : `최근 ${days}거래일`;
-    const where = positionPct >= 70 ? '위쪽' : positionPct <= 30 ? '아래쪽' : '가운데';
+    const where = rangePositionWord(positionPct);   // StatsGrid 게이지와 동일 임계
     parts.push(`${spanLabel} 가격 범위(${low.toLocaleString()}~${high.toLocaleString()}원)에서 지금은 ${where}에 있어요(범위의 ${positionPct}% 지점).`);
   }
   if (parts.length === 0) return NA('priceContext', '변동');

@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { deriveFinancialTrends } from '@/server/domains/dart/derive';
 import { computePriceContext } from '@/server/domains/analysis/priceContext';
-import { interpretGrowth, interpretCashflowQuality, interpretPriceContext } from '@/lib/stockDetail/interpret';
-import { FORBIDDEN_BASE } from '../forbiddenWords';
+import {
+  interpretGrowth, interpretCashflowQuality, interpretPriceContext,
+  rangeSpanLabel, rangePositionWord, describeRangePosition, rangeBasisNote,
+  RANGE_YEAR_MIN_DAYS, RANGE_POS_HIGH, RANGE_POS_LOW,
+} from '@/lib/stockDetail/interpret';
+import { FORBIDDEN_BASE, FORBIDDEN_RANGE } from '../forbiddenWords';
 
 // Phase A — 관점 3종(실적 성장·현금흐름 질·가격 변동/위치).
 // 핵심 검증은 **계산-문구 일치**다: 서버가 못 만든 값은 서술하지 않고, 서술한 숫자는 계산과 같아야 한다.
@@ -243,6 +247,72 @@ describe('interpretPriceContext — 표본에 맞는 라벨만 쓴다', () => {
   it('데이터 없음 → available:false', () => {
     expect(interpretPriceContext(null).available).toBe(false);
     expect(interpretPriceContext({ volatility: null, range: null }).available).toBe(false);
+  });
+});
+
+// F1~F3 — StatsGrid "52주" 거짓 라벨 수정. 게이지 라벨/문구는 순수 함수로 뽑아
+// 여기서 표본 수 ↔ 라벨 일치와 금지어를 고정한다(컴포넌트에 하드코딩하면 스윕이 못 덮는다).
+describe('rangeSpanLabel — 표본 수가 라벨을 결정한다', () => {
+  it('1년 표본 기준(200거래일) 이상이면 "52주"', () => {
+    expect(rangeSpanLabel(250)).toBe('52주');
+    expect(rangeSpanLabel(RANGE_YEAR_MIN_DAYS)).toBe('52주');
+  });
+
+  it('기준 미달이면 "52주"라 부르지 않고 실제 표본 수로 부른다', () => {
+    // 이 사고의 원본: history 40행(LIMIT 40)을 "52주 최고/최저"라 표시하고 있었다.
+    expect(rangeSpanLabel(40)).toBe('40거래일');
+    expect(rangeSpanLabel(RANGE_YEAR_MIN_DAYS - 1)).toBe('199거래일');
+    expect(rangeSpanLabel(40)).not.toContain('52주');
+  });
+});
+
+describe('rangePositionWord — 임계는 변동 관점과 동일(70/30)', () => {
+  it('경계값 정확히', () => {
+    expect(rangePositionWord(RANGE_POS_HIGH)).toBe('위쪽');       // 70 포함
+    expect(rangePositionWord(RANGE_POS_HIGH - 1)).toBe('가운데');
+    expect(rangePositionWord(RANGE_POS_LOW)).toBe('아래쪽');      // 30 포함
+    expect(rangePositionWord(RANGE_POS_LOW + 1)).toBe('가운데');
+    expect(rangePositionWord(100)).toBe('위쪽');
+    expect(rangePositionWord(0)).toBe('아래쪽');
+  });
+
+  it('게이지와 "변동" 관점이 같은 위치를 가리킨다', () => {
+    for (const positionPct of [0, 30, 31, 50, 69, 70, 100]) {
+      const word = rangePositionWord(positionPct);
+      const perspective = interpretPriceContext({
+        volatility: null, range: { high: 90000, low: 50000, days: 250, positionPct },
+      });
+      expect(perspective.text, `pct=${positionPct}`).toContain(word);
+      expect(describeRangePosition(250, positionPct), `pct=${positionPct}`).toContain(word);
+    }
+  });
+});
+
+describe('describeRangePosition / rangeBasisNote — 위치 사실 + 기준 공개', () => {
+  it('표본이 충분하면 52주, 부족하면 표본 수 — 게이지 문구도 동일 기준', () => {
+    expect(describeRangePosition(250, 80)).toBe('52주 범위에서 위쪽에 있어요 (범위의 80% 지점)');
+    expect(describeRangePosition(40, 15)).toBe('40거래일 범위에서 아래쪽에 있어요 (범위의 15% 지점)');
+    expect(describeRangePosition(40, 15)).not.toContain('52주');
+  });
+
+  it('range.high/low가 종가 기준임을 밝히고 표본 수를 노출한다', () => {
+    // 서버 /volatility 쿼리는 price(종가)만 SELECT → 장중 고저와 다른 값이다.
+    expect(rangeBasisNote(234)).toBe('종가 기준 234거래일 표본');
+  });
+});
+
+describe('가격 범위 게이지 금지어 전수 스윕', () => {
+  it('전 구간 문구에 판단·방향 지시가 없다', () => {
+    const outputs: string[] = [];
+    for (const days of [1, 40, 199, 200, 250]) {
+      outputs.push(rangeBasisNote(days));
+      for (let pct = 0; pct <= 100; pct++) outputs.push(describeRangePosition(days, pct));
+    }
+    for (const t of new Set(outputs)) {
+      for (const w of FORBIDDEN_RANGE) {
+        expect(t.includes(w), `"${t}" 에 금지 표현 "${w}" 포함`).toBe(false);
+      }
+    }
   });
 });
 

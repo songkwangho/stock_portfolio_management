@@ -278,7 +278,7 @@ function StockDetailContent({ code }: { code: string }) {
         <div className="space-y-6">
           {stockDetail && <ChartSection code={stock.code} stockDetail={stockDetail} signals={signals} />}
           <IndicatorPanel indicators={indicators} volatility={volatility} onHelp={setHelpTerm} />
-          {stockDetail && <StatsGrid stockDetail={stockDetail} />}
+          {stockDetail && <StatsGrid stockDetail={stockDetail} priceContext={priceContext} />}
           {stockDetail && <MetricsGrid stockDetail={stockDetail} category={stock.category} sectorData={sectorData} onHelp={setHelpTerm} />}
           {stockDetail && <InvestorChart stockDetail={stockDetail} onHelp={setHelpTerm} />}
           <AnalysisDetail stockDetail={stockDetail} name={stock.name} />
