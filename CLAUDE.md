@@ -549,7 +549,8 @@ PC (md: 이상):
 - [x] **[DART-4]** 공시 카테고리 규칙 분류 9종(clarification 포함) + `NOISE_PATTERNS` 블랙리스트(소유상황·대량보유·의결권권유만 제외, 미분류 other는 저장)
 - [x] **[DART-5]** `GET /stock/:code/dart/financials`·`/dart/disclosures` — DB 읽기 전용, 10분 캐시, 데이터 없으면 `available:false`
 - [x] **[DART-6]** [기업] 탭 재배치 — 공시(구분선·무채색 뱃지·정정/철회 표시·DART 원문) → 재무제표(DART 우선, 네이버 폴백, 3섹션 세로) → 업종비교 → 뉴스
-- **검증 파서 보정**(부트 샘플): 재무 계정 부분일치 오매칭(귀속·계속영업 하위라인)→정확일치+배제+PK first-wins / net_income IS·CIS 중복→손익 IS 한정 / 공시 corp_code 필터 정상(삼성 월 778건은 실제 다발) → 적응형+블랙리스트 / rm 꼬리공백 trim
+- **검증 파서 보정**(부트 샘플): 재무 계정 부분일치 오매칭(귀속·계속영업 하위라인)→정확일치+배제+PK first-wins / net_income IS·CIS 중복→손익 IS 한정(**2026-08-12 철회 — 아래 CIS 폴백**) / 공시 corp_code 필터 정상(삼성 월 778건은 실제 다발) → 적응형+블랙리스트 / rm 꼬리공백 trim
+- **[DART-FIX] 손익 계정 CIS 폴백 (2026-08-12)**: IS 한정이 **단일 포괄손익계산서 보고 종목의 손익을 통째로 누락**시켰다(유유제약 000220 — 자산·부채·자본·현금흐름만, 손익 0건 → 성장 관점 미표시·현금 관점 배수 없음). `revenue`/`operating_income`/`net_income` sjDiv를 `['IS','CIS']`로 확장. 이중매칭은 3중 방어 — first-wins 디둡(pk에 sj_div 미포함) + **`orderBySection`(신설) IS 우선 안정정렬**(응답 순서에 정확도를 걸지 않음) + `NAME_EXCLUDE`·nameKeys 정확일치(기타포괄·총포괄·귀속 차단). 검증: `npm test` 234(+18) · tsc 0. **재적재는 운영자 수동** — `sync-dart-financials.js`만 재실행(corpcodes·disclosures 불요)
 - **판단**: 재무 증감은 화살표(▲▼)+**무채색**(매출 증가 ≠ 주가 상승, 3.13 방향색 규칙). 기존 네이버 FinancialsTable도 rise색 제거 통일. corp_code 매핑은 부트 샘플에서 005930→00126380 폴백(10만 건 부트 적재 회피)
 - 검증: tsc 0 · build ✓ · npm test 16 · 순수 로직 스모크 53 · 어드버서리얼 리뷰(CONFIRMED 1건 수정)
 - 환경변수: `DART_API_KEY`(Render). 미설정 시 기능 비활성(에러 아님, `available:false`)

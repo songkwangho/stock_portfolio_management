@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pool, { withTransaction } from '../server/db/connection.js';
 import { fetchFinancials, parseAmount, dartEnabled } from '../server/scrapers/dart.js';
-import { matchAccount, REPRT_CODES } from '../server/helpers/dartAccounts.js';
+import { matchAccount, orderBySection, REPRT_CODES } from '../server/helpers/dartAccounts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_FILE = path.join(__dirname, '.dart-sample.json');
@@ -73,6 +73,10 @@ async function main() {
         const rows = [];
         // canonical PK first-wins 디둡 — DART는 합계를 하위/귀속 라인보다 먼저 나열하므로
         // 최초 매칭(=합계)을 유지한다. matchAccount 정확일치와 함께 이중 방어(오값 저장 차단).
+        //
+        // 손익 계정이 IS·CIS 양쪽에서 잡히게 된 뒤(단일 포괄손익계산서 보고 회사 커버)로는
+        // '최초'가 곧 '어느 표에서 왔는가'를 정한다 → orderBySection()으로 IS를 먼저 흘려
+        // 응답 순서와 무관하게 IS 값이 남게 한다. 섹션 내부 순서는 안정 정렬로 보존된다.
         const seen = new Set();
         let matchedThisStock = 0, skippedThisStock = 0;
         for (const year of years) {
@@ -94,7 +98,7 @@ async function main() {
                     return;
                 }
 
-                for (const item of res.list) {
+                for (const item of orderBySection(res.list)) {
                     const matched = matchAccount(item);
                     if (!matched) { skippedThisStock++; continue; }
                     const pk = `${year}|${quarter}|${fsDiv}|${matched.id}`;
