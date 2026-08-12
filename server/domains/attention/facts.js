@@ -48,19 +48,26 @@ export function computePriceStats(rows, C = ATTENTION_CONSTANTS) {
     return { close: last ? last.price : null, ret5d, volSurge };
 }
 
-// 한 종목의 dart_disclosures 행 → { count, latestDaysAgo, categories }.
+// 한 종목의 dart_disclosures 행 → { count, latestDaysAgo, categories, events }.
 // categories는 **중립 표시 라벨**(호재/악재 아님, dartCategory.js 공용 규칙)만 최대 3개.
+//
+// events는 공시 **전건**의 (category id, 경과일) 쌍이다. score.js가 카테고리 가중을
+// 걸려면 "가장 최신 1건"이 아니라 건별 (무엇이, 언제)가 필요하다 — 12일 전 '기타' 1건과
+// 12일 전 유상증자 1건은 현저성이 달라야 하는데, count·latestDaysAgo만으로는 구분이 안 된다.
+// 여기서는 **사실만** 만들고 가중치 정책은 score.js가 갖는다(계산·정책 분리 유지).
 export function summarizeDisclosures(rows, todayIso) {
     const arr = rows || [];
-    if (arr.length === 0) return { count: 0, latestDaysAgo: null, categories: [] };
+    if (arr.length === 0) return { count: 0, latestDaysAgo: null, categories: [], events: [] };
 
     let latestDaysAgo = null;
     const labels = new Set();
+    const events = [];
     for (const r of arr) {
         // 미래 날짜(시차·오적재)는 0일로 클램프 — 음수 경과일은 감쇠식을 뒤집는다.
         const daysAgo = Math.max(0, daysBetween(isoFromYmd(r.rcept_dt), todayIso));
         if (latestDaysAgo == null || daysAgo < latestDaysAgo) latestDaysAgo = daysAgo;
         labels.add(categoryLabel(r.category));
+        events.push({ category: r.category || 'other', daysAgo });
     }
-    return { count: arr.length, latestDaysAgo, categories: [...labels].slice(0, 3) };
+    return { count: arr.length, latestDaysAgo, categories: [...labels].slice(0, 3), events };
 }

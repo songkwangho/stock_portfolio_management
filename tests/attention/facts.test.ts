@@ -52,6 +52,10 @@ describe('attention facts — 공시 집계', () => {
     expect(s.count).toBe(4);
     expect(s.latestDaysAgo).toBe(1);
     expect(s.categories).toHaveLength(3);
+    // events는 라벨과 달리 **전건**을 남긴다 — score.js가 건별 (카테고리, 경과일)로 가중한다.
+    expect(s.events).toHaveLength(4);
+    expect(s.events).toContainEqual({ category: 'dividend', daysAgo: 1 });
+    expect(s.events).toContainEqual({ category: 'earnings', daysAgo: 6 });
     expect(s.categories).toContain('실적');
   });
 
@@ -61,7 +65,7 @@ describe('attention facts — 공시 집계', () => {
   });
 
   it('공시 없음은 0건 — 정상 경로(에러 아님)', () => {
-    expect(summarizeDisclosures([], '2026-08-07')).toEqual({ count: 0, latestDaysAgo: null, categories: [] });
+    expect(summarizeDisclosures([], '2026-08-07')).toEqual({ count: 0, latestDaysAgo: null, categories: [], events: [] });
     expect(summarizeDisclosures(null, '2026-08-07').count).toBe(0);
   });
 

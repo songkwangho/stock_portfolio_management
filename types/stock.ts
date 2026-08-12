@@ -421,6 +421,7 @@ export interface AttentionItem {
   discCount: number;
   discLatestDaysAgo: number | null;
   discCategories: string[];        // 중립 표시 라벨(호재/악재 아님)
+  discEvents?: { category: string; daysAgo: number }[];  // 건별 원시 사실(카테고리 가중 입력)
   score: number;                   // 현저성. 정렬용이며 화면에 노출하지 않는다
   components?: { disc: number; move: number; unrl: number; stake: number };
 }

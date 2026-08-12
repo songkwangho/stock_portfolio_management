@@ -93,6 +93,9 @@ function factsFor(st, currentPrice, disc) {
         discCount: disc ? disc.count : 0,
         discLatestDaysAgo: disc ? disc.latestDaysAgo : null,
         discCategories: disc ? disc.categories : [],
+        // 카테고리 가중용 건별 (category, 경과일). 응답에도 그대로 실린다 — 원시 사실이라
+        // R1/R2에 저촉되지 않고, 정렬 근거를 되짚을 수 있다(화면은 쓰지 않는다).
+        discEvents: disc ? disc.events : [],
     };
 }
 
