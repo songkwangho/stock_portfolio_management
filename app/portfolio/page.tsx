@@ -6,6 +6,7 @@ import { Pencil, Trash2, Check, X } from 'lucide-react';
 import StockSearchInput from '@/components/stock/StockSearchInput';
 import { formatWeight } from '@/lib/stockDetail/format';
 import { describeHoldingState } from '@/lib/stockDetail/summary';
+import { describePositionAnchorShort, type RangeFacts } from '@/lib/stockDetail/interpret';
 import WatchlistContent from '@/components/portfolio/WatchlistContent';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { stockApi } from '@/lib/stockApi';
@@ -54,6 +55,8 @@ function PortfolioContent() {
   const profitHelpRef = useRef<HTMLDivElement>(null);
   // 3.14차 — 보유 종목 상관관계. 2종목 이상·available일 때만 분산 점검 블록 노출.
   const [correlation, setCorrelation] = useState<CorrelationResult | null>(null);
+  // B — 보유 종목별 가격 범위(종목상세 게이지와 같은 priceContext.range). 매수가 위치 한 줄용.
+  const [ranges, setRanges] = useState<Record<string, RangeFacts>>({});
 
   useEffect(() => {
     if (!profitHelpCode) return;
@@ -77,6 +80,28 @@ function PortfolioContent() {
       .then(d => setCorrelation(d.available ? d : null))
       .catch(() => setCorrelation(null));
   }, [holdings.length]);
+
+  // B — 매수가 위치 한 줄에 쓸 범위. `/volatility`가 종목당 엔드포인트라 보유 수만큼 호출한다.
+  //     보조 정보라 (a) 상한 8종목, (b) silent 실패(문장만 미표시), (c) 이미 받은 코드는 skip.
+  //     보유가 많은 계정에서 목록 로드가 무거워지지 않게 상한을 둔다 — 벌크 엔드포인트가
+  //     생기면 이 루프는 한 번의 호출로 접힌다.
+  const RANGE_FETCH_LIMIT = 8;
+  const fetchedRanges = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (holdings.length === 0 || holdings.length > RANGE_FETCH_LIMIT) return;
+    const targets = holdings.map(h => h.code).filter(c => !fetchedRanges.current.has(c));
+    if (targets.length === 0) return;
+    targets.forEach(c => fetchedRanges.current.add(c));
+    Promise.all(targets.map(code =>
+      stockApi.getVolatility(code)
+        .then(v => ({ code, range: v.priceContext?.range ?? null }))
+        .catch(() => ({ code, range: null }))
+    )).then(results => {
+      const next: Record<string, RangeFacts> = {};
+      for (const r of results) if (r.range) next[r.code] = r.range;
+      if (Object.keys(next).length > 0) setRanges(prev => ({ ...prev, ...next }));
+    });
+  }, [holdings]);
 
   // H1: 첫 종목 가이드 처리 (add-holding focus는 폼 상시 노출 변경으로 무의미)
   useEffect(() => {
@@ -374,6 +399,16 @@ function PortfolioContent() {
                       추가매수/매도 방향 지시로 읽힌다. 위의 평균 가격 위치 관찰만 남긴다. */}
                 </div>
               )}
+
+              {/* B — 매수가 위치 한 줄. 위 수익률 줄이 '얼마'라면 이 줄은 '이 종목 범위에서 어디'다
+                  (축이 달라 중복 아님). 평단을 되돌아갈 목표가 아니라 시장 범위 안의 한 점으로 둔다.
+                  무채색 — 범위 위치는 방향도 가치 판단도 아니다. 범위를 못 받았으면 미표시. */}
+              {(() => {
+                const anchor = describePositionAnchorShort(ranges[stock.code], stock.avgPrice, true);
+                return anchor
+                  ? <p className="text-xs text-muted leading-relaxed mb-4 break-keep">{anchor}</p>
+                  : null;
+              })()}
 
               {isEditing ? (
                 <div className="space-y-3 mb-5 p-4 bg-inset border border-line rounded-xl">

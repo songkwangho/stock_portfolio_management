@@ -10,7 +10,7 @@
 // tone은 색이 아니라 synthesize의 상충 집계용 논리 구분(UI는 무채색 렌더 권장).
 
 export interface Interpretation {
-  key: 'valuation' | 'financial' | 'technical' | 'flow' | 'growth' | 'cashflow' | 'priceContext';
+  key: 'valuation' | 'financial' | 'technical' | 'flow' | 'growth' | 'cashflow' | 'priceContext' | 'positionAnchor';
   label: string;
   text: string;
   tone: 'positive' | 'caution' | 'neutral';
@@ -151,9 +151,10 @@ export interface CashflowFacts {
   netIncome?: number | null;
   ratio?: number | null;   // 영업현금 ÷ 순이익. 순이익 ≤ 0이면 null(부호 뒤집힘 방지)
 }
+export interface RangeFacts { high: number; low: number; days: number; positionPct: number | null }
 export interface PriceContextFacts {
   volatility: { dailyPct: number; days: number } | null;
-  range: { high: number; low: number; days: number; positionPct: number | null } | null;
+  range: RangeFacts | null;
 }
 
 // 증감 방향을 말로. 0은 '거의 같아요'(반올림 후 0.0%인 경우 포함).
@@ -262,6 +263,23 @@ export function rangeSpanLabel(days: number): string {
     return days >= RANGE_YEAR_MIN_DAYS ? '52주' : `${days}거래일`;
 }
 
+// 문장 안에서 쓰는 기간 구. '최근 1년' / '최근 N거래일'.
+// interpretPriceContext에 인라인으로 있던 삼항식을 끌어냈다 — 같은 range를 소비하는 표면이
+// 늘어날수록(B 앵커 해석) 한쪽만 고쳐 라벨이 갈리는 사고가 난다.
+export function rangeSpanPhrase(days: number): string {
+    return days >= RANGE_YEAR_MIN_DAYS ? '최근 1년' : `최근 ${days}거래일`;
+}
+
+// 범위 안에서 임의의 가격이 몇 % 지점인지 — 0~100 클램프 + 반올림.
+// 현재가는 range.positionPct(서버 계산)를 그대로 쓰고, 이 함수는 **범위 밖일 수 있는**
+// 가격(내 매수가)에만 쓴다. 정의는 서버 computePriceContext와 동일하다.
+export function pricePositionPct(price: number, range: RangeFacts | null | undefined): number | null {
+    if (!range || !Number.isFinite(price)) return null;
+    if (!(range.high > range.low)) return null;   // 무변동 구간 — 위치를 정의할 수 없다
+    const raw = ((price - range.low) / (range.high - range.low)) * 100;
+    return Math.round(Math.min(100, Math.max(0, raw)));
+}
+
 // F3 — StatsGrid 위치 게이지 캡션. 순수 함수로 둬서 금지어 스윕이 이 표면을 덮게 한다.
 // 위치 사실 + 표본 수까지만. 방향 단정('상승 흐름')·명령형 경고('주의하세요') 금지.
 export function describeRangePosition(days: number, positionPct: number): string {
@@ -288,7 +306,7 @@ export function interpretPriceContext(p: PriceContextFacts | null | undefined): 
   if (p.range && p.range.positionPct !== null) {
     const { high, low, days, positionPct } = p.range;
     // 표본이 1년에 못 미치면 '1년'이라 부르지 않는다(기존 40행 → "52주" 오라벨 재발 방지).
-    const spanLabel = days >= RANGE_YEAR_MIN_DAYS ? '최근 1년' : `최근 ${days}거래일`;
+    const spanLabel = rangeSpanPhrase(days);
     const where = rangePositionWord(positionPct);   // StatsGrid 게이지와 동일 임계
     parts.push(`${spanLabel} 가격 범위(${low.toLocaleString()}~${high.toLocaleString()}원)에서 지금은 ${where}에 있어요(범위의 ${positionPct}% 지점).`);
   }
@@ -296,6 +314,78 @@ export function interpretPriceContext(p: PriceContextFacts | null | undefined): 
 
   // 변동성·위치는 좋고 나쁨이 아니라 맥락 → tone neutral (균형 요약의 우호/비우호에 넣지 않는다).
   return { key: 'priceContext', label: '변동', tone: 'neutral', available: true, text: parts.join(' ') };
+}
+
+// ─────────────────────────────────────────────────────────────
+// B — 포지션 앵커 해석 (탈앵커 시장 맥락)
+//
+// 왜 평단이 해석의 중심이 아닌가:
+//  · 사용자는 평단 대비 손익을 **이미 보고 있다**(DetailHeader가 "수익률 X% (매수가 ₩…)").
+//    다시 풀어주는 건 한계효용이 없고 상처만 재확인시킨다.
+//  · 이 앱은 server/domains/journal/biases/anchoring.js에서 **평단 집착을 편향으로 관찰**한다.
+//    평단을 해석의 중심에 놓으면 종목상세가 그 편향을 강화하는 자기모순이 된다.
+//
+// 그래서 B는 평단을 **시장 범위 안의 또 하나의 참고점**으로 상대화한다.
+// "얼마 잃었다"가 아니라 "이 종목의 지형은 이렇고 네 진입은 여기".
+// 평단 사실을 숨기지 않는다 — 바꾸는 건 **프레임**이다.
+//
+// ⚠️ 앵커링 강화 금지: 평단을 **되돌아갈 목표**로 제시하지 않는다.
+//    '본전까지 N%'·'회복하려면'류는 평단을 복귀 목표로 설정하는 문장이라 절대 만들지 않는다.
+// ⚠️ 범위 위치 ≠ 가치. 위쪽이 비싼 것도, 아래쪽이 싼 것도 아니다 → tone은 항상 neutral.
+// ─────────────────────────────────────────────────────────────
+
+// 매수가가 범위를 벗어났을 때의 사실 서술. 가치 판단('싸게/비싸게 샀다')로 넘어가지 않는다.
+function outOfRangePhrase(avgPct: number): string {
+  return avgPct >= 100 ? '이 범위 위로 벗어나 있어요' : '이 범위 아래로 벗어나 있어요';
+}
+
+export function interpretPositionAnchor(
+  range: RangeFacts | null | undefined,
+  avgPrice: number | null | undefined,
+  currentPrice: number | null | undefined,
+  held: boolean,
+): Interpretation {
+  // 가드 — 없는 값을 억지로 해석하지 않는다.
+  if (!held) return NA('positionAnchor', '매수가');
+  if (avgPrice === null || avgPrice === undefined || !(avgPrice > 0)) return NA('positionAnchor', '매수가');
+  if (!range || range.positionPct === null || range.positionPct === undefined) return NA('positionAnchor', '매수가');
+
+  const { high, low, days, positionPct } = range;
+  const avgPct = pricePositionPct(avgPrice, range);
+  if (avgPct === null) return NA('positionAnchor', '매수가');
+
+  // 현재가 위치는 **서버가 준 값을 그대로** 쓴다 — StatsGrid 게이지·'변동' 관점과 같은 수치여야 한다.
+  const curWord = rangePositionWord(positionPct);
+  const outside = avgPrice > high || avgPrice < low;
+
+  const avgPart = outside
+    ? `매수가 ${Math.round(avgPrice).toLocaleString()}원은 ${outOfRangePhrase(avgPct)}`
+    : `매수가 ${Math.round(avgPrice).toLocaleString()}원은 ${rangePositionWord(avgPct)}이에요(범위의 ${avgPct}% 지점)`;
+
+  const text =
+    `${rangeSpanPhrase(days)} 동안 이 종목은 ${low.toLocaleString()}~${high.toLocaleString()}원에서 움직였어요. `
+    + `지금은 ${curWord}에 있고(범위의 ${positionPct}% 지점), ${avgPart}. `
+    + `매수가는 그때 산 가격일 뿐이고, 지금 이 종목의 위치는 시장이 정해요.`;
+
+  // 손익 부호로 색을 칠하지 않는다 — 여기서 말하는 건 판단이 아니라 위치 사실이다(3.13).
+  return { key: 'positionAnchor', label: '매수가', tone: 'neutral', available: true, text };
+}
+
+// 포트폴리오 보유 카드용 축약 — 카드가 이미 수익률을 보여주므로 **위치 프레임만** 보강한다.
+// 탈앵커 문장은 공간상 생략(종목상세 관점 패널이 담당).
+export function describePositionAnchorShort(
+  range: RangeFacts | null | undefined,
+  avgPrice: number | null | undefined,
+  held: boolean,
+): string | null {
+  if (!held) return null;
+  if (avgPrice === null || avgPrice === undefined || !(avgPrice > 0)) return null;
+  if (!range || range.positionPct === null || range.positionPct === undefined) return null;
+  const avgPct = pricePositionPct(avgPrice, range);
+  if (avgPct === null) return null;
+  const outside = avgPrice > range.high || avgPrice < range.low;
+  const avgPart = outside ? outOfRangePhrase(avgPct) : `${rangePositionWord(avgPct)}에 있어요`;
+  return `${rangeSpanLabel(range.days)} 범위에서 지금은 ${rangePositionWord(range.positionPct)}, 매수가는 ${avgPart}`;
 }
 
 // ── 업종 내 위치 — PER/ROE 백분위를 말로 ([기업] 탭 업종비교용) ──
@@ -333,8 +423,13 @@ export interface BalanceSummary {
   text: string;
 }
 
+// 관점 균형에서 제외하는 key.
+// 'positionAnchor'는 **종목에 대한 관점이 아니라 내 진입점에 대한 사실**이다. 여기에 섞으면
+// "관찰한 8개 관점" 안에 종목과 무관한 항목이 끼어 집계의 의미가 흐려진다(패널에는 렌더된다).
+export const BALANCE_EXCLUDED_KEYS: Interpretation['key'][] = ['positionAnchor'];
+
 export function summarizeBalance(interps: Interpretation[]): BalanceSummary {
-  const avail = (interps || []).filter(x => x && x.available);
+  const avail = (interps || []).filter(x => x && x.available && !BALANCE_EXCLUDED_KEYS.includes(x.key));
   const favorable = avail.filter(x => x.tone === 'positive').map(x => x.label);
   const unfavorable = avail.filter(x => x.tone === 'caution').map(x => x.label);
   const neutral = avail.filter(x => x.tone === 'neutral').map(x => x.label);

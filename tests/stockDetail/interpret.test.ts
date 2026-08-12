@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   interpretValuation, interpretFinancial, interpretTechnical, interpretFlow,
   interpretSectorPosition, synthesize, summarizeBalance, consecutiveStreak, type Interpretation,
+  interpretPositionAnchor, describePositionAnchorShort, rangePositionWord, describeRangePosition,
 } from '@/lib/stockDetail/interpret';
-import { FORBIDDEN_BASE } from '../forbiddenWords';
+import { FORBIDDEN_BASE, FORBIDDEN_POSITION } from '../forbiddenWords';
 
 describe('interpretValuation', () => {
   it('PER < 업종중앙값 → 싼 편, positive', () => {
@@ -235,5 +236,171 @@ describe('금지 단어 미포함 (사라/팔라/좋다/나쁘다/위험 등)', 
   it('관찰형 표현(팔고/사고 있어요)은 허용 — 명령형만 차단', () => {
     // 매도 스트릭 문구는 "팔고 있어요"라 '팔라'에 걸리지 않아야 함
     expect(interpretFlow(-3, 0).text).toContain('팔고 있어요');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// B — 포지션 앵커 해석 (탈앵커 시장 맥락)
+//
+// 이 표면의 위험은 두 가지다:
+//  1) 평단을 **복귀 목표**로 제시하는 앵커링 강화("본전까지 N%") — 앱이 journal에서 편향이라
+//     부르는 걸 종목상세가 강화하는 자기모순.
+//  2) 범위 위치를 **가치 판단**으로 바꾸기("아래쪽이라 싸다").
+// 아래 스윕이 둘 다 잡는다.
+// ─────────────────────────────────────────────────────────────
+describe('interpretPositionAnchor — 가드', () => {
+  const range = { high: 12000, low: 8000, days: 250, positionPct: 50 };
+
+  it('보유가 아니면 available:false (관심·비보유엔 평단이 없다)', () => {
+    expect(interpretPositionAnchor(range, 10000, 10000, false).available).toBe(false);
+  });
+
+  it('평단이 없거나 0 이하면 available:false', () => {
+    expect(interpretPositionAnchor(range, null, 10000, true).available).toBe(false);
+    expect(interpretPositionAnchor(range, undefined, 10000, true).available).toBe(false);
+    expect(interpretPositionAnchor(range, 0, 10000, true).available).toBe(false);
+    expect(interpretPositionAnchor(range, -100, 10000, true).available).toBe(false);
+  });
+
+  it('범위 표본이 없거나 위치를 못 구하면 available:false (억지 해석 금지)', () => {
+    expect(interpretPositionAnchor(null, 10000, 10000, true).available).toBe(false);
+    expect(interpretPositionAnchor({ ...range, positionPct: null }, 10000, 10000, true).available).toBe(false);
+    // 고가=저가(무변동)면 위치 자체가 정의되지 않는다.
+    expect(interpretPositionAnchor({ high: 9000, low: 9000, days: 250, positionPct: 50 }, 9000, 9000, true).available).toBe(false);
+  });
+});
+
+describe('interpretPositionAnchor — 두 위치를 시장 범위 안에 함께 놓는다', () => {
+  const range = { high: 12000, low: 8000, days: 250, positionPct: 75 };
+
+  it('현재가·평단 위치가 둘 다 등장하고, 평단은 복귀 목표로 제시되지 않는다', () => {
+    const r = interpretPositionAnchor(range, 9000, 11000, true);
+    expect(r.available).toBe(true);
+    expect(r.tone).toBe('neutral');            // 손익 부호로 색을 칠하지 않는다
+    expect(r.text).toContain('75% 지점');       // 현재가 위치(서버 값 그대로)
+    expect(r.text).toContain('25% 지점');       // 평단 위치 (9000-8000)/4000 = 25%
+    expect(r.text).toContain('8,000~12,000원');
+    expect(r.text).toContain('매수가는 그때 산 가격일 뿐');   // 탈앵커 페이로드
+    for (const w of ['본전', '회복', '만회', '되돌리']) expect(r.text.includes(w)).toBe(false);
+  });
+
+  it('표본이 1년에 못 미치면 52주·1년이라 부르지 않는다', () => {
+    const short = interpretPositionAnchor({ high: 12000, low: 8000, days: 120, positionPct: 50 }, 10000, 10000, true);
+    expect(short.text).toContain('120거래일');
+    expect(short.text).not.toContain('1년');
+    const long = interpretPositionAnchor({ high: 12000, low: 8000, days: 250, positionPct: 50 }, 10000, 10000, true);
+    expect(long.text).toContain('최근 1년');
+  });
+
+  it('경계 — 평단이 범위 저점/고점과 정확히 같을 때 0%/100%', () => {
+    expect(interpretPositionAnchor(range, 8000, 10000, true).text).toContain('0% 지점');
+    expect(interpretPositionAnchor(range, 12000, 10000, true).text).toContain('100% 지점');
+  });
+
+  it('평단이 범위 밖이면 % 지점 대신 벗어난 사실을 말한다 (클램프 값을 진짜 위치처럼 쓰지 않음)', () => {
+    const above = interpretPositionAnchor(range, 20000, 10000, true);
+    expect(above.text).toContain('이 범위 위로 벗어나 있어요');
+    expect(above.text).not.toContain('100% 지점');
+    const below = interpretPositionAnchor(range, 3000, 10000, true);
+    expect(below.text).toContain('이 범위 아래로 벗어나 있어요');
+    // 범위 밖이어도 가치 판단으로 넘어가지 않는다.
+    for (const w of ['싸', '비싸', '이득', '손실']) expect(below.text.includes(w)).toBe(false);
+  });
+
+  it('현재가와 평단이 같아도 문장이 성립한다', () => {
+    const r = interpretPositionAnchor({ high: 12000, low: 8000, days: 250, positionPct: 50 }, 10000, 10000, true);
+    expect(r.available).toBe(true);
+    expect(r.text.match(/50% 지점/g) || []).toHaveLength(2);   // 두 위치가 모두 50%
+  });
+});
+
+describe('interpretPositionAnchor — SSOT: 현재가 위치어가 다른 표면과 일치', () => {
+  it('rangePositionWord·describeRangePosition(StatsGrid 게이지)와 같은 임계를 쓴다', () => {
+    for (const pct of [0, 15, 30, 31, 50, 69, 70, 85, 100]) {
+      const range = { high: 12000, low: 8000, days: 250, positionPct: pct };
+      const anchor = interpretPositionAnchor(range, 10000, 10000, true);
+      const word = rangePositionWord(pct);
+      // 게이지 캡션이 쓰는 단어가 앵커 문장에도 그대로 등장해야 한다.
+      expect(describeRangePosition(250, pct)).toContain(word);
+      expect(anchor.text).toContain(`지금은 ${word}에 있고`);
+    }
+  });
+
+  it('현재가 위치는 서버 값(range.positionPct)을 재계산하지 않고 그대로 쓴다', () => {
+    // 현재가로 다시 계산하면 게이지와 어긋난다(반올림·기준 차이). 값 자체를 신뢰해야 한다.
+    const range = { high: 12000, low: 8000, days: 250, positionPct: 62 };
+    const r = interpretPositionAnchor(range, 9000, 99999, true);   // currentPrice가 범위 밖이어도
+    expect(r.text).toContain('62% 지점');
+  });
+});
+
+describe('describePositionAnchorShort — 포트폴리오 카드 축약', () => {
+  const range = { high: 12000, low: 8000, days: 250, positionPct: 80 };
+
+  it('현재가·평단 위치어만 담고 탈앵커 문장은 생략', () => {
+    const s = describePositionAnchorShort(range, 9000, true)!;
+    expect(s).toContain('52주 범위');
+    expect(s).toContain('지금은 위쪽');
+    expect(s).toContain('매수가는 아래쪽');
+    expect(s).not.toContain('그때 산 가격');
+  });
+
+  it('가드 — 비보유·평단없음·범위없음은 null (카드에 아무것도 안 그린다)', () => {
+    expect(describePositionAnchorShort(range, 9000, false)).toBeNull();
+    expect(describePositionAnchorShort(range, null, true)).toBeNull();
+    expect(describePositionAnchorShort(null, 9000, true)).toBeNull();
+    expect(describePositionAnchorShort({ ...range, positionPct: null }, 9000, true)).toBeNull();
+  });
+
+  it('표본 부족이면 52주라 부르지 않는다', () => {
+    expect(describePositionAnchorShort({ ...range, days: 120 }, 9000, true)).toContain('120거래일');
+  });
+});
+
+describe('positionAnchor는 관점 균형 집계에서 빠진다', () => {
+  it('종목이 아니라 내 진입점에 대한 사실이라 관점 수에 포함하지 않는다', () => {
+    const mk = (key: Interpretation['key'], tone: Interpretation['tone']): Interpretation =>
+      ({ key, label: key, text: 'x', tone, available: true });
+    const withAnchor = summarizeBalance([mk('valuation', 'positive'), mk('positionAnchor', 'neutral')]);
+    const without = summarizeBalance([mk('valuation', 'positive')]);
+    expect(withAnchor.total).toBe(1);
+    expect(withAnchor.neutral).toEqual([]);
+    expect(withAnchor.text).toBe(without.text);
+  });
+});
+
+describe('B — FORBIDDEN_POSITION 전수 스윕', () => {
+  // 광범위 입력: 평단이 범위 밖/경계/현재가와 동일, 손실·이익 양쪽, 표본 장단.
+  const texts: string[] = [];
+  for (const days of [60, 199, 200, 250]) {
+    for (const pos of [0, 20, 30, 50, 70, 90, 100]) {
+      const range = { high: 12000, low: 8000, days, positionPct: pos };
+      for (const avg of [3000, 8000, 8001, 9500, 10000, 11999, 12000, 20000]) {
+        for (const cur of [8000, 10000, 12000]) {
+          const r = interpretPositionAnchor(range, avg, cur, true);
+          if (r.available) texts.push(r.text);
+          const short = describePositionAnchorShort(range, avg, true);
+          if (short) texts.push(short);
+        }
+      }
+    }
+  }
+
+  it('스윕이 공회전하지 않는다', () => {
+    expect(texts.length).toBeGreaterThan(100);
+  });
+
+  it('전 출력에 금지 표현 없음 (특히 본전·회복·싸/비싸)', () => {
+    for (const t of new Set(texts)) {
+      for (const w of FORBIDDEN_POSITION) {
+        expect(t.includes(w), `"${t}" 에 금지 표현 "${w}" 포함`).toBe(false);
+      }
+    }
+  });
+
+  it("'매수가'는 허용된다 — 차단 대상은 '매도'뿐", () => {
+    expect(texts.some(t => t.includes('매수가'))).toBe(true);
+    expect(FORBIDDEN_POSITION.includes('매수')).toBe(false);
+    expect(FORBIDDEN_POSITION.includes('매도')).toBe(true);
   });
 });

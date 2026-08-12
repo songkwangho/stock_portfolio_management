@@ -11,7 +11,7 @@ import DartFinancials from '@/components/stock/detail/DartFinancials';
 import DisclosureList from '@/components/stock/detail/DisclosureList';
 import InterpretationPanel from '@/components/stock/detail/InterpretationPanel';
 import NewsList from '@/components/stock/detail/NewsList';
-import { interpretValuation, interpretFinancial, interpretTechnical, interpretFlow, interpretSectorPosition, consecutiveStreak, interpretGrowth, interpretCashflowQuality, interpretPriceContext } from '@/lib/stockDetail/interpret';
+import { interpretValuation, interpretFinancial, interpretTechnical, interpretFlow, interpretSectorPosition, consecutiveStreak, interpretGrowth, interpretCashflowQuality, interpretPriceContext, interpretPositionAnchor } from '@/lib/stockDetail/interpret';
 import ConclusionCard from '@/components/stock/detail/ConclusionCard';
 import StatsGrid from '@/components/stock/detail/StatsGrid';
 import SignalPanel from '@/components/stock/detail/SignalPanel';
@@ -193,6 +193,9 @@ function StockDetailContent({ code }: { code: string }) {
     interpretTechnical(latestPrice, latest.sma5, latest.sma20),
     interpretFlow(consecutiveStreak(inv.map(d => d.foreign)), consecutiveStreak(inv.map(d => d.institution))),
     interpretPriceContext(priceContext),
+    // B — 같은 range를 소비하므로 '변동' 바로 뒤에 둔다. 역할 분리: 변동=현재가만,
+    // 매수가=거기에 내 진입점을 겹쳐 프레임을 넓힘. 보유가 아니면 available:false로 자동 미표시.
+    interpretPositionAnchor(priceContext?.range, stock.avgPrice, latestPrice, isHolding),
   ];
   // [기업] 탭 재무제표 아래 한 줄 해석 — 인덱스가 아니라 key로 찾는다(관점 추가 시 어긋나지 않게).
   const financialInterp = interps.find(i => i.key === 'financial')!;
