@@ -8,7 +8,10 @@
  *   DART_API_KEY=... DATABASE_URL=... node scripts/sync-dart-financials.js
  *   ... --years 3                 # 최근 3개년
  *   ... --limit 5 --offset 0      # 종목 부분 배치
+ *   ... --code 000220,005930      # 특정 종목만 (쉼표 구분)
  *   ... --dry-run                 # DB 미기록, 첫 종목 매핑 결과만 출력
+ *                                   ※ dry-run은 유효 종목 **첫 건**에서 멈춘다. 특정 종목의
+ *                                     매칭을 확인하려면 --code 로 대상을 좁혀서 함께 쓸 것.
  *   ... --save-sample             # 첫 성공 응답 원본을 scripts/.dart-sample.json 저장 후 종료
  *                                   (운영자가 실제 구조 확인 → 파서 대조·보정용. dry-run 포함)
  *
@@ -26,11 +29,12 @@ const SAMPLE_FILE = path.join(__dirname, '.dart-sample.json');
 
 function parseArgs() {
     const a = process.argv.slice(2);
-    const out = { years: 2, limit: null, offset: 0, dryRun: false, saveSample: false };
+    const out = { years: 2, limit: null, offset: 0, codes: null, dryRun: false, saveSample: false };
     for (let i = 0; i < a.length; i++) {
         if (a[i] === '--years') out.years = parseInt(a[++i], 10);
         else if (a[i] === '--limit') out.limit = parseInt(a[++i], 10);
         else if (a[i] === '--offset') out.offset = parseInt(a[++i], 10);
+        else if (a[i] === '--code') out.codes = String(a[++i] || '').split(',').map(s => s.trim()).filter(Boolean);
         else if (a[i] === '--dry-run') out.dryRun = true;
         else if (a[i] === '--save-sample') { out.saveSample = true; out.dryRun = true; }
     }
@@ -59,6 +63,17 @@ async function main() {
         console.error('대상 없음 — sync-dart-corpcodes.js 를 먼저 실행해 매핑을 채우세요.');
         await pool.end();
         process.exit(1);
+    }
+    // --code 는 offset/limit보다 먼저 — 특정 종목 하나를 dry-run으로 확인하는 용도라
+    // "몇 번째에 있는지" 몰라도 되게 한다(dry-run이 첫 유효 종목에서 멈추므로 필요).
+    if (args.codes) {
+        const want = new Set(args.codes);
+        targets = targets.filter(t => want.has(t.code));
+        if (targets.length === 0) {
+            console.error(`--code ${args.codes.join(',')}: 대상 없음 — stocks ⨝ dart_corp_codes 매핑을 확인하세요.`);
+            await pool.end();
+            process.exit(1);
+        }
     }
     if (args.offset) targets = targets.slice(args.offset);
     if (args.limit) targets = targets.slice(0, args.limit);
