@@ -12,6 +12,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import AttentionBlock from '@/components/dashboard/AttentionBlock';
 import { stockApi } from '@/lib/stockApi';
 import { formatWeight } from '@/lib/stockDetail/format';
+import { computePortfolioTotals, interpretAttribution } from '@/lib/portfolio/attribution';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   // 3.14차 — KOSPI 대비 초과수익(벤치마크). 데이터 부족 시 null 유지(항목 미표시).
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [showBenchmarkHelp, setShowBenchmarkHelp] = useState(false);
+  const [showAttrHelp, setShowAttrHelp] = useState(false);   // D — 종목별 기여 도움말
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=holding`);
@@ -137,10 +139,11 @@ export default function DashboardPage() {
     fullDate: i === rawChartData.length - 1 ? `${d.fullDate} (오늘)` : d.fullDate,
   }));
 
-  const totalAsset = holdings.reduce((acc, cur) => acc + (cur.currentPrice * (cur.quantity || 0)), 0);
-  const totalCost = holdings.reduce((acc, cur) => acc + (cur.avgPrice * (cur.quantity || 0)), 0);
-  const totalPnL = totalAsset - totalCost;
-  const avgProfitRate = totalCost > 0 ? (totalPnL / totalCost * 100) : 0;
+  // D — 히어로 합계와 종목별 기여 분해가 **같은 함수**를 쓴다. 각자 계산하면 유효행 기준·반올림
+  // 차이로 "히어로 -36%인데 기여 합계는 -35%"가 되고, 그 순간 두 숫자 다 못 믿게 된다.
+  // (인라인 reduce에서 옮겨옴 — 평단·수량·현재가가 결측인 행은 이제 NaN을 퍼뜨리지 않고 제외된다.)
+  const { totalAsset, totalCost, totalPnL, profitRatePct: avgProfitRate } = computePortfolioTotals(holdings);
+  const attribution = interpretAttribution(holdings);
   // 보유 목록 행 비중 표시용 정밀 비중 (TASK 1).
   const weightPct = (avg?: number, qty?: number) => totalCost > 0 ? (avg || 0) * (qty || 0) / totalCost * 100 : 0;
 
@@ -314,6 +317,59 @@ export default function DashboardPage() {
           <p className="text-xs text-faint mt-1">※ 최근 {benchmark.period} 거래일 기준, 참고용이에요.</p>
         </Card>
       )}
+
+      {/* D — 성과 귀인(종목별 기여). 히어로 손익률을 "왜?"로 잇는 자리라 그 바로 아래 둔다.
+          벤치마크 블록과 역할 분리: 벤치마크=시장 대비 / 여기=내 손익의 종목별 출처.
+          방향색은 기여 막대·수치에만 — 부호 있는 손익이라 방향이 곧 데이터다. 종목명·라벨은 무채색.
+          (ScoringBreakdownPanel의 무채색 ramp 규칙은 '범주를 방향색으로 칠하지 말라'는 것이라
+           여기엔 해당하지 않는다. 이 막대는 실제로 손익 방향을 나타낸다.) */}
+      {holdings.length > 0 && attribution.available && (() => {
+        const rows = attribution.contributions;
+        const maxAbs = Math.max(...rows.map(c => Math.abs(c.contribPP)), 0);
+        const shown = rows.slice(0, 5);
+        const hidden = rows.length - shown.length;
+        return (
+          <Card variant="secondary" padding="base">
+            <div className="flex items-center gap-2 mb-1.5">
+              <p className="text-xs font-bold text-muted">손익이 어디서 왔나</p>
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-caution/10 text-caution">임시 기준</span>
+              <button
+                onClick={() => setShowAttrHelp(v => !v)}
+                className="text-xs text-faint hover:text-ink min-w-[24px] min-h-[24px] flex items-center justify-center font-bold"
+                aria-label="종목별 기여 설명"
+              >?</button>
+            </div>
+            <p className="text-sm text-ink leading-relaxed break-keep tabular-nums">{attribution.text}</p>
+            {showAttrHelp && (
+              <p className="text-xs text-muted leading-relaxed mt-2 break-keep">
+                종목별 기여란? 각 종목이 전체 손익률을 몇 %p 움직였는지예요. 전부 합치면 위의 전체 손익률({avgProfitRate.toFixed(2)}%)이 돼요.
+                한 종목이 전체 손익 변동의 절반 이상을 차지하는지 보는 기준은 실증 검증 전 임시값이에요.
+              </p>
+            )}
+            {rows.length > 1 && (
+              <div className="mt-3 divide-y divide-line">
+                {shown.map(c => (
+                  <div key={c.code} className="py-2 flex items-center gap-3">
+                    <span className="text-xs text-ink truncate flex-1 min-w-0">{c.name}</span>
+                    <div className="w-20 sm:w-28 h-1.5 bg-line rounded-full overflow-hidden shrink-0">
+                      <div
+                        className={`h-full rounded-full ${c.contribPP >= 0 ? 'bg-rise' : 'bg-fall'}`}
+                        style={{ width: `${maxAbs > 0 ? Math.round(Math.abs(c.contribPP) / maxAbs * 100) : 0}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums w-16 text-right shrink-0 ${c.contribPP >= 0 ? 'text-rise' : 'text-fall'}`}>
+                      {c.contribPP >= 0 ? '+' : ''}{c.contribPP.toFixed(1)}%p
+                    </span>
+                  </div>
+                ))}
+                {hidden > 0 && (
+                  <p className="py-2 text-xs text-faint">외 {hidden}종목</p>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })()}
 
       <ErrorBanner error={historyError} kind="server" onRetry={fetchHistory} autoRetryMs={3000} />
 

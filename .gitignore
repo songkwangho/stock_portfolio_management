@@ -36,3 +36,9 @@ test-results/
 .playwright-mcp/
 # dev 도구 크리덴셜(FIRECRAWL_API_KEY 등)은 .env.tools.local — 위 .env*.local 이 이미 차단
 
+
+# ── 세션 지시문 문서 (앱 코드 아님, cowork로 공유됨 — 레포에 남기지 않는다) ─────────
+# git add -A 로 레포 루트 지시문이 딸려 커밋된 사고(3e5b946) 재발 차단.
+/attention-score-redesign.md
+/position-anchor-interpretation-spec.md
+/performance-attribution-spec.md
