@@ -210,13 +210,15 @@ function detectMACD(history) {
     if (hP <= 0 && hT > 0) {
         return {
             id: 'macd', type: 'positive', label: 'MACD 상승 전환',
-            description: '매수 힘이 매도 힘보다 강해지기 시작했어요. 단기 흐름이 위로 돌아섰어요.',
+            // MACD는 매수/매도 '힘'을 재지 않는다 — 두 이동평균(12·26일 EMA)의 간격이다.
+            // indicators.js와 같은 처리: 측정하는 값 그대로 서술하고 방향 단정은 뺀다.
+            description: 'MACD가 위로 전환됐어요 — 단기선이 장기선 위로 올라선 상태예요.',
         };
     }
     if (hP >= 0 && hT < 0) {
         return {
             id: 'macd', type: 'caution', label: 'MACD 하락 전환',
-            description: '매도 힘이 매수 힘보다 강해지기 시작했어요. 단기 흐름이 아래로 돌아섰어요.',
+            description: 'MACD가 아래로 전환됐어요 — 단기선이 장기선 아래로 내려선 상태예요.',
         };
     }
     return null;
@@ -240,14 +242,17 @@ function detectOBV(history) {
     const priceFlatOrDown = priceNow <= price10 * 1.02; // 횡보 또는 하락
     if (obvNow > obv10 && priceFlatOrDown) {
         return {
-            id: 'obv', type: 'positive', label: '매집 흐름',
-            description: '거래량 흐름상 조용히 사들이는 모습이 보여요. 세력 매집 가능성을 참고만 하세요.',
+            id: 'obv', type: 'positive', label: '거래량 흐름 증가',
+            // '세력 매집 가능성'은 OBV가 확인할 수 없는 주체·의도 추측이라 제거. 라벨의 '매집'도
+            // 같은 단정이라 계산이 실제로 본 것(주가 정체·하락 + OBV 증가)으로 바꾼다.
+            description: '주가는 크게 오르지 않았는데 거래량 흐름(OBV)은 늘었어요.',
         };
     }
     if (obvNow < obv10 && priceUp) {
         return {
             id: 'obv', type: 'caution', label: '거래량 미확인 상승',
-            description: '주가는 오르지만 거래량이 받쳐주지 않아요. 상승 힘이 약할 수 있어요.',
+            // '상승 힘이 약할 수 있어요'는 앞으로의 방향 예측이라 제거. 계산은 '주가↑ + OBV↓'다.
+            description: '주가는 올랐는데 거래량 흐름(OBV)은 반대로 줄었어요.',
         };
     }
     return null;
@@ -267,12 +272,12 @@ function detectVolumeSpike(history) {
         if (up) {
             return {
                 id: 'volume', type: 'positive', label: '거래량 급증(상승)', date,
-                description: '평소보다 거래가 크게 늘며 올랐어요. 상승에 힘이 실린 모습이에요.',
+                description: '거래량이 20일 평균의 2배를 넘으며 전일보다 올랐어요.',
             };
         }
         return {
             id: 'volume', type: 'caution', label: '거래량 급증(하락)', date,
-            description: '평소보다 거래가 크게 늘며 내렸어요. 하락에 힘이 실린 모습이에요.',
+            description: '거래량이 20일 평균의 2배를 넘으며 전일보다 내렸어요.',
         };
     }
     return null;
