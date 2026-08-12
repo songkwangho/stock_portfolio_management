@@ -88,13 +88,15 @@ export async function calculateIndicators(pool, code) {
     // Summary for beginners
     const details = [];
     if (rsi !== null) {
-        if (rsi >= 70) details.push({ indicator: 'RSI', signal: '과매수', description: '주가가 단기간에 많이 올라 쉬어갈 수 있어요.', color: 'red' });
-        else if (rsi <= 30) details.push({ indicator: 'RSI', signal: '과매도', description: '주가가 많이 떨어져서 반등할 수 있어요.', color: 'green' });
-        else details.push({ indicator: 'RSI', signal: '보통', description: '현재 과열이나 침체 없이 안정적이에요.', color: 'neutral' });
+        // 방향 예측('쉬어갈/반등할 수 있어요') 제거 — 지표가 재는 것(최근 14일 등락폭)만 말한다.
+        if (rsi >= 70) details.push({ indicator: 'RSI', signal: '과매수', description: '최근 14일 오름폭이 큰 구간이에요.', color: 'red' });
+        else if (rsi <= 30) details.push({ indicator: 'RSI', signal: '과매도', description: '최근 14일 내림폭이 큰 구간이에요.', color: 'green' });
+        else details.push({ indicator: 'RSI', signal: '보통', description: '최근 14일 등락폭이 보통 수준이에요.', color: 'neutral' });
     }
     if (macd) {
-        if (macd.histogram > 0) details.push({ indicator: 'MACD', signal: '상승 추세', description: '매수 힘이 매도 힘보다 강해요.', color: 'green' });
-        else details.push({ indicator: 'MACD', signal: '하락 추세', description: '매도 힘이 매수 힘보다 강해요.', color: 'red' });
+        // MACD는 '매수/매도 힘'을 재지 않는다 — 두 이동평균의 간격이다. 재는 값 그대로 서술.
+        if (macd.histogram > 0) details.push({ indicator: 'MACD', signal: '단기선 우위', description: '단기 이동평균이 장기 이동평균 위에 있어요.', color: 'green' });
+        else details.push({ indicator: 'MACD', signal: '장기선 우위', description: '단기 이동평균이 장기 이동평균 아래에 있어요.', color: 'red' });
     }
     if (bollinger) {
         if (bollinger.percentB > 80) details.push({ indicator: '볼린저밴드', signal: '상단 근접', description: '주가가 평소보다 많이 올라간 상태예요.', color: 'red' });

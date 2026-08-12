@@ -37,7 +37,7 @@ const PRESETS: Preset[] = [
   },
   {
     name: '고ROE 성장주',
-    description: 'ROE↑ — 자기자본으로 돈 잘 버는 기업',
+    description: 'ROE↑ — 자기자본 대비 이익이 큰 편',
     summary: 'ROE ≥ 20%',
     filters: { roeMin: 20 },
     slug: 'high-roe',
@@ -53,7 +53,8 @@ const PRESETS: Preset[] = [
   // 3.7차 — 히스토리/수급 기반 동적 프리셋
   {
     name: '52주 신고가 돌파',
-    description: '강한 상승 흐름',
+    // 방향단정 제거 — 걸러내는 조건(고점 부근)을 그대로 부른다.
+    description: '52주 고점 부근',
     summary: '최근 1년 고점 대비 +0~N%',
     filters: { preset: 'breakout_52w' },
     slug: 'breakout-52w',
@@ -97,7 +98,7 @@ const PRESETS: Preset[] = [
     isNew: true,
   },
   {
-    name: '3개월 강세',
+    name: '3개월 상승폭 상위',
     description: '모멘텀 — 최근 3개월 상승률 상위',
     summary: '90일 전 대비 +N%',
     filters: { preset: 'momentum_3m' },

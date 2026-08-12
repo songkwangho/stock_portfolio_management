@@ -108,7 +108,9 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
         <p>
           <span className="text-rise font-bold">빨간선</span>(5일 평균, 단기 흐름) /
           <span className="text-caution font-bold"> 주황선</span>(20일 평균, 중기 흐름). <br />
-          주가 &gt; 빨간선 = 단기 상승 흐름 · 빨간선 &gt; 주황선 = 정배열(긍정적 추세).
+          {/* 방향단정 제거 — '정배열'은 배열 상태를 가리키는 사실이라 남기고,
+              그 뒤에 붙던 verdict 꼬리표('긍정적 추세')와 '상승 흐름'만 위치 사실로 바꾼다. */}
+          주가 &gt; 빨간선 = 최근 5일 평균보다 위 · 빨간선 &gt; 주황선 = 정배열(단기선이 중기선 위).
         </p>
       </div>
       <div className="h-72 w-full">

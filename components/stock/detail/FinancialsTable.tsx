@@ -12,7 +12,8 @@ export default function FinancialsTable({ financials }: FinancialsTableProps) {
   return (
     <div className="bg-surface p-6 rounded-xl border border-line">
       <h3 className="text-lg font-semibold text-ink mb-4">분기별 실적</h3>
-      <p className="text-xs text-muted mb-1 break-keep">최근 분기별 매출과 이익 추이예요. 꾸준히 늘어나면 좋은 신호예요.</p>
+      {/* '좋은 신호예요' 판정 제거 — 무엇을 볼지만 안내한다. */}
+      <p className="text-xs text-muted mb-1 break-keep">최근 분기별 매출과 이익 추이예요. 꾸준히 늘고 있는지 함께 보세요.</p>
       <p className="text-xs text-faint mb-4 break-keep">단위: 억 원 (네이버 증권 기준). 1조 = 10,000억</p>
       <div className="overflow-x-auto">
         <table className="w-full text-xs tabular-nums">

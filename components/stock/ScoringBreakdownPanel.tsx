@@ -7,8 +7,10 @@ interface ScoringBreakdownPanelProps {
   bare?: boolean; // true면 카드 래퍼 없이 렌더 — 상위 카드에 병합 (3.13 밀도 2차)
 }
 
-// 해석 기준: 영역 점수 / 만점 비율 (80%↑ 매우 좋음, 60%↑ 적정, 25%↑ 약함, 그 외 부정)
-const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score: number, detail: ScoringBreakdown['detail']) => string }[] = [
+// 항목별 문구. 방향 verdict('상승 흐름이에요')를 쓰지 않고 위치·정도까지만 말한다.
+// 테스트가 점수→문구 매핑과 금지어를 검사할 수 있게 export 한다
+// (trend 분기가 계산과 어긋나 있던 버그를 잡은 뒤 회귀 방지용으로 고정).
+export const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score: number, detail: ScoringBreakdown['detail']) => string }[] = [
   {
     key: 'valuation', label: '밸류에이션', max: 3,
     descFn: (score, _d) => {
@@ -21,12 +23,14 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
   },
   {
     key: 'technical', label: '기술지표', max: 3,
+    // 방향단정 제거 — 항목 점수는 RSI·MACD·볼린저를 합산한 값이라 '상승/하락 흐름'을 단정할
+    // 근거가 못 된다. 몇 개 항목이 어느 쪽으로 기울었는지(정도)까지만 말한다.
     descFn: (score, _d) => {
       const pct = score / 3;
-      if (pct >= 0.8) return '기술 지표가 강한 상승 흐름을 보이고 있어요';
-      if (pct >= 0.6) return '보통 수준의 기술적 신호예요';
-      if (pct >= 0.25) return '약한 기술적 신호예요';
-      return '기술 지표가 하락 흐름을 보이고 있어요';
+      if (pct >= 0.8) return '기술 지표 대부분이 위쪽으로 기울어 있어요';
+      if (pct >= 0.6) return '기술 지표가 반반에 가까워요';
+      if (pct >= 0.25) return '기술 지표 상당수가 아래쪽으로 기울어 있어요';
+      return '기술 지표 대부분이 아래쪽으로 기울어 있어요';
     }
   },
   {
@@ -44,12 +48,21 @@ const CATEGORY_LABELS: { key: string; label: string; max: number; descFn: (score
   },
   {
     key: 'trend', label: '추세', max: 2,
+    // 방향단정 제거 — 이 항목은 이평선 배열·주가 위치로만 결정되므로 그 위치를 그대로 말한다
+    // ('상승 흐름이에요'/'하락 추세예요' verdict 없이).
+    //
+    // ⚠️ 동시에 **표시-계산 불일치 버그**를 고친다. 기존 코드는 pct(=score/2) 구간으로 문구를
+    // 골랐는데, calculateTrendScore가 내는 값은 {2.0, 1.0, 0.5, 0.0} 이산값뿐이라
+    //   · pct>=0.6 분기는 도달 불가(0.5 < 0.6)였고
+    //   · total=1.0('주가 > 5일선, 역배열')과 '이평선 데이터 부족'이 둘 다 pct=0.5로 떨어져
+    //     "20일선은 지지하지만 5일선 아래예요" — **위치가 정반대인 문구**가 표시되고 있었다.
+    // 그래서 구간이 아니라 점수값에 정확히 대응시키고, 1.0 충돌은 서버 reason으로 가른다.
     descFn: (score, d) => {
-      const pct = score / 2;
-      if (pct >= 0.8) return '상승 흐름이에요 (이평선 정배열)';
-      if (pct >= 0.6) return '5일선 위이지만 완전한 상승세는 아니에요';
-      if (pct >= 0.25) return '20일선은 지지하지만 5일선 아래예요';
-      return d?.trend?.reason || '하락 추세예요';
+      if (d?.trend?.reason === '이평선 데이터 부족') return '이동평균 데이터를 모으는 중이에요';
+      if (score >= 2) return '주가가 5일선 위, 5일선이 20일선 위에 있어요 (정배열)';
+      if (score >= 1) return '주가는 5일선 위지만, 5일선이 20일선 아래에 있어요';
+      if (score >= 0.5) return '주가가 5일선 아래, 20일선 위에 있어요';
+      return '주가가 5일선·20일선 모두 아래에 있어요';
     }
   },
 ];

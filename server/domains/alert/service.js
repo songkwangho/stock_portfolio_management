@@ -72,7 +72,7 @@ export async function generateAlerts(pool, code, name, price, sma5) {
 
             if (broken && !(await hasDuplicate(pool, device_id, code, 'sma5_break')) && !(await dailyLimitReached(pool, device_id, code))) {
                 await insertAlert(pool, device_id, code, name, 'sma5_break', 'holding',
-                    `${name}(${code}) 주가가 5일 평균(${sma5.toLocaleString()}원) 아래로 내려갔어요. 단기 하락 흐름이에요.`
+                    `${name}(${code}) 주가가 5일 평균(${sma5.toLocaleString()}원) 아래로 내려갔어요.`
                 );
             } else if (touched && !(await hasDuplicate(pool, device_id, code, 'sma5_touch')) && !(await dailyLimitReached(pool, device_id, code))) {
                 await insertAlert(pool, device_id, code, name, 'sma5_touch', 'holding',

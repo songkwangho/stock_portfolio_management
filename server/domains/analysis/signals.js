@@ -130,13 +130,14 @@ function detectBollingerSqueeze(history) {
     if (price > today.upper && volUp) {
         return {
             id: 'bollinger', type: 'positive', label: '상단 돌파', date,
-            description: '가격이 밴드 상단을 거래량 증가와 함께 넘었어요. 상승 쪽으로 움직이기 시작했어요.',
+            // 앞 문장이 이미 사실을 말한다. '움직이기 시작했어요'는 이어질 방향을 암시해 제거.
+            description: '가격이 밴드 상단을 거래량 증가와 함께 넘었어요.',
         };
     }
     if (price < today.lower && volUp) {
         return {
             id: 'bollinger', type: 'caution', label: '하단 이탈', date,
-            description: '가격이 밴드 하단을 거래량 증가와 함께 벗어났어요. 하락 쪽으로 움직이기 시작했어요.',
+            description: '가격이 밴드 하단을 거래량 증가와 함께 벗어났어요.',
         };
     }
 
@@ -169,13 +170,14 @@ function detectRSI(history) {
     if (rsi <= 30) {
         return {
             id: 'rsi', type: 'positive', label: '과매도',
-            description: '과매도 구간이에요. 단기 반등 가능성을 지켜볼 수 있어요.',
+            // '반등 가능성'은 앞으로의 방향 예측이라 제거하고, 지표가 무엇을 재는지로 되돌린다.
+            description: '최근 14일 등락을 지수로 환산하면 과매도 구간이에요(내림폭이 컸다는 뜻).',
         };
     }
     if (rsi >= 70) {
         return {
             id: 'rsi', type: 'caution', label: '과매수',
-            description: '과매수 구간이에요. 단기 조정 가능성에 주의하며 지켜보세요.',
+            description: '최근 14일 등락을 지수로 환산하면 과매수 구간이에요(오름폭이 컸다는 뜻).',
         };
     }
     return null;

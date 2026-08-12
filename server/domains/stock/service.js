@@ -363,34 +363,36 @@ export async function getStockData(code, fallbackName = null) {
             const distance = sma5 ? Math.abs((latestPrice - sma5) / sma5 * 100).toFixed(1) : 0;
             const trendDir = latestPrice > sma5 ? '위' : '아래';
 
+            // '정배열/역배열'은 이평선 배열을 가리키는 사실이라 유지. 이격도 뒤에 붙던
+            // '(과열/안정)' verdict만 제거하고, 5% 기준을 문구에 밝혀 사실로 돌린다.
             analysis = `현재 주가는 5일선(${sma5?.toLocaleString() || '-'}원) ${trendDir}에 위치하고 있으며, 이평선은 ${alignment} 상태입니다. `;
-            analysis += `이격도 ${distance}%(${parseFloat(distance) > 5 ? '과열' : '안정'}). `;
+            analysis += `5일선과의 이격도는 ${distance}%입니다(5% 초과 시 평소보다 벌어진 편). `;
             analysis += `PER ${per || '-'}, PBR ${pbr || '-'}, ROE ${roe || '-'}%. `;
             // B1 — 사용자에게 보이는 상세분석 문구에서 합산 점수([종합점수 N/10]) 제거.
             // 항목별 점수는 재료로 남긴다. totalScore 계산 자체는 추천·스크리너 랭킹이 쓰므로 유지.
             analysis += `항목별 점수 — 밸류에이션 ${valuation.total}/3, 기술지표 ${technical.total}/3, 수급 ${supplyDemand.total}/2, 추세 ${trend.total}/2.`;
 
-            // 임시 임계값 — Phase 4 백테스팅 후 데이터 기반 최적화 예정
-            // advice 문구는 앱스토어 심사 대비 중립/서술형으로 작성 (투자 권유로 해석되지 않도록).
-            if (totalScore >= 7.0) {
-                market_opinion = '긍정적';
-                advice = `종합점수 ${totalScore}점으로 긍정적인 지표가 많아요. `;
-                advice += valuation.total >= 2 ? '밸류에이션이 섹터 대비 낮은 편이며, ' : '';
-                advice += technical.total >= 2 ? '기술적 지표도 우호적인 흐름이에요. ' : '';
-                advice += supplyDemand.total >= 1.5 ? '외국인·기관 수급도 우호적이에요.' : '';
-            } else if (totalScore >= 4.0) {
-                market_opinion = '중립적';
-                advice = `종합점수 ${totalScore}점으로 강한 방향성은 보이지 않아요. `;
-                if (valuation.total < 1) advice += '밸류에이션 매력이 낮고, ';
-                if (technical.total < 1) advice += '기술적 지표가 약세를 보이고 있어 ';
-                advice += '지표를 직접 확인해보세요.';
-            } else {
-                market_opinion = '부정적';
-                advice = `종합점수 ${totalScore}점으로 주의가 필요한 상태예요. `;
-                if (valuation.total < 1) advice += '밸류에이션 부담이 있고, ';
-                if (technical.total < 1) advice += '기술적 지표도 약세 흐름이며, ';
-                if (supplyDemand.total < 0.5) advice += '수급도 비우호적이에요.';
-            }
+            // 임시 임계값 — Phase 4 백테스팅 후 데이터 기반 최적화 예정.
+            // market_opinion은 추천 필터·스크리너 정렬의 **내부 랭킹**으로만 쓰인다(화면 노출 없음).
+            //
+            // advice: 현재 프론트 어디에서도 렌더되지 않지만 stock_analysis.advice에 저장되고
+            // getStockData가 실어 보낸다 → 언젠가 소비되면 그대로 새는 경로다. 그래서 합산 판정
+            // ('종합점수 N점으로 긍정적인 지표가 많아요' · '주의가 필요한 상태' · '약세')을 걷어내고
+            // 항목별 사실 나열로 바꿔 둔다. 문장이 아니라 재료만 남긴다.
+            const facts = [];
+            if (valuation.total >= 2) facts.push('밸류에이션이 업종 대비 낮은 편');
+            else if (valuation.total < 1) facts.push('밸류에이션이 업종 대비 높은 편');
+            if (technical.total >= 2) facts.push('기술 지표 다수가 위쪽으로 기울어 있음');
+            else if (technical.total < 1) facts.push('기술 지표 다수가 아래쪽으로 기울어 있음');
+            if (supplyDemand.total >= 1.5) facts.push('외국인·기관 순매수가 이어짐');
+            else if (supplyDemand.total < 0.5) facts.push('뚜렷한 수급 흐름 없음');
+            advice = facts.length > 0
+                ? `항목별 관찰 — ${facts.join(', ')}.`
+                : '항목별로 뚜렷하게 기운 곳이 없습니다.';
+
+            if (totalScore >= 7.0) market_opinion = '긍정적';
+            else if (totalScore >= 4.0) market_opinion = '중립적';
+            else market_opinion = '부정적';
         }
 
         const tossUrl = `https://tossinvest.com/stocks/${code}/order`;
