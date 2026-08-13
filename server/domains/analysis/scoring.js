@@ -98,7 +98,7 @@ export async function calculateValuationScore(pool, code, per, pbr, roe, price, 
     };
 }
 
-// Technical Score: 0.0 ~ 3.0
+// Technical Score: 0.0 ~ 3.0 — DB 조회부. 계산은 아래 순수 함수에 위임한다.
 export async function calculateTechnicalScore(pool, code) {
     const { rows: rawHistory } = await pool.query(
         'SELECT date, price, open, high, low, volume FROM stock_history WHERE code = $1 ORDER BY date ASC',
@@ -113,6 +113,20 @@ export async function calculateTechnicalScore(pool, code) {
         low: Number(h.low),
         volume: Number(h.volume),
     }));
+    return computeTechnicalFromHistory(history);
+}
+
+// Technical Score 순수 계산 — Phase 4 백테스팅 하네스가 **시점 t의 접두 슬라이스**로 호출한다.
+//
+// historyAsc: 날짜 오름차순 `[{date, price, open, high, low, volume}]`(전부 Number).
+// 위 calculateTechnicalScore에서 계산부를 그대로 떼어낸 것이라 **반환값이 완전히 동일**하다
+// (동치 테스트가 두 경로를 대조해 고정한다 — 백테스트가 프로덕션과 다른 걸 재면 무의미하다).
+//
+// ⚠️ 이 함수는 배열 **길이 전체**에 의존한다(MACD 루프의 `prices.length - 20`, EMA 시드가
+//    `data.slice(0, period)`). 최근 46봉만 잘라 넣으면 값이 달라진다 — 백테스트도 반드시
+//    `history[0..i]` 접두를 통째로 넘겨야 "그날 프로덕션이 계산했을 값"과 같아진다.
+export function computeTechnicalFromHistory(historyAsc) {
+    const history = historyAsc || [];
     if (history.length < 15) return { total: 1.5, detail: {} };
 
     const prices = history.map(h => h.price);

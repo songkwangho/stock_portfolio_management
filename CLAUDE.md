@@ -119,6 +119,8 @@ stock-app/                        # 단일 레포 (프론트 + 백엔드 통합,
 │   # 운영은 전부 PostgreSQL (`pg` Pool, Neon). SQLite 레거시는 2026-04-15 정리 완료.
 │
 └── scripts/
+    ├── backtest/                 # Phase 4 — 백테스팅 하네스(내부 임계값 보정, ESM .mjs)
+    │                             #   config·load·signals·returns·ic·run + README. out/은 gitignore
     ├── backfill-history.js       # 97종목 × 3년 히스토리 적재 (배치 3개, ~6시간)
     ├── sync-directory.js         # 3.6차 — KRX 상장법인목록 수동 동기화
     ├── expand-stocks.js          # 3.7차 감마 — 종목 96→~180 확대 (배치 3 × 3초)
@@ -202,6 +204,10 @@ DATABASE_URL=postgres://... node scripts/expand-stocks.js
 
 # KOSPI/KOSDAQ 지수 일봉 적재 (벤치마크 초과수익·IR용) — 3.14차, 운영자 수동
 DATABASE_URL=postgres://... node scripts/sync-index-history.js
+
+# Phase 4 백테스팅 하네스 (내부 임계값 보정용 — 사용자 노출 없음). 설정은 config.mjs 고정
+# 산출물: scripts/backtest/out/*.csv|json (gitignore). 상세는 scripts/backtest/README.md
+DATABASE_URL=postgres://... node scripts/backtest/run.mjs
 
 # DART 적재 3종 (4.5a차) — 전부 --dry-run 지원. DART_API_KEY 필요
 DART_API_KEY=... node scripts/sync-dart-corpcodes.js
@@ -764,10 +770,35 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 
 ### Phase 4 — 데이터 누적 + 백테스팅
 - **시작 조건**: backfill 완료 + 최소 2개월 실서비스 데이터 누적 후
-- [ ] 스코어 임계값 백테스팅 (7/4점 → 데이터 기반)
+- [ ] 스코어 임계값 백테스팅 (7/4점 → 데이터 기반) — **세션1에서 판정 불가**로 확정(아래)
 - [ ] 섹터별 스코어링 가중치 (바이오·금융 우선)
-- [ ] **`computeProbability` 폐기 결정** — MarketOpinion 스코어로 일원화 (백테스팅 대상 단일화)
-- [ ] backfill 검증 SQL 사전 작성 (공휴일·임시휴장 오차 반영, 600건 이하 경고)
+- [x] **`computeProbability` 폐기** — 이미 제거됨(`app/stock/[code]/page.tsx:177` 제거 주석만 잔존, 부활 없음 확인)
+- [x] backfill 검증 SQL 사전 작성 (공휴일·임시휴장 오차 반영, 600건 이하 경고)
+
+**세션 1 — 백테스팅 하네스 (2026-08-13)**
+
+⚠️ **프레이밍 불변**: 하네스는 **내부 임계값 보정용**이지 사용자에게 "오르는 확률"을 약속하는 물건이 아니다. 결과는 내부 문서에만. UI·R2 원칙 불변.
+
+**데이터 현실이 범위를 정했다** — MarketOpinion 10점 중 point-in-time 정직 재구성되는 건 **기술(0~3)+추세(0~2) 두 축뿐**:
+
+| 축 | 재구성 | 근거 |
+|---|---|---|
+| 기술·추세 | ✅ 3년 | `stock_history`만 사용(sma5·sma20 포함) |
+| 수급 | ❌ 미검증 | `investor_history` 2026-03-18~ 약 5개월(≥600행 종목 0). 과거 t에 데이터 없음 |
+| 밸류 | ❌ 미검증 | `calculateValuationScore`가 `stocks` **현재 스냅샷** PER/PBR/ROE + peer 현재 중앙값 → look-ahead |
+
+→ **7/4 컷은 이 세션에서 판정하지 않는다**(합의 절반만 재구성). 두 축을 억지로 5점으로 더해 하나의 IC로 보고하지도 않는다 — **축별 독립 IC가 1차 산출물**, 부분합은 `*` 표시 + 정직 라벨.
+
+- [x] **[P4-1]** `computeTechnicalFromHistory(historyAsc)` 추출 — `calculateTechnicalScore`는 DB 조회 + `Number()` 캐스팅만 남기고 계산을 위임. **프로덕션 반환값 불변**. 동치 테스트가 두 경로를 대조해 고정한다(리팩터 안전망이 아니라 **하네스의 전제 조건** — 다른 걸 재면 IC가 무의미)
+- [x] **[P4-2]** `scripts/backtest/` — `config.mjs`(상수 SSOT, 커맨드라인 플래그 없음) · `load.mjs`(유니버스+시계열, DB 읽기) · `signals.mjs` · `returns.mjs`(순수) · `ic.mjs`(순수) · `run.mjs` · `README.md`. 실행: `DATABASE_URL='...' node scripts/backtest/run.mjs`
+- [x] **[P4-3]** 누수 차단 — 신호는 `series[0..i]` 접두만 · forward return 엄격히 `i+N`(초과·결측 표본 **제외**, 억지 채움 금지) · sacred holdout 마지막 20% 봉인 · 신호일 그리드 5거래일 + **Newey-West** 중첩 보정 t · **BH** 다중검정 보정(원 p 병기)
+- [x] **[P4-4]** IC 정의 = **날짜별 횡단면 Rank IC → 시계열 평균**(한 덩어리 Spearman은 종목 수 많은 날이 가중되고 시장 공통 움직임이 상관으로 샌다). `ICIR(연) = (평균/표준편차)×√(252/N)`
+- **판단 — `db.mjs`를 별도 파일로 두지 않음**: `server/db/connection.js`를 그대로 쓰면 되는데 한 줄 래퍼 파일은 간접층만 늘린다 → `load.mjs`가 직접 import
+- **판단 — `groupByDate`를 `ic.mjs`로**: `run.mjs`에 두면 테스트 불가 표면이 늘어난다. run.mjs에는 DB 오케스트레이션·출력만 남겼다
+- **발견 — MACD만 배열 길이에 의존**: `computeTechnicalFromHistory`가 접두 전체를 요구하는 이유가 'EMA 시드'가 아니었다. 시드 영향은 k=2/13로 170봉이면 `(1-k)^170 ≈ 0`으로 죽는다. 진짜 원인은 MACD 루프 시작점 `prices.length - 20` — **어느 구간을 평균하는지가 바뀐다**(RSI·볼린저·거래량은 뒤쪽 고정 개수만 봐서 잘라도 동일). 실측: 60개 합성 시계열 중 4개에서 총점 상이(0.81 vs 0.36). 테스트로 고정
+- 검증: node --check 전 파일 · tsc 0 · **npm test 376**(+64: 동치 11 · ic 23 · returns 18 · pipeline 12) · 누수 가드는 `series[i+1..]`를 조작해도 신호 불변임을 직접 검사 · UI·프로덕션 API 무변경
+- ⚠️ **운영 대기**: `node scripts/backtest/run.mjs` 실행은 운영자(로컬 `DATABASE_URL`). 결과 CSV/JSON을 전달받아 축별 IC·버킷 해석 + 컷 관련 권고
+- **후속(범위 밖)**: ① KRX 투자자 어댑터 → `investor_history` 3년 backfill → 수급축 활성화(Phase 6 정합) ② 밸류 역산 스파이크(`dart_financials` 과거 EPS/BPS × 과거 가격 — 발행주식수 이력·과거 peer 중앙값 해결 필요) ③ 둘 다 확보 후 **전체 10점 7/4 컷 검증**(이 하네스 골격 재사용)
 
 ### Phase 5 — 소셜 로그인 + 구독 (50명 달성 후)
 - [ ] Google OAuth 먼저 → Kakao OAuth 심사 병행 신청 (영업일 3~7일)

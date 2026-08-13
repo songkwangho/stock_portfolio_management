@@ -46,3 +46,11 @@ test-results/
 /kickoff-roadmap.md
 /phase4-kickoff-instruction.md
 /session-handover.md
+/phase4-session1-validation.sql
+/phase4-session1-harness-instruction.md
+
+# 백테스팅 산출물 (Phase 4) — 실행 결과는 재현 가능하고 용량이 크다. 하네스 코드만 커밋한다.
+scripts/backtest/out/
+# 세션 지시문 (추가분)
+/phase4-session1-instruction.md
+/phase4-session1-validation.sql
