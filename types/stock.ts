@@ -344,6 +344,13 @@ export interface VolatilityResult {
   volatility: number | null;   // 기존 5일 표본 값(호환 유지)
   priceContext?: PriceContext | null;
 }
+// 보유 전 종목의 range를 한 번에 (GET /api/holdings/volatility).
+// 위치를 못 구하는 표본(1행·무변동)은 ranges에서 아예 빠진다 — 없는 값을 만들지 않는다.
+export interface HoldingsVolatilityResult {
+  available: boolean;
+  reason?: 'empty' | 'error';
+  ranges?: Record<string, NonNullable<PriceContext['range']>>;
+}
 
 // 4.5a차 — DART 공시. category는 표시용(호재/악재 아님). rm '정'=정정, '철'=철회.
 export interface DartDisclosureItem {

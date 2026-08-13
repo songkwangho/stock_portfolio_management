@@ -5,107 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { RefreshCw, Search } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import type { StockSummary, ScreenerResult } from '@/types/stock';
-
-interface Preset {
-  name: string;
-  description: string;
-  summary: string;
-  filters: Record<string, string | number>;
-  caveat?: string;
-  isNew?: boolean;
-  // D3 — /screener?preset=<slug> 딥링크 키. "종목 탐색"의 렌즈 칩이 이 값으로 연결된다.
-  // filters.preset(서버 키)과 별개다 — 정적 프리셋(서버 키 없음)도 링크할 수 있어야 하고,
-  // 서버 키가 바뀌어도 외부 링크가 깨지지 않게 하려면 표면 식별자를 분리해야 한다.
-  slug?: string;
-}
-
-const PRESETS: Preset[] = [
-  {
-    // M3 — '우량주'는 가치 판정어. 프리셋 이름은 걸러낸 조건을 그대로 부른다.
-    name: '저평가 고ROE주',
-    description: 'PER↓ ROE↑ — 저평가 가능성',
-    summary: 'PER < 15 + ROE > 10%',
-    filters: { perMax: 15, roeMin: 10 },
-    caveat: '금융·통신·자동차 업종이 많이 포함될 수 있어요. 이 업종은 원래 PER이 낮은 편이라 단순 저평가로 보기 어려워요.',
-  },
-  {
-    name: '자산 저평가주',
-    description: 'PBR↓ — 자산 대비 저평가',
-    summary: 'PBR ≤ 1',
-    filters: { pbrMax: 1 },
-    caveat: '자산 대비 저평가지만 사업이 부진한 경우도 많아요. ROE를 함께 확인해보세요.',
-  },
-  {
-    name: '고ROE 성장주',
-    description: 'ROE↑ — 자기자본 대비 이익이 큰 편',
-    summary: 'ROE ≥ 20%',
-    filters: { roeMin: 20 },
-    slug: 'high-roe',
-    caveat: '일시적 호황으로 ROE가 높을 수 있어요. 최근 분기 실적도 함께 봐주세요.',
-  },
-  {
-    name: '소액 투자 가능',
-    description: '적은 금액으로 시작',
-    summary: '주가 ≤ 10만원',
-    filters: { priceMax: 100000 },
-    caveat: '주가가 낮다고 좋은 종목은 아니에요. 시가총액과 사업 내용을 꼭 확인하세요.',
-  },
-  // 3.7차 — 히스토리/수급 기반 동적 프리셋
-  {
-    name: '52주 신고가 돌파',
-    // 방향단정 제거 — 걸러내는 조건(고점 부근)을 그대로 부른다.
-    description: '52주 고점 부근',
-    summary: '최근 1년 고점 대비 +0~N%',
-    filters: { preset: 'breakout_52w' },
-    slug: 'breakout-52w',
-    caveat: '고점 돌파 후 단기 조정이 올 수 있어요. 거래량과 함께 확인하세요.',
-    isNew: true,
-  },
-  {
-    name: '외국인 순매수',
-    description: '해외 큰손 매수 중',
-    summary: '최근 5거래일 외국인 순매수 상위',
-    filters: { preset: 'foreign_buy' },
-    slug: 'foreign-buy',
-    caveat: '외국인 매수가 항상 좋은 신호는 아니에요. 단기 흐름만으로 판단하지 마세요.',
-    isNew: true,
-  },
-  {
-    name: '기관·연기금 순매수',
-    description: '국내 기관 매수 중',
-    summary: '최근 5거래일 기관 순매수 상위',
-    filters: { preset: 'fund_buy' },
-    caveat: '기관 매수도 단기 트레이딩일 수 있어요. 장기 관점에서 함께 판단하세요.',
-    isNew: true,
-  },
-  {
-    name: '소외된 종목',
-    description: '역발상 — 관심 줄어든 종목',
-    summary: '30일 평균 대비 거래량 < 30%',
-    filters: { preset: 'neglected' },
-    slug: 'neglected',
-    caveat: '소외됐다고 무조건 좋은 종목이 아니에요. 하락 추세 중일 수도 있으니 지표를 함께 보세요.',
-    isNew: true,
-  },
-  // 3.8차 — vibe-investing 접목
-  {
-    name: '그레이엄 저평가',
-    description: '내재가치 — 기준가가 현재가보다 높은 종목',
-    summary: 'Graham Number > 현재가',
-    filters: { preset: 'graham' },
-    slug: 'graham',
-    caveat: '그레이엄 공식은 안정적인 이익을 내는 기업에 적합해요. 적자·바이오·성장주에는 맞지 않아요.',
-    isNew: true,
-  },
-  {
-    name: '3개월 상승폭 상위',
-    description: '모멘텀 — 최근 3개월 상승률 상위',
-    summary: '90일 전 대비 +N%',
-    filters: { preset: 'momentum_3m' },
-    caveat: '많이 오른 종목은 단기 조정이 올 수 있어요. 거래량과 이평선을 함께 확인하세요.',
-    isNew: true,
-  },
-];
+// 프리셋 정의·보조 지표 문구는 lib/screener/presets.ts가 정본 —
+// "종목 탐색"의 인라인 렌즈 버킷과 **같은 필터·같은 캐비엇**을 봐야 한다.
+import { PRESETS, presetMetric, type Preset } from '@/lib/screener/presets';
 
 const CATEGORIES = [
   '기술/IT', '바이오/헬스케어', '자동차/모빌리티', '에너지/소재',
@@ -181,42 +83,10 @@ function ScreenerContent() {
 
   // 활성 프리셋에 따라 종목별로 표시할 보조 지표 문구 생성.
   // 정적 프리셋(저평가/자산/성장/소액)은 null 반환 → 기존 표시 유지.
+  // 보조 지표 문구는 공용 presetMetric에 위임 — 스크리너와 렌즈 버킷이 같은 문구를 쓴다.
   const activePresetKey = PRESETS.find(p => p.name === activePreset)?.filters?.preset;
-  const renderPresetMetric = (stock: ScreenerResult): string | null => {
-    if (!activePresetKey) return null;
-    if (activePresetKey === 'breakout_52w') {
-      if (stock.breakout_pct === null || stock.breakout_pct === undefined) return null;
-      const pct = stock.breakout_pct;
-      return pct >= 0 ? `52주 고점 돌파 +${pct}%` : `52주 고점 ${pct}% 근접`;
-    }
-    if (activePresetKey === 'foreign_buy') {
-      const sum = stock.foreign_sum ?? 0;
-      const eok = Math.round(sum / 1_0000_0000); // 원 → 억
-      return eok > 0 ? `외국인 +${eok.toLocaleString()}억 순매수` : '외국인 순매수 중';
-    }
-    if (activePresetKey === 'fund_buy') {
-      const sum = stock.fund_sum ?? 0;
-      const eok = Math.round(sum / 1_0000_0000);
-      return eok > 0 ? `기관 +${eok.toLocaleString()}억 순매수` : '기관 순매수 중';
-    }
-    if (activePresetKey === 'neglected') {
-      if (stock.vol_ratio === null || stock.vol_ratio === undefined) return null;
-      return `30일 평균의 ${stock.vol_ratio}% 거래량`;
-    }
-    if (activePresetKey === 'graham') {
-      // Part 2 — "적정가 ₩X (+N%)" 상승여력 표기 제거. '적정가'는 그 값이 옳다는 뉘앙스를 주고
-      // (+N%)는 upside = 매수 근거로 읽힌다(R2). 계산식 이름을 그대로 부르고 차이는 말하지 않는다.
-      // 캐비엇은 아래 preset.caveat이 이미 담당한다.
-      const fair = stock.graham_number;
-      if (!fair) return null;
-      return `그레이엄 기준가 ₩${fair.toLocaleString()}`;
-    }
-    if (activePresetKey === 'momentum_3m') {
-      if (stock.momentum_3m === null || stock.momentum_3m === undefined) return null;
-      return `3개월 +${stock.momentum_3m}%`;
-    }
-    return null;
-  };
+  const renderPresetMetric = (stock: ScreenerResult): string | null =>
+    presetMetric(activePresetKey as string | undefined, stock);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">

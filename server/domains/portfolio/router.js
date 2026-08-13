@@ -6,6 +6,7 @@ import { computeSMA } from '../../helpers/sma.js';
 import { buildSetClause } from '../../helpers/queryBuilder.js';
 import { recalcWeights } from './service.js';
 import { getStockData } from '../stock/service.js';
+import { computePriceContext, PRICE_CONTEXT_CONSTANTS } from '../analysis/priceContext.js';
 
 const router = express.Router();
 router.use(requireDeviceIdMiddleware);
@@ -291,6 +292,53 @@ router.get('/correlation', async (req, res) => {
         res.json({ available: true, pairs: pairs.slice(0, 3), maxCorrelation, avgCorrelation });
     } catch (error) {
         console.error('Correlation Error:', error.message);
+        res.json({ available: false, reason: 'error' });
+    }
+});
+
+// GET /api/holdings/volatility - 보유 전 종목의 가격 범위(range)를 **한 번에**.
+//
+// 포트폴리오 카드의 '매수가 위치' 한 줄(B)이 종목당 /stock/:code/volatility를 부르고 있었다
+// (보유 수만큼 병렬 요청). 목록 페이지에서 N요청은 과하다 → 1요청으로 접는다.
+//
+// ⚠️ SSOT: range는 /stock/:code/volatility와 **같은 computePriceContext**로 만든다.
+//    카드·종목상세 관점·StatsGrid 게이지가 전부 같은 range 정의를 봐야 한다
+//    (한쪽만 따로 계산하면 "카드는 아래쪽인데 상세는 가운데"가 된다).
+// 창(250거래일)도 종목별 ROW_NUMBER로 잘라 단건 엔드포인트의 `ORDER BY date DESC LIMIT 250`과
+// 정확히 같은 표본을 쓴다 — 전역 날짜 목록으로 자르면 종목별 표본 수가 달라진다.
+router.get('/volatility', async (req, res) => {
+    const deviceId = req.deviceId;
+    try {
+        const { rows: holdings } = await query(
+            'SELECT code FROM holding_stocks WHERE device_id = $1',
+            [deviceId]
+        );
+        if (holdings.length === 0) return res.json({ available: false, reason: 'empty' });
+
+        const codes = [...new Set(holdings.map(h => h.code))];
+        const { rows: hist } = await query(`
+            SELECT code, price FROM (
+                SELECT code, date, price,
+                       ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+                FROM stock_history WHERE code = ANY($1)
+            ) t
+            WHERE rn <= ${PRICE_CONTEXT_CONSTANTS.RANGE_WINDOW}
+            ORDER BY code, date ASC
+        `, [codes]);
+
+        const closesByCode = {};
+        for (const r of hist) (closesByCode[r.code] ||= []).push(Number(r.price));
+
+        const ranges = {};
+        for (const code of codes) {
+            const { range } = computePriceContext(closesByCode[code] || []);
+            // 위치를 못 구하는 표본(1행·무변동 구간)은 아예 싣지 않는다 — 없는 값을 만들지 않는다.
+            if (range && range.positionPct !== null) ranges[code] = range;
+        }
+
+        res.json({ available: true, ranges });
+    } catch (error) {
+        console.error('Holdings volatility Error:', error.message);
         res.json({ available: false, reason: 'error' });
     }
 });

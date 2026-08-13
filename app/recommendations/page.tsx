@@ -2,19 +2,41 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronDown } from 'lucide-react';
 import { stockApi } from '@/lib/stockApi';
 import RecommendedStockCard from '@/components/stock/RecommendedStockCard';
-import type { Recommendation, StockSummary } from '@/types/stock';
+import { PRESETS, LENSES, presetMetric } from '@/lib/screener/presets';
+import type { Recommendation, StockSummary, ScreenerResult } from '@/types/stock';
+
+const LENS_PREVIEW = 5;   // 모바일 과밀 방지 — 나머지는 '더 보기'
 
 export default function RecommendationsPage() {
   const router = useRouter();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  // C — 렌즈별 결과. 한 번 받은 렌즈는 다시 부르지 않는다(같은 방문 안에서 재조회 없음).
+  const [openLens, setOpenLens] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [buckets, setBuckets] = useState<Record<string, { loading: boolean; rows: ScreenerResult[] }>>({});
 
   const onDetailClick = (stock: StockSummary) => {
     router.push(`/stock/${stock.code}?from=recommendation`);
+  };
+
+  // 렌즈 토글 — 닫혀 있으면 열고(필요하면 1회 조회), 열려 있으면 접는다.
+  // 실패는 silent: 결과 0건과 같은 화면이 되고 토스트로 놀래지 않는다(보조 탐색 경로라).
+  const toggleLens = (slug: string) => {
+    setExpanded(false);
+    if (openLens === slug) { setOpenLens(null); return; }
+    setOpenLens(slug);
+    if (buckets[slug]) return;                       // 이미 받아둠
+    const preset = PRESETS.find(p => p.slug === slug);
+    if (!preset) return;
+    setBuckets(b => ({ ...b, [slug]: { loading: true, rows: [] } }));
+    stockApi.screener(preset.filters)
+      .then((rows: ScreenerResult[]) => setBuckets(b => ({ ...b, [slug]: { loading: false, rows: rows || [] } })))
+      .catch(() => setBuckets(b => ({ ...b, [slug]: { loading: false, rows: [] } })));
   };
 
   useEffect(() => {
@@ -86,30 +108,102 @@ export default function RecommendationsPage() {
         </p>
       </div>
 
-      {/* D3 — 대표 렌즈 바로가기. 조건으로 직접 찾아보는 경로(스크리너)로 연결한다.
-          신규 계산 없이 딥링크만 — 수신부는 /screener 의 ?preset= 처리(같은 커밋). */}
+      {/* D3 → C — 대표 렌즈. 눌러도 **페이지를 떠나지 않고** 결과를 인라인으로 펼친다.
+          (기존엔 /screener?preset= 로 이탈해 탐색 흐름이 끊겼다. 딥링크 경로는 '자세히 →'로 병존.)
+          신규 계산 0 — 스크리너가 쓰는 같은 preset 엔드포인트를 그대로 호출한다. */}
       <div className="bg-surface border border-line rounded-xl p-4">
         <p className="text-sm font-bold text-ink mb-1">조건으로 직접 찾아보기</p>
         <p className="text-xs text-muted leading-relaxed mb-3">
           하나의 잣대가 아니라 여러 렌즈로 나눠 봐요. 각 렌즈는 관찰 가능한 조건일 뿐이고, 통과가 곧 매수 근거는 아니에요.
         </p>
         <div className="flex flex-wrap gap-2">
-          {[
-            { slug: 'graham', label: '밸류 렌즈 — 자산·이익 대비 낮은 가격' },
-            { slug: 'high-roe', label: '수익성 렌즈 — 자기자본 대비 이익 큼' },
-            { slug: 'foreign-buy', label: '수급 렌즈 — 외국인 순매수' },
-            { slug: 'breakout-52w', label: '가격 위치 렌즈 — 52주 고점 근처' },
-            { slug: 'neglected', label: '거래량 렌즈 — 평소보다 조용함' },
-          ].map(lens => (
-            <button
-              key={lens.slug}
-              onClick={() => router.push(`/screener?preset=${lens.slug}`)}
-              className="px-3 py-2.5 min-h-[44px] bg-inset border border-line rounded-xl text-xs font-bold text-muted hover:text-ink hover:border-line-strong transition-colors text-left"
-            >
-              {lens.label}
-            </button>
-          ))}
+          {LENSES.map(lens => {
+            const open = openLens === lens.slug;
+            return (
+              <button
+                key={lens.slug}
+                onClick={() => toggleLens(lens.slug)}
+                aria-expanded={open}
+                className={`px-3 py-2.5 min-h-[44px] border rounded-xl text-xs font-bold transition-colors text-left flex items-center gap-1.5 ${
+                  open ? 'bg-inset border-line-strong text-ink' : 'bg-inset border-line text-muted hover:text-ink hover:border-line-strong'
+                }`}
+              >
+                <span>{lens.label}</span>
+                <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+              </button>
+            );
+          })}
         </div>
+
+        {/* 인라인 버킷 — 선택한 렌즈 하나만 펼친다. 무채색·구분선 목록(카드 나열 아님). */}
+        {openLens && (() => {
+          const lens = LENSES.find(l => l.slug === openLens)!;
+          const preset = PRESETS.find(p => p.slug === openLens);
+          const bucket = buckets[openLens];
+          const rows = bucket?.rows ?? [];
+          const shown = expanded ? rows : rows.slice(0, LENS_PREVIEW);
+          return (
+            <div className="mt-3 pt-3 border-t border-line">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-ink">{lens.label}</p>
+                  {preset?.summary && <p className="text-xs text-faint tabular-nums mt-0.5">{preset.summary}</p>}
+                </div>
+                <button
+                  onClick={() => router.push(`/screener?preset=${openLens}`)}
+                  className="shrink-0 text-xs text-ink font-bold hover:underline min-h-[44px] flex items-center whitespace-nowrap"
+                >
+                  자세히 →
+                </button>
+              </div>
+
+              {/* 중립 프레임 — 스크리너와 **같은 캐비엇**(lib/screener/presets.ts가 정본). */}
+              {preset?.caveat && (
+                <p className="text-xs text-caution leading-relaxed mb-2 break-keep">{preset.caveat}</p>
+              )}
+
+              {bucket?.loading && (
+                <p className="text-xs text-muted py-3 flex items-center gap-2">
+                  <RefreshCw className="animate-spin" size={14} /> 조건에 맞는 종목을 찾는 중이에요...
+                </p>
+              )}
+              {bucket && !bucket.loading && rows.length === 0 && (
+                <p className="text-xs text-muted py-3 leading-relaxed">
+                  지금 이 조건에 걸리는 종목이 없어요. 수급·거래량 렌즈는 매일 08:00 데이터 갱신 후 채워져요.
+                </p>
+              )}
+
+              {shown.length > 0 && (
+                <div className="divide-y divide-line">
+                  {shown.map(s => {
+                    const metric = presetMetric(preset?.filters?.preset as string | undefined, s);
+                    return (
+                      <button
+                        key={s.code}
+                        onClick={() => onDetailClick({ code: s.code, name: s.name, category: '탐색 결과' })}
+                        className="w-full py-2.5 flex items-center gap-3 text-left hover:bg-inset transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-ink truncate">{s.name}</p>
+                          <p className="text-xs text-faint tabular-nums">{s.code}{metric ? ` · ${metric}` : ''}</p>
+                        </div>
+                        <span className="text-xs text-muted tabular-nums shrink-0">
+                          ₩{(s.price ?? 0).toLocaleString()}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {rows.length > LENS_PREVIEW && !expanded && (
+                <button onClick={() => setExpanded(true)} className="mt-2 text-xs text-ink font-bold hover:underline min-h-[44px] flex items-center">
+                  더 보기 ({rows.length - LENS_PREVIEW}종목) ↓
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* 3.7차 — 테마 탐색 진입 배너 (3.9차β: 모바일 가시성 강화 — 테두리 진하게 + 압축 문구).

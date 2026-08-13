@@ -81,27 +81,20 @@ function PortfolioContent() {
       .catch(() => setCorrelation(null));
   }, [holdings.length]);
 
-  // B — 매수가 위치 한 줄에 쓸 범위. `/volatility`가 종목당 엔드포인트라 보유 수만큼 호출한다.
-  //     보조 정보라 (a) 상한 8종목, (b) silent 실패(문장만 미표시), (c) 이미 받은 코드는 skip.
-  //     보유가 많은 계정에서 목록 로드가 무거워지지 않게 상한을 둔다 — 벌크 엔드포인트가
-  //     생기면 이 루프는 한 번의 호출로 접힌다.
-  const RANGE_FETCH_LIMIT = 8;
-  const fetchedRanges = useRef<Set<string>>(new Set());
+  // B — 매수가 위치 한 줄에 쓸 범위. 벌크 엔드포인트로 **1요청**(종목당 호출이었던 것을 접었다).
+  //     보조 정보라 실패는 silent — 문장만 안 나오고 카드는 그대로 뜬다.
+  //     보유 수 상한도 사라졌다(요청이 1회라 8종목 제한이 필요 없다).
+  //     서버가 `computePriceContext`를 재사용하므로 카드 range == 종목상세 range(SSOT).
   useEffect(() => {
-    if (holdings.length === 0 || holdings.length > RANGE_FETCH_LIMIT) return;
-    const targets = holdings.map(h => h.code).filter(c => !fetchedRanges.current.has(c));
-    if (targets.length === 0) return;
-    targets.forEach(c => fetchedRanges.current.add(c));
-    Promise.all(targets.map(code =>
-      stockApi.getVolatility(code)
-        .then(v => ({ code, range: v.priceContext?.range ?? null }))
-        .catch(() => ({ code, range: null }))
-    )).then(results => {
-      const next: Record<string, RangeFacts> = {};
-      for (const r of results) if (r.range) next[r.code] = r.range;
-      if (Object.keys(next).length > 0) setRanges(prev => ({ ...prev, ...next }));
-    });
-  }, [holdings]);
+    if (holdings.length === 0) { setRanges({}); return; }
+    let alive = true;
+    stockApi.getHoldingsVolatility()
+      .then(r => { if (alive && r.available && r.ranges) setRanges(r.ranges); })
+      .catch(() => { /* silent — 위치 한 줄만 미표시 */ });
+    return () => { alive = false; };
+    // 보유 **구성**이 바뀔 때만 다시 부른다. holdings 배열 참조는 가격 갱신마다 새로 생겨
+    // 그대로 의존하면 range를 반복 조회하게 된다(range는 종가 기준이라 장중 변하지 않는다).
+  }, [holdings.map(h => h.code).sort().join(',')]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // H1: 첫 종목 가이드 처리 (add-holding focus는 폼 상시 노출 변경으로 무의미)
   useEffect(() => {

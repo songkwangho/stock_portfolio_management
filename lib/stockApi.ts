@@ -107,6 +107,10 @@ export const stockApi = {
   getHoldingsHistory: async () => (await axios.get(`${API_BASE_URL}/holdings/history`)).data,
   getVolatility: async (code: string): Promise<import('@/types/stock').VolatilityResult> =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/volatility`)).data,
+  // 보유 전 종목 range 한 번에 — 포트폴리오 카드의 '매수가 위치' 한 줄용(종목당 호출을 대체).
+  // 인터셉터 silent 판정은 url.includes('/volatility')라 이 경로도 이미 조용히 실패한다.
+  getHoldingsVolatility: async (): Promise<import('@/types/stock').HoldingsVolatilityResult> =>
+    (await axios.get(`${API_BASE_URL}/holdings/volatility`)).data,
   refreshStock: async (code: string) => (await axios.post(`${API_BASE_URL}/stock/${code}/refresh`)).data,
   getAlerts: async () => (await axios.get(`${API_BASE_URL}/alerts`)).data,
   getUnreadAlertCount: async () => (await axios.get(`${API_BASE_URL}/alerts/unread-count`)).data,

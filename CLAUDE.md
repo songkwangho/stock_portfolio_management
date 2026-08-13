@@ -572,7 +572,26 @@ PC (md: 이상):
   - **히어로도 1자리 통일** — 헤드라인만 2자리면 한 값이 헤드라인(-29.01%)과 본문(-29.0%)에서 다르게 찍혀 §11 취지가 되살아난다. `formatRatePct`로 교체(직접 `toFixed(1)`이면 `|손익률|<0.05%`에서 히어로만 `-0.0%`가 되어 문장 `0.0%`와 또 갈린다). 샤프·정보비율의 `toFixed(2)`는 포트 손익률이 아니라 **불변**
 - 검증: tsc 0 · next build ✓ · **npm test 303**(+38) · 합산 정확성 4구성 `|Σ−rate| < 1e-9` · **표시 정합** `Σ round(displayPP×10) === round(rate×10)`(독립 반올림이면 실제로 어긋나는 구성 다수로 스윕 비공회전 확인) · `FORBIDDEN_ATTRIBUTION` 전수 스윕 0 매칭
 - **부대**: `attention-score-redesign.md` untrack(`git rm --cached`) + 세션 지시문 3종 `.gitignore` — `git add -A`로 레포 루트 지시문이 딸려 커밋된 사고(3e5b946) 재발 차단
-- **후속(범위 밖)**: 기여의 시간 분해(언제 벌어졌나, history 시계열) · 종목별 alpha/beta 요인 귀인(벤치마크 블록과 통합 검토 시) · 보유 range 벌크 엔드포인트 `GET /api/holdings/volatility`(B §5-2의 N요청 → 1요청)
+- **후속(범위 밖)**: 기여의 시간 분해(언제 벌어졌나, history 시계열) · 종목별 alpha/beta 요인 귀인(벤치마크 블록과 통합 검토 시)
+
+---
+
+**마감 묶음 — 벌크 볼래틸리티 · 인라인 렌즈 버킷 (2026-08-13)**
+
+C·A·B·D 종결 직후 마감. **기존 데이터·기존 계산 재조립만** — 신규 수집원 필요한 항목(배당 렌즈·코포레이트 액션 분류·우선주/ETF 매핑)은 Phase 2로 분리.
+
+- [x] **[F-1]** `GET /api/holdings/volatility` — 보유 전 종목 range를 **1요청**으로. 포트폴리오 카드의 '매수가 위치' 한 줄(B §5-2)이 종목당 `/stock/:code/volatility`를 부르던 것을 접었다. 종목별 창은 `ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) <= 250`으로 잘라 **단건 엔드포인트와 정확히 같은 표본**을 쓴다(전역 날짜 목록으로 자르면 종목별 표본 수가 달라진다). `computePriceContext` 재사용 = 카드 range == 종목상세 == StatsGrid 게이지(SSOT). 위치를 못 구하는 표본은 `ranges`에서 생략
+  - 프론트: `getHoldingsVolatility()` + `HoldingsVolatilityResult`. 보유 8종목 상한 폐지(요청 1회라 불필요), 의존성은 **보유 코드 집합**으로 — `holdings` 배열 참조는 가격 갱신마다 새로 생겨 그대로 걸면 range를 반복 조회한다(range는 종가 기준이라 장중 불변). silent 목록은 `url.includes('/volatility')`라 이미 커버
+- [x] **[F-2]** `lib/screener/presets.ts` 신설 — `Preset`·`PRESETS`·`LENSES`·`presetMetric`을 `/screener` 페이지에서 추출한 **SSOT**. 두 화면이 각자 필터를 들면 "같은 렌즈인데 결과가 다른" 상태가 되고, **캐비엇이 갈리면 한쪽 화면에서만 중립 프레임이 빠진다**. `LENSES`도 여기 둔다 — 칩과 프리셋이 다른 파일이면 slug 오타가 '눌러도 아무 일 없는 칩'으로 조용히 남는다(테스트로 고정)
+- [x] **[F-3]** "종목 탐색" 렌즈 **인라인 버킷** — 렌즈 클릭 시 `/screener`로 이탈하던 것을 같은 페이지 접이식 결과로. 스크리너와 **같은 preset 엔드포인트** 호출(신규 계산 0), 렌즈당 1회 로드·실패 silent·상위 5건 + '더 보기'. 캐비엇 존치, `자세히 →`로 딥링크 경로 병존
+- **판단 — 렌즈 금지어 스윕에서 `caveat` 제외**: 캐비엇은 의도적으로 부정문이라("소외됐다고 무조건 좋은 종목이 아니에요") 판단어를 부분문자열로 훑으면 **경고문 자체를 금지어로 잡는다**. 스윕 대상은 사용자가 렌즈의 정체성으로 읽는 이름·설명·요약·칩 라벨 + 보조 지표 출력. 그레이엄 `upside` 재유입 방지는 별도 단언
+- 검증: node --check · tsc 0 · next build ✓ · **npm test 312**(+9)
+
+**[검증] CIS 폴백 커버리지 실측 (2026-08-13, 재적재 후)**
+
+라이브 189종목 전수 프로브: `dart_financials` 보유 **117종목**, 그중 **손익 3계정 존재 117/117(손익 없는 종목 0)** · 성장 관점 available **117** · 현금 관점 배수형 **103**. 재적재 전 0건이던 유유제약(000220)도 매출 355억·영업이익 43억·`growth.available:true`(매출 YoY +8%)로 켜졌다.
+- ⚠️ **"이전 대비 증가분"은 소급 측정 불가**: ① 재적재가 `ON CONFLICT DO UPDATE`로 이전 상태를 덮었고, ② `dart_financials`에 **`sj_div` 컬럼이 없어** 지시문의 `sj_div IN ('IS','CIS')` 쿼리는 실행 자체가 불가하다(저장 시 canonical id로 정규화하며 섹션 정보를 버린다). 어느 행이 CIS에서 왔는지 알려면 스키마에 `sj_div`를 추가해야 한다 — 지금 필요한 정보는 아니라 미실행
+- 잔여 갭은 CIS가 아니라 **매핑**: 189 중 72종목이 `dart_financials` 자체가 없다(`dart_corp_codes` 미매핑 또는 sync 미포함). 커버리지를 더 올리려면 corpcodes 재동기화가 다음 레버
 
 ---
 
