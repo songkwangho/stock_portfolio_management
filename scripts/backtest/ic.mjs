@@ -134,24 +134,33 @@ export function quantile(sortedAsc, q) {
     return sortedAsc[lo] + (sortedAsc[hi] - sortedAsc[lo]) * (pos - lo);
 }
 
+// 수익률 배열 → 분포 통계. bucketStats(세션1)와 상태별 통계(세션2)가 **같은 함수**를 쓴다.
+//
+// p5·min을 함께 낸다: 세션2에서 손절의 가치는 평균이 아니라 **왼쪽 꼬리**로 판정한다
+// ("평균 -Δ 대신 p5 +Δ'"의 교환). 평균만 보면 "손절이 수익을 깎는다"로 오독된다.
+export function distributionStats(rets) {
+    const s = [...(rets || [])].filter(Number.isFinite).sort((a, b) => a - b);
+    if (s.length === 0) {
+        return { n: 0, mean: null, median: null, std: null, p5: null, p25: null, p75: null, p95: null, min: null, max: null, winRate: null };
+    }
+    const mean = s.reduce((a, v) => a + v, 0) / s.length;
+    const std = s.length > 1 ? Math.sqrt(s.reduce((a, v) => a + (v - mean) ** 2, 0) / (s.length - 1)) : null;
+    return {
+        n: s.length, mean, std,
+        median: quantile(s, 0.5),
+        p5: quantile(s, 0.05), p25: quantile(s, 0.25), p75: quantile(s, 0.75), p95: quantile(s, 0.95),
+        min: s[0], max: s[s.length - 1],
+        winRate: s.filter(v => v > 0).length / s.length,
+    };
+}
+
 export function bucketStats(observations, buckets) {
-    return buckets.map(b => {
-        const rets = (observations || [])
+    return buckets.map(b => ({
+        label: b.label,
+        ...distributionStats((observations || [])
             .filter(o => Number.isFinite(o.score) && Number.isFinite(o.ret) && o.score >= b.min && o.score < b.max)
-            .map(o => o.ret)
-            .sort((a, b2) => a - b2);
-        if (rets.length === 0) return { label: b.label, n: 0, mean: null, median: null, p25: null, p75: null, winRate: null };
-        const mean = rets.reduce((a, v) => a + v, 0) / rets.length;
-        return {
-            label: b.label,
-            n: rets.length,
-            mean,
-            median: quantile(rets, 0.5),
-            p25: quantile(rets, 0.25),
-            p75: quantile(rets, 0.75),
-            winRate: rets.filter(v => v > 0).length / rets.length,
-        };
-    });
+            .map(o => o.ret)),
+    }));
 }
 
 // Benjamini-Hochberg — 축 × 호라이즌 6개 검정의 다중검정 보정.

@@ -75,6 +75,35 @@ export async function loadBenchmark(symbol) {
     }
 }
 
+// 세션 2 — 액면분할·무상증자 등 **무수정 종가를 기계적으로 튀게 하는** 공시 날짜.
+//
+// 왜 필요한가: stock_history.price는 수정주가가 아니다(액면분할·배당 미조정). 2:1 분할은
+// 하루에 -50%로 보이고, 그러면 **-7% 손절이 거짓 발동**한다 — Part B의 결론을 통째로 오염시킨다.
+//
+// category(파생 필드) 대신 report_nm을 직접 매칭한다. dartCategory 규칙은 '주식분할결정'을
+// merger로 넣는데(키워드 '분할'), 그 카테고리엔 합병·영업양수도 섞여 있어 정밀하지 않다.
+const SPLIT_EVENT_PATTERNS = ['주식분할', '액면분할', '주식병합', '액면병합', '무상증자', '주식배당'];
+
+export async function loadCorporateActions(codes) {
+    try {
+        const { rows } = await pool.query(
+            `SELECT code, rcept_dt, report_nm FROM dart_disclosures
+             WHERE code = ANY($1) AND (${SPLIT_EVENT_PATTERNS.map((_, k) => `report_nm LIKE $${k + 2}`).join(' OR ')})`,
+            [codes, ...SPLIT_EVENT_PATTERNS.map(p => `%${p}%`)]
+        );
+        const byCode = new Map();
+        for (const r of rows) {
+            if (!byCode.has(r.code)) byCode.set(r.code, new Set());
+            byCode.get(r.code).add(String(r.rcept_dt).replace(/-/g, '').slice(0, 8));
+        }
+        return { byCode, events: rows.length, codesAffected: byCode.size, available: true };
+    } catch (e) {
+        // dart_disclosures 미적재·스키마 부재는 정상 경로 — 단일일 급락 휴리스틱만 남는다.
+        console.warn(`  [분할 스크리닝] 공시 조회 실패 — 급락 휴리스틱만 사용: ${e.message}`);
+        return { byCode: new Map(), events: 0, codesAffected: 0, available: false };
+    }
+}
+
 export async function closePool() {
     try { await pool.end(); } catch { /* ignore */ }
 }

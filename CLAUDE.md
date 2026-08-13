@@ -207,7 +207,8 @@ DATABASE_URL=postgres://... node scripts/sync-index-history.js
 
 # Phase 4 백테스팅 하네스 (내부 임계값 보정용 — 사용자 노출 없음). 설정은 config.mjs 고정
 # 산출물: scripts/backtest/out/*.csv|json (gitignore). 상세는 scripts/backtest/README.md
-DATABASE_URL=postgres://... node scripts/backtest/run.mjs
+DATABASE_URL=postgres://... node scripts/backtest/run.mjs          # 세션1: 기술·추세 축별 IC
+DATABASE_URL=postgres://... node scripts/backtest/run_holding.mjs  # 세션2: HoldingOpinion 정책 시뮬
 
 # DART 적재 3종 (4.5a차) — 전부 --dry-run 지원. DART_API_KEY 필요
 DART_API_KEY=... node scripts/sync-dart-corpcodes.js
@@ -799,6 +800,34 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 - 검증: node --check 전 파일 · tsc 0 · **npm test 376**(+64: 동치 11 · ic 23 · returns 18 · pipeline 12) · 누수 가드는 `series[i+1..]`를 조작해도 신호 불변임을 직접 검사 · UI·프로덕션 API 무변경
 - ⚠️ **운영 대기**: `node scripts/backtest/run.mjs` 실행은 운영자(로컬 `DATABASE_URL`). 결과 CSV/JSON을 전달받아 축별 IC·버킷 해석 + 컷 관련 권고
 - **후속(범위 밖)**: ① KRX 투자자 어댑터 → `investor_history` 3년 backfill → 수급축 활성화(Phase 6 정합) ② 밸류 역산 스파이크(`dart_financials` 과거 EPS/BPS × 과거 가격 — 발행주식수 이력·과거 peer 중앙값 해결 필요) ③ 둘 다 확보 후 **전체 10점 7/4 컷 검증**(이 하네스 골격 재사용)
+
+**세션 1 결과 — 라이브 실행 (2026-08-13, 운영자 Neon)**
+
+`node scripts/backtest/run.mjs` 실행. 표본: **178종목 · 24,291 신호 · 드롭 0 · 2023-07-14~2026-05-15**(holdout ≥ 2025-10-27) · KOSPI 728일(초과수익 포함). 산출물 `scripts/backtest/out/`(gitignore): ic.csv·buckets.csv·observations.csv·meta.json + `phase4_session1_summary.png`(300 DPI).
+
+- **하네스 신뢰성 확인**: 우려했던 인덱스 그리드 산란 없음 — `avgCrossSection ≈ 60`(신호일 train 326/holdout 82). 인덱스→캘린더 정렬이 유지돼(backfill 공통 창) IC 신뢰 가능.
+- **결과 = 무신호(기술·추세 5점).** train 원수익 IC: 기술 +0.007/+0.016/+0.002, 추세 **−0.019/−0.018/−0.005**(5·20·60일). 전부 \|IC\|<0.02, **BH 보정 후 살아남는 것 0**(p(BH) ≥ 0.34). 버킷 단조성 없음(기술 20일 1.47/1.68/1.40%), **추세는 역방향**(정배열 1.34% < 양 이평선 아래 2.03% — 단기 평균회귀).
+- **holdout 부호 뒤집힘** → 지속 엣지 부재 확정. 기술 60일 train ≈0 vs holdout −0.047(초과 p 0.0002). holdout의 "유의" 막대는 train과 반대 부호 = 레짐/잡음. **이 결과로 어떤 상수도 조정하지 않는다.**
+- **판정**: 10점 중 5점만 재구성됐고 그 절반은 무신호~약한 역방향 → **7/4 컷은 이 세션에서 판정하지 않는다**(재확인). 입증 부담은 밸류·수급(미검증)으로 이동. **컷 재보정 없음.**
+- **부수 정합**: 이 결과가 최근 커밋(`정배열/강세 verdict 제거`, ed9152b)을 실증 정당화 — 정배열이 더 오르지 않으니 "강세"라 부르지 않은 게 옳았다. MarketOpinion은 내부 랭킹 전용(화면 예측 노출 0)이라 **UI 변경 불필요.**
+- **지시문**(gitignore, 레포 루트): `phase4-session1-validation.sql`(백필·§D 커버리지 SQL — 실측 178/189 ≥600행, dart 손익 172/187, investor 5개월) · `phase4-session1-harness-instruction.md`.
+
+**세션 2 — HoldingOpinion 백테스트 (착수)**
+
+기술·추세 무신호 확인 후 다음 값싼 타깃. HoldingOpinion(손절 −7%·SMA 이중이탈·5일선 100~101% 근접·정배열)도 `stock_history`만 써서 **데이터 선행 없이 같은 하네스로 지금 검증 가능**. "보유 관점 컷이 실제로 손실을 줄이나"를 잰다. 지시문: `phase4-session2-holdingopinion-instruction.md`(gitignore). 밸류·수급 데이터 선행(KRX·DART)은 병렬 트랙.
+
+**IC를 쓰지 않는다** — HoldingOpinion은 연속 점수가 아니라 **범주 결정**이고 `avgPrice`(사용자 진입가)에 의존한다(종목 랭킹이 아니라 포지션별 결정) → Part A(MA-상태→forward 분포, 진입가 무관) · **Part B(실제 규칙을 exit 트리거로 돌린 정책 시뮬 vs 매수후보유 + θ 스윕)** · Part C(near5MA가 baseline보다 오르나)로 나눠 잰다.
+
+- [x] **[P4S2-1]** `holding.mjs`(순수) — `classifyMaState`(5범주, **프로덕션 판정 순서대로 근접을 정배열보다 먼저** 배정) + `simulateHolding`(exit 트리거) + `precomputeSmas` + `labeledStats`/`pairedDiff`. `run_holding.mjs` 오케스트레이터
+- [x] **[P4S2-2]** **규칙 복제 0** — `production` 정책은 `calculateHoldingOpinion`을 그대로 호출. θ 스윕 변종만 별도 구현하고 θ=−0.07·이중이탈 on 에서 프로덕션과 같은 결정인지 **테스트(300+ 그리드) + 런타임 대조** 둘로 고정
+- [x] **[P4S2-3]** 정책 10종 — `production` / `stop{−0.05,−0.07,−0.10,−0.15}_dbd` / `stop…_only`(이중이탈 off, 손절 단독 효과) / `dbd_only`(θ=−∞, 이중이탈 단독). × 호라이즌 3 × 청산지연 2 × entryFilter 2
+- [x] **[P4S2-4]** `distributionStats` 공용 추출 — `bucketStats`(세션1)와 상태별 통계(세션2)가 같은 함수를 쓴다. **p5·min 추가**(손절은 평균이 아니라 왼쪽 꼬리로 판정하므로 필수)
+- [x] **[P4S2-5]** 분할 스크리닝 — `dart_disclosures.report_nm` 직접 매칭(주식분할·액면분할·주식병합·액면병합·무상증자·주식배당) + 일일 제한폭(±30%) **밖** 단일일 하락. 파생 필드 `category`를 안 쓴 이유: dartCategory가 '주식분할결정'을 `merger`로 넣는데 거긴 합병·영업양수도 섞여 정밀하지 않다
+- **판단 — `EXIT_LAG_DAYS=[0,1]` 축 추가(지시문 밖)**: lag 0(트리거 당일 종가 청산)은 낙관적이다. 종가는 장이 끝나야 아는데 그 종가로 파는 셈이고, 프로덕션은 **어제 종가로 판정해 다음날 08:00 알림**(alert 스케줄) → 실사용자는 최소 1일 지연이다. 손절 효과의 지연 민감도가 "−7%가 하방을 지킨다"는 결론의 강건성을 좌우하므로 둘 다 낸다
+- **발견(합성 스모크, 실측 규모는 운영자 실행에서 확정) — θ 스윕이 프로덕션 형태에선 흡수된다**: 이중이탈이 켜져 있으면 손절보다 거의 항상 먼저 발동한다(합성 25종목: `production` 청산 1,118건 중 **손절 0 / 이탈 1,118**). → θ 효과는 `*_only` 계열에서만 보이고, `*_dbd` 전 계열이 같은 값이면 버그가 아니라 이 성질이다
+- **판단 — `entryFilter` 축 추가(지시문 밖)**: 진입 시점에 **이미 doubleBreakdown인 표본**(합성 38%)은 다음날 즉시 청산돼 "정책"이 사실상 1일 보유가 되고 헤드라인 평균이 그 표본에 끌려간다 → `all` / `notSellAtEntry`로 분리 보고
+- 검증: node --check 전 파일 · tsc 0 · next build ✓ · **npm test 400**(+24 holding) · 누수 가드는 트리거 이후 봉을 3배로 조작해도 결정·수익 불변임을 직접 검사 · `precomputeSmas` 최적화 경로가 즉석 `smaAt`과 동일 결과인지도 고정 · 프로덕션 규칙 무변경
+- ⚠️ **운영 대기**: `node scripts/backtest/run_holding.mjs` 실행은 운영자(로컬 `DATABASE_URL`). `holding_states.csv`·`holding_policy.csv`·`holding_meta.json` 전달받아 해석 + 컷(−7%·이중이탈) 권고
 
 ### Phase 5 — 소셜 로그인 + 구독 (50명 달성 후)
 - [ ] Google OAuth 먼저 → Kakao OAuth 심사 병행 신청 (영업일 3~7일)
