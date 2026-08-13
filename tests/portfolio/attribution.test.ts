@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  interpretAttribution, computePortfolioTotals, CONCENTRATION_SHARE,
+  interpretAttribution, computePortfolioTotals, CONCENTRATION_SHARE, formatPP,
 } from '@/lib/portfolio/attribution';
 import { FORBIDDEN_ATTRIBUTION } from '../forbiddenWords';
 import type { Holding } from '@/types/stock';
@@ -249,5 +249,121 @@ describe('D — FORBIDDEN_ATTRIBUTION 전수 스윕', () => {
   it("'매수'는 미차단, '매도'만 차단 (DIRECTIVE 계승)", () => {
     expect(FORBIDDEN_ATTRIBUTION.includes('매도')).toBe(true);
     expect(FORBIDDEN_ATTRIBUTION.includes('매수')).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// §11 — 표시 반올림 정합 (최대잔차)
+//
+// 내부 계산은 Σ contribPP === rate로 정확하지만, 행마다 독립적으로 toFixed(1)을 하면
+// **화면상 합**이 0.1 어긋난다(라이브 관찰: -24.4 -5.2 +0.4 +0.0 = -29.2 vs 문장 -29.1).
+// 사용자에겐 "둘 중 하나는 거짓말"이다 — 표시-계산 일치 원칙에서 허용하지 않는다.
+// ─────────────────────────────────────────────────────────────
+
+// 독립 반올림이면 실제로 어긋나는 구성들(결정적 생성 — 아래 스윕이 공회전하지 않는 근거).
+const drifty = (seed: number): Holding[] =>
+  [0, 1, 2, 3].map(i => h(
+    `0000${i}`, `종목${i}`,
+    1000 + ((seed * 7919 + i * 104729) % 90000),
+    100 + ((seed * 6271 + i * 31337) % 90000),
+    1 + ((seed * 97 + i * 13) % 120),
+  ));
+
+// 합산 정확성 블록의 구성들을 표시 정합 스윕에서도 재사용한다(그 describe 안의 지역 상수와 동일).
+const MIX_CASES: Holding[][] = [
+  [h('A', 'A', 100, 120, 10), h('B', 'B', 200, 150, 5)],
+  [h('A', 'A', 50000, 32000, 3), h('B', 'B', 12000, 16000, 40), h('C', 'C', 9000, 8900, 100)],
+  [h('A', 'A', 1000, 1000, 1), h('B', 'B', 2000, 2000, 2)],
+  [h('A', 'A', 100, 200, 10), h('B', 'B', 100, 50, 20), h('D', 'D', 700, 690, 3)],
+];
+
+const tenths = (v: number) => Math.round(v * 10);
+
+describe('표시 반올림 정합 — 화면상 합이 문장 손익률과 정확히 맞는다', () => {
+  const seeds = [1, 4, 6, 7, 8, 9, 23, 57, 101, 250, 999];
+
+  it('독립 반올림이었다면 어긋났을 구성이 실제로 존재한다 (스윕 비공회전)', () => {
+    const drifted = seeds.filter(s => {
+      const r = interpretAttribution(drifty(s));
+      const naive = r.contributions.reduce((a, c) => a + tenths(c.contribPP), 0);
+      return naive !== tenths(r.portfolioProfitRate);
+    });
+    expect(drifted.length).toBeGreaterThan(3);
+  });
+
+  it('Σ displayPP === 표시 손익률 (전 구성)', () => {
+    for (const rows of [...seeds.map(drifty), ...MIX_CASES]) {
+      const r = interpretAttribution(rows);
+      const sum = r.contributions.reduce((a, c) => a + tenths(c.displayPP), 0);
+      expect(sum, `rate=${r.portfolioProfitRate}`).toBe(tenths(r.portfolioProfitRate));
+    }
+  });
+
+  it('표시값은 실제값의 ±0.1 이내 — 정합을 맞추려고 값을 왜곡하지 않는다', () => {
+    for (const rows of [...seeds.map(drifty), ...MIX_CASES]) {
+      for (const c of interpretAttribution(rows).contributions) {
+        expect(Math.abs(c.displayPP - c.contribPP)).toBeLessThanOrEqual(0.1 + 1e-9);
+      }
+    }
+  });
+
+  it('1종목도 표시값이 손익률과 맞는다', () => {
+    const r = interpretAttribution([h('A', 'A', 33333, 41111, 7)]);
+    expect(tenths(r.contributions[0].displayPP)).toBe(tenths(r.portfolioProfitRate));
+  });
+
+  it('원본 contribPP·정렬·집중도는 표시 배분에 영향받지 않는다', () => {
+    // 정렬과 집중 판정은 정밀값으로 해야 한다 — 표시값으로 재판정하면 경계에서 뒤집힌다.
+    const rows = drifty(4);
+    const r = interpretAttribution(rows);
+    const t = computePortfolioTotals(rows);
+    for (const c of r.contributions) {
+      const src = rows.find(x => x.code === c.code)!;
+      expect(c.contribPP).toBeCloseTo((src.currentPrice - src.avgPrice) * src.quantity / t.totalCost * 100, 10);
+    }
+    const abs = r.contributions.map(c => Math.abs(c.contribPP));
+    expect([...abs].sort((a, b) => b - a)).toEqual(abs);
+  });
+
+  it('문장에 찍힌 %p 값이 displayPP와 같다 (문장·막대가 같은 값을 공유)', () => {
+    const r = interpretAttribution(drifty(4));
+    for (const c of r.contributions.slice(0, 3)) {
+      expect(r.text).toContain(formatPP(c.displayPP));
+    }
+  });
+
+  it('라이브 구성 — 4행 표시 합 === 표시 손익률', () => {
+    const live = [
+      h('063080', '컴투스홀딩스', 42000, 25000, 30),
+      h('000220', '유유제약', 8200, 6600, 60),
+      h('315640', '딥노이드', 3000, 3900, 10),
+      h('001780', '알루코', 2400, 2405, 80),
+    ];
+    const r = interpretAttribution(live);
+    expect(r.contributions.reduce((a, c) => a + tenths(c.displayPP), 0)).toBe(tenths(r.portfolioProfitRate));
+  });
+
+  it('대시보드가 5행만 그리므로, 접히는 나머지의 합까지 더해야 정합이 유지된다', () => {
+    // UI는 상위 5행 + '외 N종목' 한 줄을 그린다. 그 마지막 줄에 나머지 합을 실어야
+    // **보이는 열의 합**이 문장과 맞는다(값 없이 이름만 두면 5종목 초과 계정에서 다시 어긋난다).
+    const rows = Array.from({ length: 9 }, (_, i) => h(`00000${i}`, `종목${i}`, 1000 + i * 137, 900 + i * 311, 3 + i));
+    const r = interpretAttribution(rows);
+    const shownSum = r.contributions.slice(0, 5).reduce((a, c) => a + tenths(c.displayPP), 0);
+    const hiddenSum = r.contributions.slice(5).reduce((a, c) => a + tenths(c.displayPP), 0);
+    expect(shownSum + hiddenSum).toBe(tenths(r.portfolioProfitRate));
+  });
+});
+
+describe('formatPP — 문장과 막대가 공유하는 표기', () => {
+  it('양수엔 +, 0은 부호 없이, 음수는 그대로', () => {
+    expect(formatPP(3.14)).toBe('+3.1%p');
+    expect(formatPP(-3.14)).toBe('-3.1%p');
+    expect(formatPP(0)).toBe('0.0%p');
+  });
+
+  it('음의 0과 반올림해서 0이 되는 값이 "-0.0%p"로 찍히지 않는다', () => {
+    expect(formatPP(-0)).toBe('0.0%p');
+    expect(formatPP(-0.04)).toBe('0.0%p');
+    expect(formatPP(0.04)).toBe('0.0%p');
   });
 });

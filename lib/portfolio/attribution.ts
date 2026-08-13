@@ -18,7 +18,8 @@ import type { Holding } from '@/types/stock';
 export interface Contribution {
   code: string;
   name: string;
-  contribPP: number;   // 전체 원금 대비 기여 (%p, 부호 있음). 반올림하지 않는다 — 표시할 때만 반올림.
+  contribPP: number;   // 전체 원금 대비 기여 (%p, 부호 있음). 정밀값 — 정렬·집중도 판정은 이걸 쓴다.
+  displayPP: number;   // 표시 전용 1자리 값. Σ displayPP === 표시 손익률(최대잔차 반올림, 아래).
   weightPct: number;   // 참고: 원금 비중(%)
 }
 
@@ -73,15 +74,57 @@ export function computePortfolioTotals(holdings: Holding[] | null | undefined): 
   };
 }
 
-// 부호 붙인 %p 표기. 0은 '+0.0'이 아니라 '0.0'.
-const pp = (v: number): string => {
+// 부호 붙인 %p 표기. 문장과 대시보드 막대 라벨이 **같은 함수**를 쓴다 — 각자 포맷하면
+// '+0.0'과 '-0.0'처럼 같은 값이 다르게 찍힌다(음의 0은 toFixed에서 "-0.0"이 된다).
+export function formatPP(v: number): string {
   const s = v.toFixed(1);
-  return Number(s) > 0 ? `+${s}%p` : `${s}%p`;
-};
-const pct = (v: number): string => {
+  const n = Number(s);
+  if (n > 0) return `+${s}%p`;
+  if (n === 0) return '0.0%p';   // -0.0 방지
+  return `${s}%p`;
+}
+const pp = formatPP;
+
+// 표시 손익률(1자리). 문장·도움말·막대 합이 전부 이 값을 기준으로 맞는다.
+export function formatRatePct(v: number): string {
   const s = v.toFixed(1);
-  return Number(s) > 0 ? `+${s}%` : `${s}%`;
-};
+  const n = Number(s);
+  if (n > 0) return `+${s}%`;
+  if (n === 0) return '0.0%';
+  return `${s}%`;
+}
+const pct = formatRatePct;
+
+// ── 표시 반올림 정합 (최대잔차 방식) ───────────────────────────
+//
+// 내부 계산은 Σ contribPP === portfolioProfitRate로 정확하지만(1e-9), 행마다 독립적으로
+// toFixed(1)을 하면 **화면상 합이 어긋난다**:
+//   -24.4 + -5.2 + 0.4 + 0.0 = -29.2  인데 문장은 "-29.1%"
+// 사용자에게 이건 "둘 중 하나는 거짓말"로 읽힌다 — 표시-계산 일치 원칙(40행을 '52주'라
+// 부르던 사고 계열)에서 허용할 수 없다. 그래서 표시값을 tenths 단위로 한 번 배분해
+// **문장·막대가 같은 값을 공유**하고 그 합이 표시 손익률과 정확히 맞게 한다.
+//
+// 원본 contribPP는 건드리지 않는다 — 정렬·집중도는 정밀값으로 판정해야 한다.
+function reconcileDisplayPP(items: Contribution[], ratePct: number): void {
+  if (items.length === 0) return;
+  const targetT = Math.round(ratePct * 10);          // 문장이 쓰는 표시 손익률과 동일 기준
+  const rawT = items.map(c => c.contribPP * 10);
+  const baseT = rawT.map(x => Math.round(x));
+  const residual = targetT - baseT.reduce((a, b) => a + b, 0);   // 보통 0·±1 (|residual| ≤ (n+1)/2)
+
+  if (residual !== 0) {
+    // residual>0이면 **가장 많이 내림된**(frac 큰) 행부터 +0.1,
+    // residual<0이면 **가장 많이 올림된**(frac 작은) 행부터 -0.1 → 각 표시값이 실제값의 ±0.1 이내.
+    const order = items
+      .map((_, i) => ({ i, frac: rawT[i] - baseT[i] }))
+      .sort((a, b) => (residual > 0 ? b.frac - a.frac : a.frac - b.frac) || (a.i - b.i));
+    const step = residual > 0 ? 1 : -1;
+    for (let k = 0; k < Math.abs(residual); k++) baseT[order[k % order.length].i] += step;
+  }
+
+  // /10 은 0.1 * n 누적보다 정확하다(0.30000000000000004 회피).
+  items.forEach((c, i) => { c.displayPP = baseT[i] / 10; });
+}
 
 export function interpretAttribution(holdings: Holding[] | null | undefined): AttributionResult {
   const empty: AttributionResult = {
@@ -100,12 +143,15 @@ export function interpretAttribution(holdings: Holding[] | null | undefined): At
       code: h.code,
       name: h.name || h.code,
       contribPP: ((h.currentPrice - h.avgPrice) * h.quantity / totals.totalCost) * 100,
+      displayPP: 0,   // reconcileDisplayPP가 정렬 뒤에 채운다
       weightPct: (h.avgPrice * h.quantity / totals.totalCost) * 100,
     }))
     // 크기 순 — 방향(부호)이 아니라 **얼마나 움직였나**로 정렬한다. 동률은 코드 오름차순으로 고정.
     .sort((a, b) => (Math.abs(b.contribPP) - Math.abs(a.contribPP)) || a.code.localeCompare(b.code));
 
   const rate = totals.profitRatePct;
+  // 표시값 배분은 정렬 뒤에 한다 — 잔차를 어느 행이 받는지가 렌더 순서와 같아야 재현 가능하다.
+  reconcileDisplayPP(contributions, rate);
   const top = contributions[0];
 
   // 보유 1종목 — 분해가 자명하다(전부 그 종목). 과잉 분해하지 않는다.
@@ -135,9 +181,9 @@ export function interpretAttribution(holdings: Holding[] | null | undefined): At
   // 종목명 뒤에 '이에요/예요'를 붙이지 않는다: 받침 유무로 갈리는데 종목명은 영문·숫자로도
   // 끝나(LG, POSCO홀딩스, KODEX 200) 발음 기준이라 규칙으로 판정할 수 없다.
   // '~의 기여가 가장 커요'는 어떤 이름 뒤에서도 성립한다.
-  parts.push(`${top.name}의 기여가 가장 커요(전체의 ${pp(top.contribPP)}).`);
+  parts.push(`${top.name}의 기여가 가장 커요(전체의 ${pp(top.displayPP)}).`);
   if (named.length > 1) {
-    const others = named.slice(1).map(c => `${c.name} ${pp(c.contribPP)}`).join(', ');
+    const others = named.slice(1).map(c => `${c.name} ${pp(c.displayPP)}`).join(', ');
     parts.push(rest > 0 ? `다음은 ${others} 순이고, 외 ${rest}종목이 있어요.` : `다음은 ${others} 순이에요.`);
   }
   if (concentrated) {

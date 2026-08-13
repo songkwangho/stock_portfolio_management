@@ -12,7 +12,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import AttentionBlock from '@/components/dashboard/AttentionBlock';
 import { stockApi } from '@/lib/stockApi';
 import { formatWeight } from '@/lib/stockDetail/format';
-import { computePortfolioTotals, interpretAttribution } from '@/lib/portfolio/attribution';
+import { computePortfolioTotals, interpretAttribution, formatPP } from '@/lib/portfolio/attribution';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -342,7 +342,7 @@ export default function DashboardPage() {
             <p className="text-sm text-ink leading-relaxed break-keep tabular-nums">{attribution.text}</p>
             {showAttrHelp && (
               <p className="text-xs text-muted leading-relaxed mt-2 break-keep">
-                종목별 기여란? 각 종목이 전체 손익률을 몇 %p 움직였는지예요. 전부 합치면 위의 전체 손익률({avgProfitRate.toFixed(2)}%)이 돼요.
+                종목별 기여란? 각 종목이 전체 손익률을 몇 %p 움직였는지예요. 전부 합치면 위의 전체 손익률({attribution.portfolioProfitRate.toFixed(1)}%)이 돼요.
                 한 종목이 전체 손익 변동의 절반 이상을 차지하는지 보는 기준은 실증 검증 전 임시값이에요.
               </p>
             )}
@@ -357,14 +357,26 @@ export default function DashboardPage() {
                         style={{ width: `${maxAbs > 0 ? Math.round(Math.abs(c.contribPP) / maxAbs * 100) : 0}%` }}
                       />
                     </div>
-                    <span className={`text-xs font-bold tabular-nums w-16 text-right shrink-0 ${c.contribPP >= 0 ? 'text-rise' : 'text-fall'}`}>
-                      {c.contribPP >= 0 ? '+' : ''}{c.contribPP.toFixed(1)}%p
+                    {/* 라벨은 displayPP(최대잔차 배분값) — 이 열의 합이 위 문장의 손익률과 정확히 맞는다.
+                        포맷은 문장과 같은 formatPP를 쓴다(각자 포맷하면 -0.0/+0.0이 갈린다).
+                        막대 너비만 정밀값 contribPP — 비례 폭이라 표시 반올림과 무관하다. */}
+                    <span className={`text-xs font-bold tabular-nums w-16 text-right shrink-0 ${c.displayPP >= 0 ? 'text-rise' : 'text-fall'}`}>
+                      {formatPP(c.displayPP)}
                     </span>
                   </div>
                 ))}
-                {hidden > 0 && (
-                  <p className="py-2 text-xs text-faint">외 {hidden}종목</p>
-                )}
+                {hidden > 0 && (() => {
+                  // 접힌 행도 값을 보여준다 — 값 없이 '외 N종목'만 두면 **보이는 열의 합**이
+                  // 문장 손익률과 어긋나서, 표시 정합을 맞춘 의미가 5종목 넘는 계정에서 사라진다.
+                  const hiddenPP = Math.round(rows.slice(5).reduce((a, c) => a + c.displayPP, 0) * 10) / 10;
+                  return (
+                    <div className="py-2 flex items-center gap-3">
+                      <span className="text-xs text-faint flex-1 min-w-0">외 {hidden}종목</span>
+                      <div className="w-20 sm:w-28 shrink-0" />
+                      <span className="text-xs text-faint tabular-nums w-16 text-right shrink-0">{formatPP(hiddenPP)}</span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </Card>
