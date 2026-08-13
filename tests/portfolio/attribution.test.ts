@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  interpretAttribution, computePortfolioTotals, CONCENTRATION_SHARE, formatPP,
+  interpretAttribution, computePortfolioTotals, CONCENTRATION_SHARE, formatPP, formatRatePct,
 } from '@/lib/portfolio/attribution';
 import { FORBIDDEN_ATTRIBUTION } from '../forbiddenWords';
 import type { Holding } from '@/types/stock';
@@ -365,5 +365,26 @@ describe('formatPP — 문장과 막대가 공유하는 표기', () => {
     expect(formatPP(-0)).toBe('0.0%p');
     expect(formatPP(-0.04)).toBe('0.0%p');
     expect(formatPP(0.04)).toBe('0.0%p');
+  });
+});
+
+describe('formatRatePct — 히어로·문장·도움말이 공유하는 손익률 표기', () => {
+  it('1자리 + 부호. 히어로와 문장이 같은 문자열을 낸다', () => {
+    expect(formatRatePct(-29.0123)).toBe('-29.0%');
+    expect(formatRatePct(5)).toBe('+5.0%');
+    expect(formatRatePct(0)).toBe('0.0%');
+  });
+
+  it('|손익률| < 0.05%에서 히어로만 "-0.0%"가 되지 않는다', () => {
+    // 직접 toFixed(1)을 쓰면 (-0.04).toFixed(1) === "-0.0" 이라 문장("0.0%")과 갈린다.
+    expect(formatRatePct(-0.04)).toBe('0.0%');
+    expect(formatRatePct(-0)).toBe('0.0%');
+  });
+
+  it('문장의 손익률 문구가 formatRatePct와 정확히 같다', () => {
+    for (const rows of [...MIX_CASES, drifty(4), drifty(8)]) {
+      const r = interpretAttribution(rows);
+      expect(r.text).toContain(formatRatePct(r.portfolioProfitRate));
+    }
   });
 });

@@ -569,7 +569,8 @@ PC (md: 이상):
 - [x] **[D-5] 표시 반올림 정합 (최대잔차, 라이브 후속)** — 내부 계산은 `Σ === rate`로 정확한데(1e-9) 행마다 독립적으로 `toFixed(1)`을 하니 **화면상 합**이 0.1 어긋났다(라이브: `-24.4 -5.2 +0.4 +0.0 = -29.2`인데 문장은 `-29.1%`). 사용자에겐 "둘 중 하나는 거짓말"이다. → `Contribution.displayPP` 신설(tenths 단위 최대잔차 배분, 문장·막대가 **공유**). 원본 `contribPP`는 불변 — 정렬·집중도는 정밀값으로 판정한다(표시값으로 재판정하면 경계에서 뒤집힌다). 각 표시값은 실제값의 ±0.1 이내
   - `formatPP`/`formatRatePct` export — 문장과 막대 라벨이 **같은 포매터**를 쓴다. 각자 포맷하면 `-0.0%p`(음의 0)와 `+0.0%p`가 갈린다
   - 대시보드: 막대 라벨 `displayPP`(막대 **너비**는 정밀값 유지 — 비례 폭이라 반올림과 무관) · 도움말 `avgProfitRate.toFixed(2)` → `portfolioProfitRate.toFixed(1)`로 통일 · **'외 N종목' 행에 나머지 합 표기**(값 없이 이름만 두면 5행만 그리는 UI에서 보이는 열의 합이 다시 어긋난다)
-- 검증: tsc 0 · next build ✓ · **npm test 300**(+35) · 합산 정확성 4구성 `|Σ−rate| < 1e-9` · **표시 정합** `Σ round(displayPP×10) === round(rate×10)`(독립 반올림이면 실제로 어긋나는 구성 다수로 스윕 비공회전 확인) · `FORBIDDEN_ATTRIBUTION` 전수 스윕 0 매칭
+  - **히어로도 1자리 통일** — 헤드라인만 2자리면 한 값이 헤드라인(-29.01%)과 본문(-29.0%)에서 다르게 찍혀 §11 취지가 되살아난다. `formatRatePct`로 교체(직접 `toFixed(1)`이면 `|손익률|<0.05%`에서 히어로만 `-0.0%`가 되어 문장 `0.0%`와 또 갈린다). 샤프·정보비율의 `toFixed(2)`는 포트 손익률이 아니라 **불변**
+- 검증: tsc 0 · next build ✓ · **npm test 303**(+38) · 합산 정확성 4구성 `|Σ−rate| < 1e-9` · **표시 정합** `Σ round(displayPP×10) === round(rate×10)`(독립 반올림이면 실제로 어긋나는 구성 다수로 스윕 비공회전 확인) · `FORBIDDEN_ATTRIBUTION` 전수 스윕 0 매칭
 - **부대**: `attention-score-redesign.md` untrack(`git rm --cached`) + 세션 지시문 3종 `.gitignore` — `git add -A`로 레포 루트 지시문이 딸려 커밋된 사고(3e5b946) 재발 차단
 - **후속(범위 밖)**: 기여의 시간 분해(언제 벌어졌나, history 시계열) · 종목별 alpha/beta 요인 귀인(벤치마크 블록과 통합 검토 시) · 보유 range 벌크 엔드포인트 `GET /api/holdings/volatility`(B §5-2의 N요청 → 1요청)
 

@@ -12,7 +12,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import AttentionBlock from '@/components/dashboard/AttentionBlock';
 import { stockApi } from '@/lib/stockApi';
 import { formatWeight } from '@/lib/stockDetail/format';
-import { computePortfolioTotals, interpretAttribution, formatPP } from '@/lib/portfolio/attribution';
+import { computePortfolioTotals, interpretAttribution, formatPP, formatRatePct } from '@/lib/portfolio/attribution';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
 import { useMarketStore } from '@/stores/useMarketStore';
 import { useAlertStore } from '@/stores/useAlertStore';
@@ -193,8 +193,12 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(0,420px)] gap-x-8 gap-y-6">
               <div>
                 <p className="text-[13px] text-muted mb-2">내 포트폴리오</p>
+                {/* 표시 정합 — 히어로도 아래 기여 분해와 **같은 포매터**를 쓴다(1자리).
+                    2자리로 두면 한 값이 헤드라인과 본문에서 다르게 찍힌다(-29.01% vs -29.0%).
+                    formatRatePct는 부호까지 붙여 문장과 완전히 같은 문자열을 낸다
+                    (직접 toFixed(1)을 쓰면 |손익률|<0.05%에서 히어로만 '-0.0%'가 된다). */}
                 <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
-                  {gain ? '+' : ''}{avgProfitRate.toFixed(2)}%
+                  {formatRatePct(avgProfitRate)}
                 </p>
                 <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
                   {totalPnL >= 0 ? '+' : ''}₩{totalPnL.toLocaleString()}
