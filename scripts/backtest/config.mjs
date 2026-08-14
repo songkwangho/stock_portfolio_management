@@ -15,7 +15,20 @@ export const CONFIG = {
     TEST_HOLDOUT_FROM: null,             // sacred test set 시작일. null이면 신호일의 마지막 20%
     HOLDOUT_FRACTION: 0.2,               // TEST_HOLDOUT_FROM이 null일 때의 자동 분할 비율
     STEP_DAYS: 5,                        // 신호일 그리드 간격(거래일). 중첩 완화
-    AXES: ['technical', 'trend'],        // 세션1: 이 둘만. supply/value는 데이터 미비로 공란
+    // 세션1: 기술·추세만. 세션3에서 수급을 추가 — investor_history backfill 후에만 표본이 생긴다
+    // (미적재 상태로 돌리면 수급 표본이 0이라 IC 행이 '—'로 비고, 나머지 축은 그대로 나온다).
+    // 밸류는 여전히 공란 — calculateValuationScore가 stocks 현재 스냅샷을 써서 look-ahead.
+    AXES: ['technical', 'trend', 'supplyDemand'],
+
+    // ── 세션 3: 수급축 ────────────────────────────────────────
+    // 시점 t의 투자자 행 슬라이스 크기. 프로덕션 쿼리(`ORDER BY date DESC LIMIT 20`)와 맞춘다.
+    SUPPLY_LOOKBACK_ROWS: 20,
+    // 표본을 채택할 최소 행 수. **프로덕션과 의도적으로 다르다** — 프로덕션은 3행만 있어도
+    // 점수를 내지만(그게 사용자에게 보여줄 수 있는 최선), 백테스트에서 얕은 창을 섞으면
+    // 같은 날짜 횡단면 안에 서로 다른 깊이의 추정치가 들어가고, 무엇보다 `rows<3 → total:0`이
+    // **"순매수 없음"과 구분되지 않는 가짜 0 덩어리**를 만든다(IC를 통째로 오염시킨다).
+    // 그래서 창이 다 안 차면 점수를 내지 않고 표본에서 뺀다(억지 채움 금지 — 세션1 규율).
+    SUPPLY_MIN_ROWS: 20,
     BENCHMARK: 'KOSPI',                  // market_index_history 심볼. 데이터 없으면 자동 skip
     MIN_CROSS_SECTION: 10,               // 횡단면 IC를 낼 최소 종목 수(그날 신호난 종목)
     TRADING_DAYS_PER_YEAR: 252,          // ICIR 연환산용
@@ -56,7 +69,17 @@ export const BUCKETS = {
         { label: '1.0 (5일선 위·역배열/데이터부족)', min: 0.9999, max: 1.0001 },
         { label: '2.0 (정배열)', min: 1.9999, max: 2.0001 },
     ],
+    // 수급 0~2 — foreignScore(0~1.2) + instScore(0~0.8)의 합. 정규화 특성상 값이
+    // 상단(1.2·2.0 부근)에 몰릴 수 있어 균등폭 4구간으로 두고 n을 함께 본다.
+    supplyDemand: [
+        { label: '[0.0,0.5)', min: -0.0001, max: 0.5 },
+        { label: '[0.5,1.0)', min: 0.5, max: 1.0 },
+        { label: '[1.0,1.5)', min: 1.0, max: 1.5 },
+        { label: '[1.5,2.0]', min: 1.5, max: 2.0001 },
+    ],
     // 참고용 부분합(기술+추세, 0~5). **밸류·수급 제외** — MarketOpinion 7/4 컷 검증이 아니다.
+    // ⚠️ 세션3에서 수급축이 붙어도 이 정의는 **바꾸지 않는다** — 바꾸면 세션1 결과와 같은
+    //    이름의 다른 숫자가 되어 비교가 끊긴다.
     partialSum: [
         { label: '[0,1)', min: 0, max: 1 },
         { label: '[1,2)', min: 1, max: 2 },

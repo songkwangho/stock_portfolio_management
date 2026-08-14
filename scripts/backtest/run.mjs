@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG, BUCKETS } from './config.mjs';
-import { loadUniverse, loadSeries, loadBenchmark, closePool } from './load.mjs';
+import { loadUniverse, loadSeries, loadBenchmark, loadInvestorHistory, closePool } from './load.mjs';
 import { signalsAt } from './signals.mjs';
 import { forwardReturn, excessReturn, signalIndices } from './returns.mjs';
 import { computeIC, bucketStats, benjaminiHochberg, overlapLag, groupByDate } from './ic.mjs';
@@ -51,22 +51,37 @@ async function run() {
     const bench = await loadBenchmark(CONFIG.BENCHMARK);
     console.log(`[벤치마크] ${CONFIG.BENCHMARK}: ${bench ? `${bench.size}일 적재 — 초과수익 IC 포함` : '미적재 — 초과수익 IC 생략'}`);
 
+    // 세션 3 — 수급축. 미적재면 빈 Map이고 수급 표본이 0이 된다(나머지 축은 그대로).
+    const investor = await loadInvestorHistory(universe.map(u => u.code));
+    const invDepth = [...investor.byCode.values()].map(v => v.length).sort((a, b) => a - b);
+    console.log(`[투자자] ${investor.totalRows}행 · ${investor.codesWithData}/${universe.length}종목`
+        + (invDepth.length ? ` · 종목당 행수 중앙값 ${invDepth[Math.floor(invDepth.length / 2)]} (최소 ${invDepth[0]} / 최대 ${invDepth[invDepth.length - 1]})` : ''));
+
     // ── 2. 신호 × forward return 수집 ────────────────────────────
     const maxHorizon = Math.max(...CONFIG.HORIZONS);
-    const records = [];      // { code, date, technical, trend, partialSum, r5, r20, r60, x5, x20, x60 }
+    const records = [];      // { code, date, technical, trend, supplyDemand, partialSum, r5, r20, r60, x5, x20, x60 }
     const drops = { horizon_beyond_series: 0, exit_price_missing: 0, entry_price_missing: 0, other: 0 };
-    let signalPoints = 0;
+    const supplyDrops = { no_investor_data: 0, insufficient_investor_rows: 0 };
+    let signalPoints = 0, supplyScored = 0;
 
     for (const { code } of universe) {
         const series = byCode.get(code);
         if (!series || series.length < CONFIG.MIN_WARMUP + maxHorizon + 1) continue;
+        const investorAsc = investor.byCode.get(code) || null;
 
         for (const i of signalIndices(series.length, {
             minWarmup: CONFIG.MIN_WARMUP, stepDays: CONFIG.STEP_DAYS, maxHorizon,
         })) {
-            const sig = signalsAt(series, i);           // ← series[0..i] 만 본다
+            const sig = signalsAt(series, i, { investor: investorAsc });   // ← series[0..i] 만 본다
             signalPoints++;
-            const rec = { code, date: series[i].date, technical: sig.technical, trend: sig.trend, partialSum: sig.partialSum };
+            if (sig.supplyReason) supplyDrops[sig.supplyReason] = (supplyDrops[sig.supplyReason] ?? 0) + 1;
+            else supplyScored++;
+            const rec = {
+                code, date: series[i].date,
+                technical: sig.technical, trend: sig.trend,
+                supplyDemand: sig.supplyDemand, supplyRows: sig.supplyRows,
+                partialSum: sig.partialSum,
+            };
             let any = false;
             for (const n of CONFIG.HORIZONS) {
                 const fr = forwardReturn(series, i, n);
@@ -83,6 +98,12 @@ async function run() {
     }
     console.log(`[신호] ${signalPoints}개 시점 · 유효 표본 ${records.length}개`);
     console.log(`  제외: ${Object.entries(drops).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(' ') || '없음'}`);
+    console.log(`  수급 채점 ${supplyScored}/${signalPoints} 시점`
+        + ` · 미채점: ${Object.entries(supplyDrops).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(' ') || '없음'}`);
+    if (supplyScored === 0) {
+        console.log('  ⚠️ 수급 표본 0 — investor_history backfill 전이거나 창(20행)이 안 찼습니다.');
+        console.log('     `node scripts/backfill-investor-history.js` 실행 후 재실행하면 수급축이 채워집니다.');
+    }
     if (records.length === 0) { console.error('표본이 없습니다 — 중단'); await closePool(); process.exit(1); }
 
     // ── 3. sacred holdout 분할 (§4-4) ────────────────────────────
@@ -153,14 +174,24 @@ async function run() {
         universe: { included: universe.length, excluded: excluded.length, minHistory: CONFIG.MIN_HISTORY },
         sample: { signalPoints, records: records.length, drops, dateFrom: dates[0], dateTo: dates[dates.length - 1], holdoutFrom: cut },
         benchmark: bench ? { symbol: CONFIG.BENCHMARK, days: bench.size } : null,
+        supply: {
+            investorRows: investor.totalRows,
+            codesWithData: investor.codesWithData,
+            scoredPoints: supplyScored,
+            drops: supplyDrops,
+            lookbackRows: CONFIG.SUPPLY_LOOKBACK_ROWS,
+            minRows: CONFIG.SUPPLY_MIN_ROWS,
+        },
         axesNotMeasured: {
             valuation: '미검증(데이터 미비) — calculateValuationScore가 stocks 현재 스냅샷 PER/PBR/ROE + peer 현재 중앙값을 써서 과거 시점 재구성 시 look-ahead',
-            supplyDemand: '미검증(데이터 미비) — investor_history가 2026-03-18부터 ~5개월(600행 이상 종목 0)',
+            ...(supplyScored === 0 ? { supplyDemand: '미검증 — investor_history 미적재 또는 창(20행) 미충족. backfill-investor-history.js 실행 후 재측정' } : {}),
         },
         caveats: [
+            '수급은 종종 **동시대(contemporaneous)** 다 — 플로우와 수익이 같이 움직인다. forward는 엄격히 t+1 이후라 계산상 누수는 없지만, IC가 양(+)이어도 "예측"인지 "동행의 잔향"인지는 이 설계로 구분되지 않는다',
+            '수급 표본은 투자자 창(20행)이 다 찬 시점만 채택 — 프로덕션은 3행부터 점수를 내지만 백테스트에서 얕은 창을 섞으면 rows<3의 total:0이 "순매수 없음"과 뒤섞인다',
             '수정주가 아님: stock_history.price는 액면분할·배당 미조정(INTEGER) → 개별 종목 forward return 왜곡 가능',
             '중첩: 신호일 간격보다 긴 호라이즌은 forward 창이 겹친다 → Newey-West 보정 t를 함께 보고(overlapLag 열)',
-            '다중검정: 축 2 × 호라이즌 3 = 6검정 → BH 보정 p를 원 p와 함께 보고',
+            `다중검정: 축 ${CONFIG.AXES.length} × 호라이즌 ${CONFIG.HORIZONS.length} = ${CONFIG.AXES.length * CONFIG.HORIZONS.length}검정 → BH 보정 p를 원 p와 함께 보고`,
             'partialSum(기술+추세, 0~5)은 **부분 점수**다 — 밸류·수급이 빠져 있어 MarketOpinion 7/4 컷 검증이 아니다',
             'p값은 표본 날짜 수가 커 정규 근사(t분포 아님)',
             `표본은 ${universe.length}종목·${dates[0]}~${dates[dates.length - 1]} — 일반화 한계`,
@@ -175,7 +206,7 @@ async function run() {
 
     printIcTable(icRows);
     printBucketTable(bucketRows);
-    printAxisGaps();
+    printAxisGaps(supplyScored);
 
     console.log(`\n[산출물] ${outDir}/ic.csv · buckets.csv · observations.csv · ic.json · meta.json`);
     console.log(`[소요] ${((Date.now() - t0) / 1000).toFixed(1)}s`);
@@ -218,11 +249,18 @@ function printBucketTable(rows) {
     }
 }
 
-function printAxisGaps() {
+function printAxisGaps(supplyScored) {
     console.log('\n=== 미검증 축 (데이터 미비 — 공란) ===');
     console.log('  밸류(0~3)  : 미검증 — calculateValuationScore가 stocks 현재 스냅샷 + peer 현재 중앙값 → 과거 시점은 look-ahead');
-    console.log('  수급(0~2)  : 미검증 — investor_history 2026-03-18~ (약 5개월). 과거 t에 데이터 자체가 없음');
-    console.log('  → MarketOpinion 10점의 절반(5점)만 재구성됐다. 7/4 컷은 이 세션에서 판정하지 않는다.');
+    if (supplyScored === 0) {
+        console.log('  수급(0~2)  : 미검증 — investor_history 미적재(또는 20행 창 미충족)');
+        console.log('  → MarketOpinion 10점의 절반(5점)만 재구성됐다. 7/4 컷은 판정하지 않는다.');
+    } else {
+        console.log(`  수급(0~2)  : **측정됨** (${supplyScored}시점) — 위 표 참조`);
+        console.log('  → MarketOpinion 10점 중 7점(기술3+추세2+수급2) 재구성. 밸류 3점이 여전히 공란이라');
+        console.log('     7/4 컷 자체는 아직 판정하지 않는다 — 컷은 10점 합에 걸린 값이다.');
+        console.log('  ⚠️ 수급 IC가 양(+)이어도 "예측"과 "동행"은 이 설계로 구분되지 않는다(meta.caveats 참조).');
+    }
 }
 
 function writeCsv(file, rows) {

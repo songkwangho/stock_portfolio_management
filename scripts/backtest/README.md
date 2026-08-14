@@ -176,3 +176,66 @@ HoldingOpinion은 연속 점수가 아니라 **범주 결정**('보유'/'추가�
 
 `SPLIT_SCREEN='exclude'`면 의심 표본을 1차 표에서 빼고 건수를 따로 보고한다.
 완전하지 않다 — 공시 미적재 종목·배당락은 여전히 남는다(`holding_meta.json` 캐비엇에 명시).
+
+---
+
+# 세션 3 — 수급(플로우) 축
+
+```bash
+# 1) 투자자 이력 backfill (운영자 수동, ≈35분)
+DATABASE_URL='...' node scripts/backfill-investor-history.js --dry-run --limit 2   # 먼저 확인
+DATABASE_URL='...' node scripts/backfill-investor-history.js                        # --resume 지원
+
+# 2) 수급축 포함 재실행 (세션 1과 같은 러너)
+DATABASE_URL='...' node scripts/backtest/run.mjs
+```
+
+## Step 0 게이트 — 소스가 지시문 전제와 다르다
+
+`node scripts/probe-krx-capability.mjs` (DB·키 불필요)로 실측한 결과:
+
+| 경로 | 투자자 3년 이력 |
+|---|---|
+| KRX Open API (openapi.krx.co.kr) | **데이터 없음** — 서비스 40여 종에 투자자별 항목 자체가 없다 |
+| data.krx MDC (`MDCSTAT02303`) | 데이터는 있으나 **본인인증 회원 로그인 필수**(2026 회원체계 변경). 익명은 전 화면 HTTP 400 `LOGOUT` |
+| **네이버 `frgn.naver` `&page=N`** | **가능** — page 37이 3년 전 도달. 인증·신규 의존성 0 ← 채택 |
+
+⇒ `server/scrapers/krx.js`(KRX_API_KEY)는 **만들어도 동작할 수 없다.** 대신 이미 쓰는 네이버
+소스에 페이지네이션을 붙인 `server/scrapers/naverInvestor.js`를 만들었다. 인터페이스는
+`fetchInvestorHistory(code, opts)`로 고정 — 훗날 KRX 계정을 도입하면 같은 시그니처로 갈아끼운다.
+
+⚠️ 이 경로는 네이버라 **단일소스 리스크는 해소되지 않는다**. 수정주가도 KRX 계정에 묶여 있다
+(`docs/ADR-001-adjusted-prices.md`).
+
+## 시점 t 슬라이스 — `supplyAt`
+
+```
+investorAsc → (date ≤ t 필터) → 최근 SUPPLY_LOOKBACK_ROWS(20)행 → reverse(DESC) → computeSupplyDemandFromRows
+```
+
+프로덕션(`calculateSupplyDemandScore`)은 `ORDER BY date DESC LIMIT 20`으로 최신 20행을 같은
+순수 함수에 넘긴다. 하네스는 '최신'을 **시점 t 기준**으로 다시 정의할 뿐 계산은 동일하다
+(`tests/backtest/supplyEquivalence.test.ts`가 DB 경로 == 순수 코어를 고정. pg가 BIGINT를
+문자열로 돌려주는 것까지 재현해 `Number()` 캐스팅이 살아 있는지도 잰다).
+
+## 창이 안 차면 **점수를 내지 않는다** — `SUPPLY_MIN_ROWS`
+
+프로덕션은 3행만 있어도 점수를 내고, 3행 미만이면 `{total: 0}`을 돌려준다. 그 0은
+**"순매수가 없었다"와 구분되지 않는다.** 백테스트에서 그대로 두면 backfill 경계 근처가
+전부 0으로 채워져 IC를 통째로 오염시킨다.
+
+→ 창(20행)이 안 차면 `supplyDemand: null` + `supplyReason`을 남기고 **그 표본은 수급 IC에서만
+빠진다**(기술·추세는 그대로 쓰인다). `groupByDate`·`bucketStats`가 비유한값을 이미 거른다.
+억지 채움 금지 — 세션 1 규율 그대로.
+
+## 해석 경고 — 동시대(contemporaneous) 문제
+
+수급은 플로우와 수익이 **같이 움직이는** 성질이 있다. forward는 엄격히 `t+1` 이후라
+계산상 누수는 없지만, **IC가 양(+)이어도 "예측"인지 "동행의 잔향"인지 이 설계로는 구분되지
+않는다.** 결과 해석에 반드시 함께 적는다(`meta.caveats`에 박아 뒀다).
+
+## 축 정의 불변
+
+`partialSum`은 세션 3에서도 **기술+추세(0~5)** 그대로다. 수급을 더하면 세션 1과 같은 이름의
+다른 숫자가 되어 두 세션 결과를 나란히 못 놓는다. 수급은 **독립 축**으로만 보고한다.
+밸류(0~3)는 여전히 공란이라 **10점 7/4 컷은 아직 판정하지 않는다** — 컷은 10점 합에 걸린 값이다.

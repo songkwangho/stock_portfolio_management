@@ -207,8 +207,13 @@ DATABASE_URL=postgres://... node scripts/sync-index-history.js
 
 # Phase 4 백테스팅 하네스 (내부 임계값 보정용 — 사용자 노출 없음). 설정은 config.mjs 고정
 # 산출물: scripts/backtest/out/*.csv|json (gitignore). 상세는 scripts/backtest/README.md
-DATABASE_URL=postgres://... node scripts/backtest/run.mjs          # 세션1: 기술·추세 축별 IC
+DATABASE_URL=postgres://... node scripts/backtest/run.mjs          # 세션1: 기술·추세 축별 IC (세션3에서 수급축 추가)
 DATABASE_URL=postgres://... node scripts/backtest/run_holding.mjs  # 세션2: HoldingOpinion 정책 시뮬
+
+# 세션3 — KRX 소스 역량 프로브(빌드 게이트). DB·키 불필요, 쓰기 없음
+node scripts/probe-krx-capability.mjs
+# 세션3 — 투자자 순매매 3년 backfill (네이버 페이지네이션, ≈35분). --resume/--dry-run 지원
+DATABASE_URL=postgres://... node scripts/backfill-investor-history.js
 
 # DART 적재 3종 (4.5a차) — 전부 --dry-run 지원. DART_API_KEY 필요
 DART_API_KEY=... node scripts/sync-dart-corpcodes.js
@@ -812,7 +817,7 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 - **부수 정합**: 이 결과가 최근 커밋(`정배열/강세 verdict 제거`, ed9152b)을 실증 정당화 — 정배열이 더 오르지 않으니 "강세"라 부르지 않은 게 옳았다. MarketOpinion은 내부 랭킹 전용(화면 예측 노출 0)이라 **UI 변경 불필요.**
 - **지시문**(gitignore, 레포 루트): `phase4-session1-validation.sql`(백필·§D 커버리지 SQL — 실측 178/189 ≥600행, dart 손익 172/187, investor 5개월) · `phase4-session1-harness-instruction.md`.
 
-**세션 2 — HoldingOpinion 백테스트 (착수)**
+**세션 2 — HoldingOpinion 백테스트 (완료)**
 
 기술·추세 무신호 확인 후 다음 값싼 타깃. HoldingOpinion(손절 −7%·SMA 이중이탈·5일선 100~101% 근접·정배열)도 `stock_history`만 써서 **데이터 선행 없이 같은 하네스로 지금 검증 가능**. "보유 관점 컷이 실제로 손실을 줄이나"를 잰다. 지시문: `phase4-session2-holdingopinion-instruction.md`(gitignore). 밸류·수급 데이터 선행(KRX·DART)은 병렬 트랙.
 
@@ -828,6 +833,38 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 - **판단 — `entryFilter` 축 추가(지시문 밖)**: 진입 시점에 **이미 doubleBreakdown인 표본**(합성 38%)은 다음날 즉시 청산돼 "정책"이 사실상 1일 보유가 되고 헤드라인 평균이 그 표본에 끌려간다 → `all` / `notSellAtEntry`로 분리 보고
 - 검증: node --check 전 파일 · tsc 0 · next build ✓ · **npm test 400**(+24 holding) · 누수 가드는 트리거 이후 봉을 3배로 조작해도 결정·수익 불변임을 직접 검사 · `precomputeSmas` 최적화 경로가 즉석 `smaAt`과 동일 결과인지도 고정 · 프로덕션 규칙 무변경
 - ⚠️ **운영 대기**: `node scripts/backtest/run_holding.mjs` 실행은 운영자(로컬 `DATABASE_URL`). `holding_states.csv`·`holding_policy.csv`·`holding_meta.json` 전달받아 해석 + 컷(−7%·이중이탈) 권고
+
+**세션 2 결과 — 라이브 실행 (2026-08-13, 운영자 Neon)**
+
+178종목·24,291 진입·정책행 145.7만·simDrop 0·**변종=프로덕션 불일치 0**(규칙 복제 잠금)·분할 스크리닝 15신호/2종목·holdout ≥ 2025-10-27. 산출물 `scripts/backtest/out/`: holding_states.csv·holding_policy.csv·holding_meta.json + `phase4_session2_summary.png`(300 DPI). 기준: train·notSellAtEntry·exitLag=1.
+
+- **Part A — 규칙이 '매도'로 보는 상태가 forward 최고**(세션 1 역방향 확증, 부호 안정): doubleBreakdown 20일 **2.03%**(승률 51.9%) > aligned(보유) 1.37%(47.6%) > baseline 1.61%. holdout도 동일(4.32% vs 3.68%). near5MA('추가매수') 1.32% < baseline → 추가매수도 비예측.
+- **Part B — HoldingOpinion을 exit 정책으로**: production 20일 평균 **0.54% vs 매수후보유 1.36%**, p5 **−9.08% vs −15.73%**; 60일 0.65% vs 4.73%, p5 −9.09% vs −24.19%. **평균 크게 깎되 왼쪽 꼬리는 강하게 보호.** 이중이탈 exit(역방향)이 ~90% 먼저 발동 → **production ≈ dbd_only**(−7% 스톱은 프로덕션에서 거의 무기능).
+- **−7%는 변곡점이 아니다**: 손절 단독(`*_only`) 스윕이 매끄러운 mean↔p5 트레이드오프 — −5/−7/−10/−15%에서 p5 −10.1/−11.5/−13.5/−16.4%, 평균 0.75/0.89/1.06/1.23%. **kink 없음**(−15%는 거의 미발동, p5가 BH보다 나쁨).
+- **판정**: ① **−7% 재보정 안 함** — 변곡점 부재 + 프로덕션에선 이중이탈이 먼저라 스톱 거의 무기능. 튜닝은 train-only **제품 트레이드오프 선택**(꼬리 vs 수익)일 뿐. ② 이중이탈 '매도'는 **역발상 리스크감축**(수익 최적화 아님) — 안 팔면 기대수익↑·드로다운↑. ③ **앱 철학과 정합**: '매도'는 "[주의 필요]" 소프트·비예측 노출 → "하락 예측"이 아니라 **"드로다운 위험 높은 상태"**로 읽으면 정직. **UI 변경 불필요** — 팀에 "매도=보수적 리스크감축, 수익 희생" 성격 공유 필요.
+- **세션 1+2 정합**: SMA 기반 컷(MarketOpinion 기술·추세 / HoldingOpinion)은 **forward 수익을 못 가른다**. 관찰형·비예측 정책이 실증적으로 옳았다. 입증 부담은 수급·밸류(미검증)로 전부 이동.
+
+**다음 — 병렬 트랙**: ① 데이터 선행(KRX 투자자 3년 backfill → 수급축 · DART 밸류 역산) → 전체 10점 7/4 컷 검증. ② attention 현저성(사건성 프록시, IC 불가 — 별도 설계). ③ 집중도 0.5·scoreFloor 0.15 노출 튜닝.
+
+**세션 3 — 수급(플로우) 축 (2026-08-14)**
+
+세션 1+2가 "SMA 기반 컷은 forward 무신호"를 확정 → 남은 본질 질문은 **"예측력을 갖는 축이 하나라도 있는가, 아니면 이 앱의 가치는 전적으로 관찰 레이어에 있는가"**. 미검증 두 축 중 수급을 먼저(5~60일 호라이즌 적합 · tractable 소스). 지시문: `phase4-session3-data-foundation-instruction.md`(gitignore).
+
+- [x] **[Step 0 게이트]** `scripts/probe-krx-capability.mjs`(DB·키 불필요) — **어댑터 전 실측 강제**(지시문 §1). 산출 `phase4-krx-source-capability.md`(gitignore)
+- **판단 — `krx.js`를 만들지 않았다(지시문 §2-1 이탈, 근거 실측)**: ① **KRX Open API에 투자자별 데이터가 아예 없다**(서비스 40여 종 전수 — 지수/주식/증권상품/채권/파생/일반상품/ESG). 키를 받아도 못 받는다. ② data.krx MDC(`MDCSTAT02302/02303`)엔 있으나 **2026년 회원체계 변경으로 본인인증 회원 로그인 필수** — 익명은 전 `MDCSTAT` 화면이 HTTP 400 `LOGOUT`(finder만 통과). pykrx·FinanceDataReader가 2026-02-27~04-14 **약 6주 동시 중단**됐다가 `KRX_ID`/`KRX_PW` 로그인으로 복구한 그 변경이다. → 지정대로 만들면 **동작할 수 없는 어댑터**가 된다
+- [x] **[T1 대안 채택]** `server/scrapers/naverInvestor.js` — **이미 쓰는 네이버 소스에 `&page=N`**. 실측: page 37 → 2023-07-28(3년), page 80 → 2020-02. 1페이지 ≈ 20거래일 · 178종목 ≈ 6,600요청 ≈ 33분. 인증·신규 의존성 0. 인터페이스는 `fetchInvestorHistory(code, opts)`로 고정 — KRX 계정 도입 시 같은 시그니처로 교체. 파서 `parseInvestorRows`는 **순수**(네트워크 없이 테스트)
+- [x] **[T2]** `scripts/backfill-investor-history.js` — `backfill-history.js` 패턴(배치·`--resume` 체크포인트·`ON CONFLICT DO UPDATE` 멱등·종목 단위 트랜잭션·`--dry-run`). 유니버스는 `stock_history` ≥600행(백테스트 유니버스와 일치)
+- [x] **[T3 순수화]** `computeSupplyDemandFromRows(rowsDescByDate)` 추출 — `calculateSupplyDemandScore`는 조회+`Number()`만 남기고 위임. **프로덕션 반환값 불변**, 동치 테스트가 두 경로를 대조(pg가 BIGINT를 **문자열**로 주는 것까지 재현해 캐스팅 생존 확인)
+- [x] **[T4 하네스]** `supplyAt(investorAsc, asOfDate)` — `date ≤ t` 필터 → 최근 20행 → `reverse()`(프로덕션 DESC 계약) → 같은 순수 함수. `AXES`에 `supplyDemand` 추가, `BUCKETS.supplyDemand` 4구간, `loadInvestorHistory`, run.mjs 커버리지 리포트
+- **판단 — 창이 안 차면 점수를 내지 않는다(`SUPPLY_MIN_ROWS=20`, 프로덕션과 의도적 상이)**: 프로덕션은 3행만 있어도 점수를 내고 3행 미만이면 `{total:0}`을 준다. 그 0은 **"순매수 없음"과 구분되지 않아**, backfill 경계 근처가 통째로 가짜 0으로 채워지며 IC를 오염시킨다 → `null` + `supplyReason`으로 남기고 **수급 IC에서만** 제외(기술·추세는 그대로 쓰임). 억지 채움 금지 — 세션 1 규율
+- **판단 — `partialSum` 정의 불변(기술+추세 0~5)**: 수급을 더하면 세션 1과 **같은 이름의 다른 숫자**가 되어 두 세션을 나란히 못 놓는다. 수급은 독립 축으로만 보고. 밸류(0~3) 여전히 공란 → **10점 7/4 컷은 아직 판정 안 함**(컷은 10점 합에 걸린 값)
+- ⚠️ **해석 경고 — 동시대(contemporaneous)**: 수급은 플로우와 수익이 같이 움직인다. forward가 엄격히 t+1 이후라 계산 누수는 없지만 **IC가 양(+)이어도 "예측"인지 "동행의 잔향"인지 이 설계로 구분되지 않는다**(`meta.caveats`에 명시)
+- [x] **[§4 ADR]** `docs/ADR-001-adjusted-prices.md` — 수정주가는 **라이브 correctness 문제**다(분할 시 −7% 손절 거짓 발동 · 52주 범위·`positionAnchor` 왜곡 · 기여 분해 오염). KRX MDC `adjStkPrc=2`가 유일 경로인데 **계정에 묶여 있다** → C안(병렬 `adj_price` 컬럼·`price` 불변·읽기 헬퍼 SSOT) 권장, 계정 결정 전까진 A안(현행 + 백테스트 스크리닝) 유지. **평단·수량은 조정하지 않으므로 분할 보유 종목엔 안내가 필수 동반**
+- ⚠️ **§0 전제 정정** — "일석삼조" 중 **둘이 성립하지 않는다**: 네이버 단일소스 리스크 해소 ❌(채택 경로가 네이버) · 수정주가 확보 ❌(KRX 계정 필요). 남은 근거는 "수급축 예측력을 지금 잴 수 있다" 하나이고, 그건 여전히 충분하다
+- ⚠️ **발견한 프로덕션 버그 2건(범위 밖, 미수정 — 판단 요청)**: ① `naver.js:128` `individual`에 **외국인 보유주수**가 들어간다(이 페이지에 개인 순매매 컬럼 없음) — 점수 영향 0, 읽는 곳 없음. 신규 backfill은 복제하지 않고 `NULL`. ② `presets.ts:135`가 `foreign_sum`을 1e8로 나누며 `// 원 → 억`이라 주석했는데 실제 단위는 **순매매량(주)** — 거의 항상 0이 되어 라벨된 지표가 조용히 죽어 있다
+- **부대**: `.gitignore`에 `/phase4-*.md`·`/phase4-*.sql` 글롭 — 파일명 나열 방식은 **새 이름의 지시문에 매번 무방비**였다(3e5b946 재발 경로)
+- 검증: node --check 전 파일 · tsc 0 · next build ✓ · **npm test 427**(+27: 동치·누수 18 · 파서 9) · 프로덕션 무변경(반환값 동치 테스트로 고정)
+- ⚠️ **운영 대기**: ① `node scripts/backfill-investor-history.js` → ② `node scripts/backtest/run.mjs` 재실행 → 수급축 IC·버킷 전달받아 해석. ③ **판단 요청 2건** — KRX 회원계정(본인인증) 도입 여부(수정주가 + 단일소스 해소가 여기 묶임) · 위 프로덕션 버그 처리
 
 ### Phase 5 — 소셜 로그인 + 구독 (50명 달성 후)
 - [ ] Google OAuth 먼저 → Kakao OAuth 심사 병행 신청 (영업일 3~7일)
@@ -953,3 +990,4 @@ DART 파서 정합성 대조·KRX 데이터 크로스체크에 활용
 | `docs/DESIGN.md` | 디자인 시스템 SSOT (3.13차 라이트 + 한국 증시 색 토큰) |
 | `docs/DEPLOY.md` | 배포 체크리스트 (Render/Vercel 환경변수, 순서, cold start) |
 | `docs/SKILL_KOREAN_STOCK_APP.md` | 도메인 지식 (주식 지표, 섹터별 특성, 면책 표현) |
+| `docs/ADR-001-adjusted-prices.md` | 수정주가 도입 ADR (Phase 4 세션 3 §4 — 라이브 correctness, KRX 계정 결정 대기) |

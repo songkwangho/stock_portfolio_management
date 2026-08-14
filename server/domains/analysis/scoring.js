@@ -229,6 +229,21 @@ export async function calculateSupplyDemandScore(pool, code) {
         institution: Number(r.institution),
         foreign_net: Number(r.foreign_net),
     }));
+    return computeSupplyDemandFromRows(rows);
+}
+
+/**
+ * Phase 4 세션 3 — 수급 채점의 **순수 코어**. DB 조회부와 분리해 백테스팅 하네스가
+ * 과거 시점 t의 투자자 행을 그대로 먹일 수 있게 한다(세션 1 computeTechnicalFromHistory와 같은 규율).
+ *
+ * ⚠️ 프로덕션 반환값 불변 — 아래 본문은 calculateSupplyDemandScore에 있던 코드 그대로다.
+ *    동치 테스트(tests/backtest/supplyEquivalence.test.ts)가 두 경로를 대조해 고정한다.
+ *
+ * @param rowsDescByDate **날짜 내림차순**(최신 우선) [{ institution, foreign_net }] — 프로덕션 쿼리가
+ *        `ORDER BY date DESC LIMIT 20`이므로 순서가 뒤집히면 감쇠 가중치가 거꾸로 붙는다.
+ */
+export function computeSupplyDemandFromRows(rowsDescByDate) {
+    const rows = rowsDescByDate || [];
     if (rows.length < 3) return { total: 0, detail: {} };
 
     const DECAY = 0.8; // 하루마다 20% 감쇠

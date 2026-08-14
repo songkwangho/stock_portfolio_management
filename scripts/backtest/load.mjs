@@ -51,6 +51,39 @@ export async function loadSeries(codes) {
     return { byCode, dropped, totalRows: rows.length };
 }
 
+// 세션 3 — 투자자 순매매 이력. 종목별 **날짜 오름차순**으로 돌려주고, 시점 t 슬라이스는
+// signals.mjs가 만든다(여기서 자르면 누수 차단 지점이 두 곳으로 갈라진다).
+//
+// 미적재 상태(backfill 전)가 정상 경로다 — 빈 Map을 돌려주면 수급 표본이 0이 되고
+// 나머지 축은 그대로 나온다.
+export async function loadInvestorHistory(codes) {
+    try {
+        const { rows } = await pool.query(
+            `SELECT code, date, institution, foreign_net
+             FROM investor_history WHERE code = ANY($1) ORDER BY code, date ASC`,
+            [codes]
+        );
+        const byCode = new Map();
+        for (const r of rows) {
+            const institution = Number(r.institution);
+            const foreign_net = Number(r.foreign_net);
+            // 두 값 모두 결측이면 부호 판정이 불가능하다 → 행 자체를 버린다(0으로 채우면
+            // '순매도'로 읽혀 점수가 내려간다 — 없는 정보를 신호로 바꾸는 짓이다).
+            if (!Number.isFinite(institution) && !Number.isFinite(foreign_net)) continue;
+            if (!byCode.has(r.code)) byCode.set(r.code, []);
+            byCode.get(r.code).push({
+                date: String(r.date),
+                institution: Number.isFinite(institution) ? institution : 0,
+                foreign_net: Number.isFinite(foreign_net) ? foreign_net : 0,
+            });
+        }
+        return { byCode, totalRows: rows.length, codesWithData: byCode.size };
+    } catch (e) {
+        console.warn(`  [투자자] 로드 실패 — 수급축을 건너뜁니다: ${e.message}`);
+        return { byCode: new Map(), totalRows: 0, codesWithData: 0 };
+    }
+}
+
 // 벤치마크(KOSPI) 종가 — 초과수익용. 테이블이 비어 있으면 null을 돌려 호출부가 skip한다.
 // (sync-index-history.js는 운영자 수동 실행이라 미적재 상태가 정상 경로다.)
 export async function loadBenchmark(symbol) {

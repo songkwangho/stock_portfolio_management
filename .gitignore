@@ -49,6 +49,12 @@ test-results/
 /phase4-session1-validation.sql
 /phase4-session1-harness-instruction.md
 /phase4-session2-holdingopinion-instruction.md
+/phase4-session3-data-foundation-instruction.md
+/phase4-krx-source-capability.md
+# 파일명을 하나씩 나열하면 **새 이름의 지시문은 매번 무방비**다(그래서 3e5b946이 났다).
+# 레포 루트의 phase4-* 산출물은 전부 세션 문서라 통째로 막는다.
+/phase4-*.md
+/phase4-*.sql
 
 # 백테스팅 산출물 (Phase 4) — 실행 결과는 재현 가능하고 용량이 크다. 하네스 코드만 커밋한다.
 scripts/backtest/out/
