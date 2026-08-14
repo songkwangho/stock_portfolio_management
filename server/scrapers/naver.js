@@ -109,7 +109,12 @@ export async function scrapeMainPage(code) {
     }
 }
 
-// Scrape investor data (foreign/institutional/individual) — EUC-KR
+// Scrape investor data (foreign/institutional) — EUC-KR
+//
+// ⚠️ 현재 **호출처가 없다**(죽은 코드). 라이브 적재는 service.js의 인라인 파서가,
+//    3년 backfill은 scrapers/naverInvestor.js의 `parseInvestorRows`(순수·테스트 있음)가 한다.
+//    셋이 같은 표를 각자 파싱하는 상태라, 되살릴 일이 있으면 이걸 고치지 말고
+//    naverInvestor.js로 합치는 게 맞다. 지금은 individual 표기만 통일해 둔다.
 export async function scrapeInvestorData(code) {
     try {
         const response = await axios.get(`https://finance.naver.com/item/frgn.naver?code=${code}`, {
@@ -121,11 +126,19 @@ export async function scrapeInvestorData(code) {
         return rows.slice(0, 20).map(row => {
             const tds = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
             const getText = (i) => tds[i]?.replace(/<[^>]+>/g, '')?.trim()?.replace(/,/g, '') || '0';
+            // 컬럼(실측 헤더): 날짜 · 종가 · 전일비 · 등락률 · 거래량 · 기관 순매매량 · 외국인 순매매량 · 외국인 보유주수 · 보유율
+            //
+            // ⚠️ individual은 null이다 — 이 표에 **개인 순매매 컬럼이 없다**.
+            //    이전에는 index 7을 넣었는데 그건 '외국인 보유주수'다. 값이 쓰이는 곳은 없어
+            //    (수급 채점은 institution·foreign_net만 본다) 영향은 0이었지만, 컬럼 이름과
+            //    내용이 어긋난 채로 쌓이면 나중에 누군가 '개인 순매매'로 읽는다.
+            //    세션 3 backfill(naverInvestor.js)도 NULL로 넣는다 — 두 경로를 통일한다.
+            //    ※ 기존 적재분의 소급 정정은 하지 않는다(점수·UI 영향 0).
             return {
                 date: getText(0).replace(/\./g, ''),
                 institution: parseInt(getText(5)) || 0,
                 foreign_net: parseInt(getText(6)) || 0,
-                individual: parseInt(getText(7)) || 0
+                individual: null
             };
         }).filter(r => r.date && r.date.length === 8);
     } catch (e) {

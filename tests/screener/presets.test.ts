@@ -51,7 +51,23 @@ describe('presetMetric — 보조 지표 문구', () => {
     expect(presetMetric('breakout_52w', stock({ breakout_pct: -3 }))).toBe('52주 고점 -3% 근접');
     expect(presetMetric('neglected', stock({ vol_ratio: 22 }))).toBe('30일 평균의 22% 거래량');
     expect(presetMetric('momentum_3m', stock({ momentum_3m: 18 }))).toBe('3개월 +18%');
-    expect(presetMetric('foreign_buy', stock({ foreign_sum: 3_500_000_000 }))).toContain('억 순매수');
+  });
+
+  it('수급 프리셋은 매그니튜드를 말하지 않는다 — 단위 오류 재발 차단', () => {
+    // foreign_net·institution은 **순매매량(주)** 이지 거래대금(원)이 아니다. 이전 코드는
+    // 1e8로 나누며 "N억"이라 찍었고, 1억 주를 넘는 순간 틀린 숫자가 노출됐다.
+    // 어떤 크기를 넣어도 문구가 고정인지 스윕한다(0·음수·1억 주 초과 포함).
+    for (const sum of [0, -5_000_000, 1, 3_500_000_000, 99_999_999_999]) {
+      const f = presetMetric('foreign_buy', stock({ foreign_sum: sum }))!;
+      const i = presetMetric('fund_buy', stock({ fund_sum: sum }))!;
+      expect(f).toBe('외국인 순매수 중');
+      expect(i).toBe('기관 순매수 중');
+      for (const t of [f, i]) {
+        expect(t).not.toContain('억');
+        expect(t).not.toContain('원');
+        expect(t).not.toMatch(/\d/);   // 어떤 수치도 새어 나오지 않는다
+      }
+    }
   });
 
   it('그레이엄은 기준가만 — 상승여력(upside)을 되살리지 않는다', () => {

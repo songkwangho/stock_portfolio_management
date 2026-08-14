@@ -244,6 +244,12 @@ router.get('/screener', async (req, res) => {
         }
 
         if (preset === 'foreign_buy') {
+            // ⚠️ 단위: SUM(foreign_net)은 **순매매량(주)** 이지 거래대금(원)이 아니다
+            //    (네이버 외국인·기관 표 원본). 집계 자체는 정렬(ORDER BY)·필터(HAVING)에
+            //    계속 필요하지만, 응답 필드 `foreign_sum`은 **표시에 쓰이지 않는다** —
+            //    presetMetric이 "N억" 표기를 걷어내고 중립 문구만 낸다(단위 오류 수정).
+            //    금액 표기를 되살리려면 price × shares 근사가 아니라 거래대금을 실제로
+            //    적재해야 한다(KRX MDC trdVolVal=2, 계정 필요 — docs/ADR-001 참조).
             const { rows } = await query(`
                 SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
                        s.per, s.pbr, s.roe, a.opinion AS market_opinion,
@@ -272,6 +278,8 @@ router.get('/screener', async (req, res) => {
         if (preset === 'fund_buy') {
             // investor_history.institution은 기관(연기금 + 금융투자 + 투신 등) 합산.
             // 연기금 단독 컬럼이 없는 현 스키마 상 '기관 순매수'로 표기하고 UI 레이블도 '기관/연기금'으로.
+            // ⚠️ 단위: SUM(institution)도 **순매매량(주)**. 응답 필드 `fund_sum`은 표시 미사용
+            //    (정렬·필터엔 계속 필요). foreign_buy 위 주석과 같은 이유.
             const { rows } = await query(`
                 SELECT s.code, s.name, s.category, s.price, s.change, s.change_rate,
                        s.per, s.pbr, s.roe, a.opinion AS market_opinion,

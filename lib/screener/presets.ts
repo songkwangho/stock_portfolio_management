@@ -130,16 +130,19 @@ export function presetMetric(presetKey: string | undefined, stock: ScreenerResul
     const pct = stock.breakout_pct;
     return pct >= 0 ? `52주 고점 돌파 +${pct}%` : `52주 고점 ${pct}% 근접`;
   }
-  if (presetKey === 'foreign_buy') {
-    const sum = stock.foreign_sum ?? 0;
-    const eok = Math.round(sum / 1_0000_0000); // 원 → 억
-    return eok > 0 ? `외국인 +${eok.toLocaleString()}억 순매수` : '외국인 순매수 중';
-  }
-  if (presetKey === 'fund_buy') {
-    const sum = stock.fund_sum ?? 0;
-    const eok = Math.round(sum / 1_0000_0000);
-    return eok > 0 ? `기관 +${eok.toLocaleString()}억 순매수` : '기관 순매수 중';
-  }
+  // 수급 두 프리셋은 **매그니튜드를 말하지 않는다**.
+  //
+  // 이전 코드는 `Math.round(sum / 1_0000_0000)`에 `// 원 → 억` 주석을 달고 "N억 순매수"라
+  // 찍었는데, `investor_history.foreign_net`·`institution`은 네이버 외국인·기관 표에서 온
+  // **순매매량(주)** 이지 거래대금(원)이 아니다 → 단위(주≠원)·스케일 이중 오류.
+  // 순매매량이 1억 주 미만이면 0으로 반올림돼 조용히 fallback으로 빠졌을 뿐,
+  // 1억 주를 넘는 순간 **틀린 "N억"** 이 뜬다(표시-계산 일치 위반).
+  //
+  // 금액(원) 환산은 하지 않는다 — `price × shares`는 측정하지 않은 "순매수 금액"을
+  // 지어내는 것이라 R2 위반이다. 두 프리셋은 **정의상 순매수 상위**라 배지가 이미 사실을
+  // 전달하고, 초보자에게 순매매량(주)은 와닿지도 않는다.
+  if (presetKey === 'foreign_buy') return '외국인 순매수 중';
+  if (presetKey === 'fund_buy') return '기관 순매수 중';
   if (presetKey === 'neglected') {
     if (stock.vol_ratio === null || stock.vol_ratio === undefined) return null;
     return `30일 평균의 ${stock.vol_ratio}% 거래량`;

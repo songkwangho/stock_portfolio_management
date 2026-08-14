@@ -160,11 +160,22 @@ export async function getStockData(code, fallbackName = null) {
                     const date = invMatch[1].replace(/\./g, '');
                     const instNet = parseInt(invMatch[4].replace(/,/g, ''));
                     const foreignNet = parseInt(invMatch[5].replace(/,/g, ''));
+                    // ⚠️ individual은 null이다 — 네이버 외국인·기관 표에 **개인 순매매 컬럼이 없다**.
+                    //
+                    //    이전에는 `-(instNet + foreignNet)`으로 역산했는데, 그건 시장 참여자가
+                    //    기관·외국인·개인 셋뿐이라 순매수 합이 0이라는 가정이다. 실제로는
+                    //    기타법인·기타외국인도 있어 성립하지 않는다 → **측정하지 않은 값을
+                    //    만들어 저장하던 것**(R2 위반). 읽는 곳이 없어 영향은 0이었다.
+                    //
+                    //    수급 채점(computeSupplyDemandFromRows)은 institution·foreign_net만 본다.
+                    //    세션 3 backfill(naverInvestor.js)도 NULL이라 두 경로가 통일된다.
+                    //    ※ 기존 적재분 소급 정정은 하지 않는다 — 재스크래핑되는 날짜는
+                    //      ON CONFLICT DO UPDATE로 자연히 NULL로 덮인다.
                     matches.push({
                         date,
                         institution: instNet,
                         foreign: foreignNet,
-                        individual: -(instNet + foreignNet)
+                        individual: null
                     });
                 }
                 investorData = matches.reverse();
