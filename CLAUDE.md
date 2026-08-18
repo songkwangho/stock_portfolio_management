@@ -362,7 +362,7 @@ PC (md: 이상):
 - [ ] **[H-NEW2/P10]** `app/portfolio/page.tsx` 로컬 toast → `useToastStore` 통일
 - [x] **[H-NEW3]** `/stock/[code]` `stockApi.deleteStock` 직접 호출 → store 경유로 변경 (로컬 상태 동기화 보장) — `usePortfolioStore.deleteStock` 액션 신설
 - [x] **[Fix-6]** 시장지수 중복 fetch 해소 — `useMarketStore` 신설. 300s TTL + inflight Promise로 중복 요청 차단. HeaderBar·대시보드 공용 구독
-- [ ] **[Fix-7/M2]** Recharts 커스텀 `CandlestickBar` wick 미동작 → Sprint 3에서 lightweight-charts 전환 우선 검토
+- [x] **[Fix-7/M2]** Recharts 커스텀 `CandlestickBar` wick 미동작 → lightweight-charts 전환으로 해소(차트 오버레이 Phase 1)
 - [ ] **[UX-NEW3]** `profitHelpCode` 팝업 외부 클릭 닫기 (mousedown 리스너)
 - [ ] **[UX-NEW5]** `RecommendedStockCard` reason 2줄 초과 시 "더 보기" 토글
 - [ ] **[UX-NEW7]** 섹터 비교 테이블 — 현재 종목 자동 스크롤 또는 최상단 고정
@@ -763,11 +763,25 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 
 ---
 
+**차트 지표 오버레이 — Phase 1: 엔진 전환 (2026-08-19)**
+
+`ChartSection`을 Recharts → **lightweight-charts 4.2.3**으로 이식. 로드맵 Sprint 3 **[M2] 캔들차트 전환 완료** + **[M1] `components/charts/` 분리** 흡수. 신규 지표 0 — **동등 재현이 목표**.
+
+- [x] **[P1-1]** `components/charts/LwcChart.tsx` — 엔진 래퍼(도메인 지식 없음). 캔들 + 오버레이 라인 + priceLine + 마커 + **시간축 동기 서브패널 스택**. `dynamic(ssr:false)`
+- [x] **[P1-2]** `lib/stockDetail/chartSeries.ts`(순수) — `toBars`·`smaSeries`·`volumeSeries`·축 포맷. SMA는 기존 `getSMA`와 같은 정의(`Math.round`), 표본 미달 구간은 점을 만들지 않는다
+- [x] **[P1-3]** `ChartSection` 재작성 — 일/주/월봉 토글 · SMA5·20 · 골든/데드크로스 마커 · 거래량 · 흐름 한 줄 해석 전부 동등 재현. **캔들 부활**(3.5차 [Fix-7]에서 Recharts wick 좌표 버그로 막혀 있던 것)
+- **판단 — 데이터를 자르지 않고 뷰포트만 잡는다**: 기존 Recharts는 `slice(-20)`으로 **데이터 자체를 잘라** 과거를 볼 방법이 없었다. lightweight-charts는 스크롤·확대가 되므로 전 구간을 넘기고 초기 표시만 일 60·주 40·월 24봉으로 둔다(기존 20/12봉보다 넓지만 스크롤로 그 이상 접근 가능)
+- **발견 — `scaleMargins`는 시리즈 옵션이 아니라 가격축 옵션**(v4 typings): 기본값(top .2/bottom .1)이 축을 데이터 폭의 **1.84배**까지 벌려 봉이 작아지고 최상단 눈금이 잘렸다(실측 18.9만~36.3만 데이터에 축이 16만~48만). `series.priceScale().applyOptions()`로 이동 + 래퍼에 `pt-1`
+- ⚠️ **정정 — `helpTexts.candle`의 색이 뒤집혀 있었다**("빨간 봉은 내린 날, 초록 봉은 오른 날"). 한국 증시는 반대이고 초록은 3.13에서 팔레트에서 걷어냈다. 미사용 문구였지만 캔들 재도입과 함께 바로잡았다
+- ⚠️ **제약 발견 — `/stock/:code` history는 40행뿐**이다. SMA60·MACD(26봉)는 이 폭으로 그릴 수 없다 → Phase 2에서 일봉 시계열 확장이 선행돼야 한다
+- ⚠️ **`/indicators`는 최신값 1개만** 반환(시계열 아님) → Phase 2는 **클라 롤링 재계산**으로 간다(서버 변경 0, pg 스텁으로 프로덕션 함수와 동치 테스트 가능)
+- 검증: tsc 0 · next build ✓ · **npm test 470**(+15 chartSeries) · **라이브 스크린샷 PC·모바일**(로컬 dev → 프로덕션 API 프록시) — 캔들 wick 정상 · 마커·SMA·거래량 시간축 정렬 · 일/주/월봉 3종 전환 **콘솔 에러 0**
+
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
-- [ ] **[M1]** 차트 `components/charts/` 분리 + dynamic import 공유 청크화
+- [x] **[M1]** 차트 `components/charts/` 분리 + dynamic import — 위 Phase 1에서 완료
+- [x] **[M2]** 캔들차트 lightweight-charts 전환 — 위 Phase 1에서 완료
 - [ ] **[M3]** ISR 적용 (`/stocks`, `/recommendations` 우선 → `/stock/[code]` 마지막)
 - [ ] **[M4]** 모바일 대시보드 상단 KOSPI/KOSDAQ 노출
-- [ ] **[M2]** 캔들차트 lightweight-charts 전환 (별도 차수)
 
 **5차 — 후속 UX 개선 (Sprint 4, 배포 후)**
 - [ ] **[UX3]** `/stock/[code]` 탭 구조 ([요약] [차트] [분석] [기업])
@@ -915,6 +929,19 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 - **지시문**(gitignore): `phase4-session3-data-foundation-instruction.md` · `phase4-krx-source-capability.md`.
 
 **Phase 4 잔여**: ① 데이터 선행/전체 컷 — 밸류 DROP으로 **사실상 종결(음성)**. ② attention 현저성 — 사건성 프록시(IC 불가), 관찰 트리아지라 별도 설계·저우선. ③ 집중도 0.5·scoreFloor 0.15 노출 튜닝 — 저우선. → **Phase 4 핵심 질문 종료. 다음은 오픈/관찰 레이어 폴리시.**
+
+**세션 4 결과 — attention 사건성 프록시 (2026-08-14, 운영자 Neon) — Phase 4 첫 양성**
+
+target = **\|forward return\|(사건 크기, 방향 무관)**. 세션 1~3과 반대로 **양(+)이 성공**(현저성 상위가 실제로 크게 움직임 = 트리아지 정상). 산출물 `scripts/backtest/out/`: attention_eventproxy.csv·attention_buckets.csv + `phase4_session4_attention.png`. Step 0: `dart_disclosures` 3,019건·177종목·**2026-04~08만**(4개월, 신호점의 1.2%만 공시 부착) → disc는 참고, **move 단독이 1차**.
+
+- **move 컴포넌트(\|5거래일 수익률\|) → \|forward return\| Rank IC 강한 양성**: train +0.160/+0.149/+0.126(5·20·60일), tNW 12~19, **BH 후 생존(p 0)**. holdout +0.161/+0.136/+0.153 — **부호 안정**(방향 신호가 holdout에서 뒤집히던 것과 대조). 버킷 **단조 증가**(train 20일 8.24→9.89→11.60%). full salience(move+disc, holdout만) 20일 14.98→15.78→19.18→23.63%(상위 버킷 포함 단조).
+- **정체 = 변동성 클러스터링**(지금 크게 움직인 종목이 계속 크게 움직임) — robust·실측. **동시대성이 여기선 결함이 아니라 원하는 성질**(트리아지는 "지금 활발한 것"을 띄우는 게 목적).
+- **disc 단독은 무신호**(holdout IC ~0/음, 비유의) + 커버리지 4개월뿐 → **disc 가중치(0.25)는 미검증**. move 가중치(0.45)는 workhorse로 검증됨. `scoreFloor 0.15`(공시 없으면 \|5거래일\|≥5% 필요)는 실제로 사건적 종목을 고름 → **관찰 컴포넌트에 한해 문턱·가중치 합리적**(③ 부분 해소).
+- **판정 — 세션 1~4 종합**: **방향(direction)은 예측 불가**(MarketOpinion 컷·HoldingOpinion·기술/추세/수급 전부 무신호~역방향) / **사건성(eventfulness)은 잡힌다**(attention move 강한 양성). 즉 "어디로 갈지는 못 말하지만, 활발한 종목은 정확히 띄운다." **관찰형·비예측 + attention 트리아지 설계가 음성·양성 양쪽으로 실증됨.** attention 블록(A차) **자신 있게 오픈 가능**. UI 변경 불필요.
+- ⚠️ full salience는 disc가 2026-04~(전부 holdout 구간)이라 **holdout·소표본(531관측)**뿐 — move-only 전구간(19,512관측)이 robust 근거. disc는 DART 적재 깊어지면 재검.
+- **지시문**(gitignore): `phase4-attention-eventproxy-instruction.md` · `phase4-parser-consolidation-instruction.md`.
+
+→ **Phase 4 종결.** 재구성 가능한 축의 방향 예측력 없음(신호 품질 투자 중단 라이선스) + attention 트리아지 실증 검증. 다음은 오픈 준비 / 관찰 레이어 폴리시.
 
 ### Phase 5 — 소셜 로그인 + 구독 (50명 달성 후)
 - [ ] Google OAuth 먼저 → Kakao OAuth 심사 병행 신청 (영업일 3~7일)

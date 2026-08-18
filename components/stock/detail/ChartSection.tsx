@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, Cell, ReferenceDot,
-} from 'recharts';
+import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { stockApi } from '@/lib/stockApi';
 import { helpTexts } from '@/lib/stockDetail/helpTexts';
-import type { StockDetail, ChartDataPoint, HistoryEntry, SignalResult } from '@/types/stock';
+import { toBars, smaSeries, volumeSeries, formatPriceAxis, formatVolumeAxis } from '@/lib/stockDetail/chartSeries';
+import type { StockDetail, HistoryEntry, SignalResult } from '@/types/stock';
+import type { SubPanelSpec, MarkerSpec, LineSpec } from '@/components/charts/LwcChart';
 
-// 주가 라인+SMA+크로스 마커 + 거래량 바 + 흐름 해석 (3.12차 S5 통합 추출).
-// chartTimeframe·extraChartData·chartData·volumeData 전부 내부 지역화.
-// [중요] Recharts 제약: h-72/h-24 래퍼 보존(#1), ReferenceDot은 ComposedChart 직속(#2).
+// Phase 1 — Recharts → lightweight-charts 전환(로드맵 Sprint 3 [M2]).
+// 캔들이 되살아났다: Recharts 커스텀 shape의 wick 좌표 버그로 3.5차부터 막혀 있던 것.
+//
+// 동등 재현 대상(회귀 금지): 일/주/월봉 토글 · SMA5·20 · 골든/데드크로스 마커 · 거래량 바 ·
+// 거래량 흐름 한 줄 해석 · 이평선 보는 법 안내.
+const LwcChart = dynamic(() => import('@/components/charts/LwcChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-72 w-full flex items-center justify-center text-xs text-faint">차트를 불러오는 중이에요...</div>
+  ),
+});
+
 interface ChartSectionProps {
   code: string;
   stockDetail: StockDetail;
@@ -22,7 +30,6 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
   const [chartTimeframe, setChartTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [extraChartData, setExtraChartData] = useState<HistoryEntry[]>([]);
 
-  // Fetch weekly/monthly chart data when timeframe changes
   useEffect(() => {
     if (chartTimeframe !== 'daily') {
       stockApi.getChartData(code, chartTimeframe as 'weekly' | 'monthly')
@@ -30,68 +37,63 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
     }
   }, [chartTimeframe, code]);
 
-  const historyData = chartTimeframe === 'daily'
-    ? (stockDetail.history || [])
-    : extraChartData;
+  const historyData = chartTimeframe === 'daily' ? (stockDetail.history || []) : extraChartData;
 
-  const fullChartData: ChartDataPoint[] = historyData.map((d, i, arr) => {
-    const sma5 = i >= 4 ? Math.round(arr.slice(i - 4, i + 1).reduce((acc, cur) => acc + cur.price, 0) / 5) : null;
-    const sma20 = i >= 19 ? Math.round(arr.slice(i - 19, i + 1).reduce((acc, cur) => acc + cur.price, 0) / 20) : null;
-    const formatDate = chartTimeframe === 'monthly'
-      ? d.date.slice(2, 4) + '/' + d.date.slice(4, 6)
-      : d.date.slice(4, 6) + '/' + d.date.slice(6, 8);
-    return {
-      name: formatDate,
-      rawDate: d.date,   // 신호 마커 매칭용 원본 날짜 보존
-      price: d.price,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      volume: d.volume,
-      sma5,
-      sma20,
-    };
-  });
+  const bars = useMemo(() => toBars(historyData), [historyData]);
 
-  const sliceCount = chartTimeframe === 'monthly' ? 12 : 20;
-  const chartData = fullChartData.slice(-sliceCount);
+  const lines = useMemo<LineSpec[]>(() => {
+    if (bars.length === 0) return [];
+    return [
+      { key: 'sma5', data: smaSeries(bars, 5), color: '#D91C1C', lineWidth: 1, dashed: true },
+      { key: 'sma20', data: smaSeries(bars, 20), color: '#9A5B08', lineWidth: 1, dashed: true },
+    ];
+  }, [bars]);
 
-  // Volume chart data with color
-  const volumeData = chartData.map(d => ({
-    name: d.name,
-    volume: d.volume || 0,
-    isUp: (d.price || 0) >= (d.open || 0),
-  }));
+  // 마커는 signals.markers(최근 20일 크로스). 주봉/월봉에선 날짜가 봉과 안 맞아 조용히 빠진다.
+  const barTimes = useMemo(() => new Set(bars.map(b => b.time)), [bars]);
+  const markers = useMemo<MarkerSpec[]>(() => {
+    const out: MarkerSpec[] = [];
+    for (const m of signals?.markers || []) {
+      const iso = `${m.date.slice(0, 4)}-${m.date.slice(4, 6)}-${m.date.slice(6, 8)}`;
+      if (!barTimes.has(iso)) continue;
+      out.push({ time: iso, color: m.type === 'golden' ? '#D91C1C' : '#1B5FD0' });
+    }
+    return out;
+  }, [signals, barTimes]);
 
-  // Candlestick: bar chart with custom shape — min/max for Y axis
-  const allPrices = chartData.flatMap(d => [d.open || 0, d.high || 0, d.low || 0, d.price || 0]).filter(p => p > 0);
-  const priceMin = Math.min(...allPrices) * 0.98;
-  const priceMax = Math.max(...allPrices) * 1.02;
+  const subPanels = useMemo<SubPanelSpec[]>(() => {
+    if (bars.length === 0) return [];
+    return [{
+      key: 'volume',
+      label: '거래량',
+      heightClass: 'h-24',
+      series: [{ kind: 'histogram', key: 'vol', data: volumeSeries(bars), color: '#85878D40' }],
+      valueFormatter: formatVolumeAxis,
+    }];
+  }, [bars]);
 
-  // 주가 Y축 — 값 크기별 포맷 + 딱 떨어지는 눈금 (3.13 종목상세 TASK 1).
-  // 대시보드 만원 축과 무관(별도 컴포넌트). 원 단위 종목이 ₩2k로 뭉개지던 회귀 수정.
-  const formatPrice = (v: number): string => {
-    if (v >= 100_000_000) return `₩${(v / 100_000_000).toFixed(1)}억`;
-    if (v >= 10_000) { const m = v / 10_000; return `₩${m % 1 === 0 ? m.toLocaleString() : m.toFixed(1)}만`; }
-    return `₩${Math.round(v).toLocaleString()}`;
-  };
-  const priceRawStep = (priceMax - priceMin) / 5;
-  const priceStepMag = Math.pow(10, Math.floor(Math.log10(priceRawStep || 1)));
-  const priceStepNorm = (priceRawStep || 1) / priceStepMag;
-  const priceNiceStep = (priceStepNorm <= 1 ? 1 : priceStepNorm <= 2 ? 2 : priceStepNorm <= 2.5 ? 2.5 : priceStepNorm <= 5 ? 5 : 10) * priceStepMag;
-  const priceTicks: number[] = [];
-  for (let t = Math.ceil(priceMin / priceNiceStep) * priceNiceStep; t <= priceMax; t += priceNiceStep) priceTicks.push(t);
+  // 초기 표시 봉 수 — lightweight-charts는 스크롤·확대가 되므로 전 구간을 넘기고 뷰포트만 잡는다.
+  // (기존 Recharts는 데이터 자체를 20/12개로 잘라 과거를 볼 방법이 없었다.)
+  const initialBars = chartTimeframe === 'monthly' ? 24 : chartTimeframe === 'weekly' ? 40 : 60;
 
-  // 3.12차 S5 — 마커는 signals.markers(최근 20일 크로스 전체)로 렌더. 주봉/월봉에선 rawDate 불일치로 조용히 미표시.
-  const visibleMarkers = (signals?.markers || []).filter(m => chartData.some(d => d.rawDate === m.date));
+  // 거래량 흐름 한 줄 해석 (3.11차, 관찰형) — 기존 로직 보존
+  const volumeNote = useMemo(() => {
+    if (bars.length < 5) return null;
+    const window = bars.slice(-20);
+    const avg20 = window.reduce((a, b) => a + b.volume, 0) / window.length;
+    const latest = bars[bars.length - 1].volume;
+    const ratio = avg20 > 0 ? latest / avg20 : 1;
+    if (ratio >= 2) return '최근 거래량이 평소의 2배 이상이에요. 관심이 크게 늘었어요.';
+    if (ratio >= 1.3) return '거래량이 평소보다 늘고 있어요.';
+    if (ratio <= 0.5) return '거래량이 평소보다 줄었어요. 관심이 식은 편이에요.';
+    return '거래량은 평소 수준이에요.';
+  }, [bars]);
 
   return (
     <div className="bg-surface p-6 rounded-xl border border-line">
       <h3 className="text-lg font-semibold text-ink mb-2 flex items-center justify-between">
         <span>주가 차트</span>
         <div className="flex items-center space-x-1">
-          {/* 캔들 차트 토글: Recharts 커스텀 shape의 wick 좌표 버그로 비활성.
-              Sprint 3 [M2] lightweight-charts 전환 시 재도입 예정. */}
           {(['daily', 'weekly', 'monthly'] as const).map(tf => (
             <button key={tf} onClick={() => setChartTimeframe(tf)}
               className={`px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-bold transition-colors ${
@@ -102,96 +104,44 @@ export default function ChartSection({ code, stockDetail, signals }: ChartSectio
           ))}
         </div>
       </h3>
-      {/* 16차 5-6: SMA 의미를 한 줄로 더 구체적으로 설명 — 초보자가 "평균선"의 의미와 해석 규칙을 모르는 경우 대비 */}
+
       <div className="bg-inset border border-line rounded-xl p-3 mb-4 text-xs text-muted leading-relaxed">
-        <p className="font-bold mb-1 text-ink">이평선(이동평균선) 보는 법</p>
+        <p className="font-bold mb-1 text-ink">캔들·이평선 보는 법</p>
         <p>
-          <span className="text-rise font-bold">빨간선</span>(5일 평균, 단기 흐름) /
-          <span className="text-caution font-bold"> 주황선</span>(20일 평균, 중기 흐름). <br />
-          {/* 방향단정 제거 — '정배열'은 배열 상태를 가리키는 사실이라 남기고,
-              그 뒤에 붙던 verdict 꼬리표('긍정적 추세')와 '상승 흐름'만 위치 사실로 바꾼다. */}
-          주가 &gt; 빨간선 = 최근 5일 평균보다 위 · 빨간선 &gt; 주황선 = 정배열(단기선이 중기선 위).
+          <span className="text-rise font-bold">빨간 봉</span>=오른 날 ·
+          <span className="text-fall font-bold"> 파란 봉</span>=내린 날 (몸통=시가~종가, 꼬리=고가·저가). <br />
+          <span className="text-rise font-bold">빨간 점선</span>(5일 평균, 단기) /
+          <span className="text-caution font-bold"> 주황 점선</span>(20일 평균, 중기).
+          주가 &gt; 5일선 = 최근 5일 평균보다 위 · 5일선 &gt; 20일선 = 정배열(단기선이 중기선 위).
         </p>
       </div>
-      <div className="h-72 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E7E7E3" vertical={false} />
-            <XAxis dataKey="name" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} domain={[priceMin, priceMax]} ticks={priceTicks} tickFormatter={(v) => formatPrice(Number(v))} />
-            <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px', fontSize: '12px' }}
-              formatter={((value: unknown, name: unknown) => {
-                const labels: Record<string, string> = { price: '종가', open: '시가', high: '고가', low: '저가', sma5: '5일 평균', sma20: '20일 평균' };
-                const n = (name as string) || '';
-                const v = typeof value === 'number' ? value : null;
-                return [`₩${v?.toLocaleString() || '---'}`, labels[n] || n];
-              }) as never} />
-            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-            <Line type="monotone" dataKey="price" name="종가" stroke="#17181C" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="sma5" name="5일 평균" stroke="#D91C1C" strokeWidth={1} dot={false} strokeDasharray="5 5" />
-            <Line type="monotone" dataKey="sma20" name="20일 평균" stroke="#9A5B08" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-            {/* 3.12차 S5 — 최근 20일 골든/데드크로스 마커. rawDate로 매칭, 보이는 구간 밖이면 미표시. */}
-            {visibleMarkers.map(m => {
-              const idx = chartData.findIndex(d => d.rawDate === m.date);
-              if (idx < 0) return null;
-              return (
-                <ReferenceDot key={`${m.date}-${m.type}`} x={chartData[idx].name} y={chartData[idx].price}
-                  r={5} fill={m.type === 'golden' ? '#D91C1C' : '#1B5FD0'}
-                  stroke="#FFFFFF" strokeWidth={2} />
-              );
-            })}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      {/* 크로스 마커가 보이는 구간에 있을 때만 범례 노출 */}
-      {visibleMarkers.length > 0 && (
+
+      {bars.length === 0 ? (
+        <div className="h-72 w-full flex items-center justify-center text-xs text-faint">
+          차트를 그릴 데이터가 아직 부족해요.
+        </div>
+      ) : (
+        <LwcChart
+          bars={bars}
+          lines={lines}
+          markers={markers}
+          subPanels={subPanels}
+          initialBars={initialBars}
+          priceFormatter={formatPriceAxis}
+        />
+      )}
+
+      {markers.length > 0 && (
         <div className="flex items-center gap-3 mt-2 text-xs text-faint">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-rise" /> 골든크로스
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-fall" /> 데드크로스
-          </span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rise" /> 골든크로스</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-fall" /> 데드크로스</span>
         </div>
       )}
 
-      {/* Volume Bar */}
-      <h4 className="text-sm font-semibold mt-6 mb-2 flex items-center space-x-2">
-        <span className="text-muted">거래량</span>
-      </h4>
-      <div className="bg-inset border border-line rounded-xl p-3 mb-3 text-xs text-muted leading-relaxed">
+      <div className="bg-inset border border-line rounded-xl p-3 mt-4 text-xs text-muted leading-relaxed">
         {helpTexts.volume}
       </div>
-      <div className="h-24 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={volumeData}>
-            <XAxis dataKey="name" stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} hide />
-            <YAxis stroke="#85878D" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => {
-              if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}백만`;
-              if (v >= 10_000) return `${Math.round(v / 10_000)}만`;
-              return v.toLocaleString();
-            }} />
-            <Bar dataKey="volume" isAnimationActive={false}>
-              {volumeData.map((entry, index) => (
-                <Cell key={index} fill={entry.isUp ? '#D91C1C40' : '#1B5FD040'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      {/* 3.11차 — 거래량 흐름 한 줄 해석 (관찰형) */}
-      {volumeData.length >= 5 && (() => {
-        const window = volumeData.slice(-20);
-        const avg20 = window.length > 0 ? window.reduce((a, b) => a + b.volume, 0) / window.length : 0;
-        const latest = volumeData[volumeData.length - 1]?.volume || 0;
-        const ratio = avg20 > 0 ? latest / avg20 : 1;
-        let msg = '';
-        if (ratio >= 2) msg = '최근 거래량이 평소의 2배 이상이에요. 관심이 크게 늘었어요.';
-        else if (ratio >= 1.3) msg = '거래량이 평소보다 늘고 있어요.';
-        else if (ratio <= 0.5) msg = '거래량이 평소보다 줄었어요. 관심이 식은 편이에요.';
-        else msg = '거래량은 평소 수준이에요.';
-        return <p className="text-xs text-muted mt-2 leading-relaxed">{msg}</p>;
-      })()}
+      {volumeNote && <p className="text-xs text-muted mt-2 leading-relaxed">{volumeNote}</p>}
     </div>
   );
 }
