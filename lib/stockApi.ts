@@ -55,6 +55,9 @@ function ensureInterceptors() {
         url.includes('/dart/') ||
         url.includes('/journal/analysis') ||
         url.includes('/attention') ||
+        // 차트용 일봉 250행 — 실패하면 40행 history로 조용히 폴백한다(차트는 계속 그려진다).
+        // 구 서버에선 404가 나므로 토스트를 띄우면 배포 창 동안 전 사용자에게 에러가 뜬다.
+        url.includes('/history/daily') ||
         url.includes('/news');
       if (!silent) {
         try {
@@ -131,6 +134,9 @@ export const stockApi = {
     (await axios.get(`${API_BASE_URL}/stock/${code}/dart/financials`)).data,
   getDartDisclosures: async (code: string, months = 3): Promise<import('@/types/stock').DartDisclosuresResult> =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/dart/disclosures`, { params: { months } })).data,
+  // 차트용 일봉 250행(SMA60·MACD26에 필요). 구 서버에선 404 → 호출부가 40행 history로 폴백.
+  getDailyHistory: async (code: string): Promise<import('@/types/stock').HistoryEntry[]> =>
+    (await axios.get(`${API_BASE_URL}/stock/${code}/history/daily`)).data,
   getChartData: async (code: string, timeframe: 'weekly' | 'monthly') =>
     (await axios.get(`${API_BASE_URL}/stock/${code}/chart/${timeframe}`)).data,
   // 4.5b — 거래일지. csvText는 프론트에서 EUC-KR 디코드된 텍스트.

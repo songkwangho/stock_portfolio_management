@@ -39,7 +39,7 @@ export type LineSpec = {
 export type PriceLineSpec = { price: number; color: string; title: string };
 
 export type SubSeries =
-  | { kind: 'line'; key: string; data: { time: Time; value: number }[]; color: string; lineWidth?: 1 | 2 }
+  | { kind: 'line'; key: string; data: { time: Time; value: number }[]; color: string; lineWidth?: 1 | 2; lastValueVisible?: boolean }
   | { kind: 'histogram'; key: string; data: { time: Time; value: number; color?: string }[]; color: string };
 
 export type SubPanelSpec = {
@@ -58,6 +58,8 @@ export type MarkerSpec = { time: Time; color: string; label?: string };
 
 interface LwcChartProps {
   bars: ChartBar[];
+  /** 캔들 칩 off — 봉을 지우고 오버레이만 남긴다. 마커·지지저항은 보이지 않는 종가 선에 붙는다. */
+  showCandles?: boolean;
   /** 메인 pane 오버레이(이평선·볼린저·LRC 등) */
   lines?: LineSpec[];
   /** 지지·저항 수평선 */
@@ -97,7 +99,7 @@ function baseOptions(priceFormatter?: (v: number) => string) {
 }
 
 export default function LwcChart({
-  bars, lines = [], priceLines = [], markers = [], subPanels = [],
+  bars, showCandles = true, lines = [], priceLines = [], markers = [], subPanels = [],
   mainHeightClass = 'h-72', initialBars = 60, priceFormatter,
 }: LwcChartProps) {
   const mainRef = useRef<HTMLDivElement>(null);
@@ -111,7 +113,7 @@ export default function LwcChart({
     l: lines.map(l => l.key), p: priceLines.map(p => p.title),
     s: subPanels.map(s => ({ k: s.key, n: s.series.map(x => x.key) })),
     n: bars.length, first: bars[0]?.time ?? null, last: bars[bars.length - 1]?.time ?? null,
-    m: markers.length,
+    m: markers.length, c: showCandles,
   });
 
   useEffect(() => {
@@ -123,17 +125,22 @@ export default function LwcChart({
     charts.push(main);
 
     // ── 캔들 — 한국 증시 색: 양봉 빨강 / 음봉 파랑 (3.13 방향색 규칙) ──
-    const candles = main.addCandlestickSeries({
-      upColor: '#D91C1C', downColor: '#1B5FD0',
-      borderUpColor: '#D91C1C', borderDownColor: '#1B5FD0',
-      wickUpColor: '#D91C1C', wickDownColor: '#1B5FD0',
-      priceLineVisible: false,
-    });
+    // 캔들 칩을 끄면 **보이지 않는 종가 선**을 대신 만든다. 마커·지지저항 priceLine이
+    // 시리즈에 붙는 구조라, 앵커가 사라지면 그것들도 함께 사라진다.
+    const anchor: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> = showCandles
+      ? main.addCandlestickSeries({
+        upColor: '#D91C1C', downColor: '#1B5FD0',
+        borderUpColor: '#D91C1C', borderDownColor: '#1B5FD0',
+        wickUpColor: '#D91C1C', wickDownColor: '#1B5FD0',
+        priceLineVisible: false,
+      })
+      : main.addLineSeries({ color: 'transparent', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     // 기본 여백(top .2 / bottom .1)은 축을 데이터 폭의 1.8배까지 벌려 봉이 작아지고
     // 최상단 눈금 라벨이 컨테이너 위로 잘린다. 조여서 봉에 화면을 준다.
     // ⚠️ scaleMargins는 **시리즈 옵션이 아니라 가격축 옵션**이다(v4 typings).
-    candles.priceScale().applyOptions({ scaleMargins: { top: 0.12, bottom: 0.1 } });
-    candles.setData(bars);
+    anchor.priceScale().applyOptions({ scaleMargins: { top: 0.12, bottom: 0.1 } });
+    if (showCandles) (anchor as ISeriesApi<'Candlestick'>).setData(bars);
+    else (anchor as ISeriesApi<'Line'>).setData(bars.map(b => ({ time: b.time, value: b.close })));
 
     // ── 오버레이 라인 — 전부 무채색/보조색. 방향색은 캔들·가격에만 ──
     for (const l of lines) {
@@ -150,7 +157,7 @@ export default function LwcChart({
 
     // ── 지지·저항 수평선 ──
     for (const pl of priceLines) {
-      candles.createPriceLine({
+      anchor.createPriceLine({
         price: pl.price, color: pl.color, lineWidth: 1,
         lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: pl.title,
       });
@@ -159,7 +166,7 @@ export default function LwcChart({
     // ── 골든/데드크로스 마커 ──
     if (markers.length) {
       const sorted = [...markers].sort((a, b) => String(a.time).localeCompare(String(b.time)));
-      candles.setMarkers(sorted.map<SeriesMarker<Time>>(m => ({
+      anchor.setMarkers(sorted.map<SeriesMarker<Time>>(m => ({
         time: m.time, position: 'aboveBar', shape: 'circle', color: m.color, text: m.label ?? '',
       })));
     }
@@ -178,7 +185,10 @@ export default function LwcChart({
         if (s.kind === 'line') {
           const ls = c.addLineSeries({
             color: s.color, lineWidth: s.lineWidth ?? 1,
-            priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+            priceLineVisible: false,
+            // 거래량 평균선처럼 축 눈금과 겹쳐 지저분해지는 선은 마지막 값 라벨을 끈다.
+            lastValueVisible: s.lastValueVisible ?? true,
+            crosshairMarkerVisible: false,
           });
           ls.setData(s.data);
         } else {

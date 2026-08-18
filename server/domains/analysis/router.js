@@ -162,6 +162,36 @@ router.get('/stock/:code/news', async (req, res) => {
     }
 });
 
+// GET /api/stock/:code/history/daily - 차트용 일봉 시계열(DB, 250행)
+//
+// 왜 별도 경로인가: `/stock/:code`의 history는 40행이라 60일선·MACD(26봉)를 그릴 수 없다.
+// 그런데 기존 `chart/:timeframe`에 'daily'를 얹으면 **구 서버가 그걸 주봉으로 해석**한다
+// (`tf = timeframe === 'monthly' ? 'month' : 'week'`). 응답 형태가 같아서 클라가 구분할 수
+// 없고, Vercel·Render 배포 순서가 어긋나는 창에서 주봉을 일봉이라 믿고 그린다.
+// 새 경로면 구 서버에서 **404로 명확히 실패**하고 클라가 40행 폴백으로 내려간다.
+//
+// 창은 `PRICE_CONTEXT_CONSTANTS.RANGE_WINDOW`(250)를 재사용한다 — priceContext·
+// /holdings/volatility와 **같은 표본**을 써야 차트의 범위·위치가 다른 화면과 갈리지 않는다.
+router.get('/stock/:code/history/daily', async (req, res) => {
+    const { code } = req.params;
+    try {
+        const { rows } = await query(
+            `SELECT date, open, high, low, price, volume FROM stock_history
+             WHERE code = $1 ORDER BY date DESC LIMIT ${PRICE_CONTEXT_CONSTANTS.RANGE_WINDOW}`,
+            [code]
+        );
+        // pg는 NUMERIC/BIGINT를 문자열로 준다 → Number() 캐스팅. DESC로 받아 시간순으로 뒤집는다.
+        res.json(rows.reverse().map(r => ({
+            date: r.date,
+            open: Number(r.open), high: Number(r.high), low: Number(r.low),
+            price: Number(r.price), volume: Number(r.volume),
+        })));
+    } catch (error) {
+        console.error('Daily History Error:', error.message);
+        res.json([]);   // 빈 배열 → 클라가 40행 history로 폴백
+    }
+});
+
 // GET /api/stock/:code/chart/:timeframe - weekly/monthly chart data
 router.get('/stock/:code/chart/:timeframe', async (req, res) => {
     const { code, timeframe } = req.params;

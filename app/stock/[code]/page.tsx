@@ -279,7 +279,7 @@ function StockDetailContent({ code }: { code: string }) {
       {/* ===== [차트·지표] — 차트 → 지표 → 한눈에 → 밸류 → 수급 → 상세분석 ===== */}
       {activeTab === 'chart' && (
         <div className="space-y-6">
-          {stockDetail && <ChartSection code={stock.code} stockDetail={stockDetail} signals={signals} />}
+          {stockDetail && <ChartSection code={stock.code} stockDetail={stockDetail} signals={signals} onHelp={setHelpTerm} />}
           <IndicatorPanel indicators={indicators} volatility={volatility} onHelp={setHelpTerm} />
           {stockDetail && <StatsGrid stockDetail={stockDetail} priceContext={priceContext} />}
           {stockDetail && <MetricsGrid stockDetail={stockDetail} category={stock.category} sectorData={sectorData} onHelp={setHelpTerm} />}
