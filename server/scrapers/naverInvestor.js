@@ -24,9 +24,12 @@ const PAGE_URL = (code, page) => `https://finance.naver.com/item/frgn.naver?code
  *
  * 컬럼(실측 헤더): 날짜 · 종가 · 전일비 · 등락률 · 거래량 · 기관 순매매량 · 외국인 순매매량 · 외국인 보유주수 · 보유율
  *
- * ⚠️ index 7은 **외국인 보유주수**이지 개인이 아니다. 기존 `scrapeInvestorData`는 이걸
- *    `individual`로 넣고 있다(server/scrapers/naver.js) — 이 페이지에 개인 순매매 컬럼은 없다.
- *    여기서는 그 오류를 복제하지 않고 `individual: null`로 둔다(없는 값을 지어내지 않는다).
+ * ⚠️ index 7은 **외국인 보유주수**이지 개인이 아니다 — 이 페이지에 개인 순매매 컬럼은 없다.
+ *    `individual: null`로 둔다(없는 값을 지어내지 않는다).
+ *
+ * 이 함수가 투자자 표의 **유일한 파서**다 — 라이브 적재(server/domains/stock/service.js)와
+ * 3년 backfill(scripts/backfill-investor-history.js)이 둘 다 여기를 지난다. 예전엔 세 곳이
+ * 각자 파싱했고, 그게 `individual` 값이 경로마다 달라지는 드리프트를 낳았다.
  *
  * @returns [{ date:'YYYYMMDD', institution:number, foreign_net:number, individual:null }] — 페이지 내 순서 그대로(최신 우선)
  */

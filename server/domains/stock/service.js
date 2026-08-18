@@ -2,6 +2,8 @@ import pool, { query, withTransaction } from '../../db/connection.js';
 import axios from 'axios';
 import { getCached, setCache } from '../../helpers/cache.js';
 import { NAVER_FINANCE_URL, mapToCategory } from '../../scrapers/naver.js';
+// 투자자 표 파서는 **한 곳**뿐이다(순수·테스트 있음). 라이브 적재와 3년 backfill이 같은 함수를 쓴다.
+import { parseInvestorRows } from '../../scrapers/naverInvestor.js';
 import { calculateValuationScore, calculateTechnicalScore, calculateSupplyDemandScore, calculateTrendScore } from '../analysis/scoring.js';
 import { generateAlerts } from '../alert/service.js';
 
@@ -153,32 +155,30 @@ export async function getStockData(code, fallbackName = null) {
         if (investorResult.status === 'fulfilled') {
             try {
                 const investorHtml = new TextDecoder('euc-kr').decode(investorResult.value.data);
-                const investorRegex = /<tr.*?>\s*<td.*?><span.*?>([\d.]{10})<\/span><\/td>\s*<td.*?><span.*?>([\d,]+)<\/span><\/td>\s*<td.*?>[\s\S]*?<\/td>\s*<td.*?>[\s\S]*?<\/td>\s*<td.*?><span.*?>([\d,]+)<\/span><\/td>\s*<td.*?><span.*?>([+-]?[\d,]+)<\/span><\/td>\s*<td.*?><span.*?>([+-]?[\d,]+)<\/span><\/td>/g;
-                let invMatch;
-                const matches = [];
-                while ((invMatch = investorRegex.exec(investorHtml)) !== null && matches.length < 20) {
-                    const date = invMatch[1].replace(/\./g, '');
-                    const instNet = parseInt(invMatch[4].replace(/,/g, ''));
-                    const foreignNet = parseInt(invMatch[5].replace(/,/g, ''));
-                    // ⚠️ individual은 null이다 — 네이버 외국인·기관 표에 **개인 순매매 컬럼이 없다**.
-                    //
-                    //    이전에는 `-(instNet + foreignNet)`으로 역산했는데, 그건 시장 참여자가
-                    //    기관·외국인·개인 셋뿐이라 순매수 합이 0이라는 가정이다. 실제로는
-                    //    기타법인·기타외국인도 있어 성립하지 않는다 → **측정하지 않은 값을
-                    //    만들어 저장하던 것**(R2 위반). 읽는 곳이 없어 영향은 0이었다.
-                    //
-                    //    수급 채점(computeSupplyDemandFromRows)은 institution·foreign_net만 본다.
-                    //    세션 3 backfill(naverInvestor.js)도 NULL이라 두 경로가 통일된다.
-                    //    ※ 기존 적재분 소급 정정은 하지 않는다 — 재스크래핑되는 날짜는
-                    //      ON CONFLICT DO UPDATE로 자연히 NULL로 덮인다.
-                    matches.push({
-                        date,
-                        institution: instNet,
-                        foreign: foreignNet,
-                        individual: null
-                    });
-                }
-                investorData = matches.reverse();
+
+                // 인라인 정규식을 `parseInvestorRows`(순수·테스트 있음)로 라우팅했다.
+                // 같은 표를 세 곳이 각자 파싱하던 상태가 `individual` 값 불일치를 낳았고,
+                // 파서가 하나면 그 드리프트가 **구조적으로 불가능**해진다.
+                //
+                // 적재 결과 동일이 목표라 옛 계약을 그대로 지킨다:
+                //   · 20행 상한(옛 `matches.length < 20`)
+                //   · `foreign` 키(응답 계약 — InvestorChart·interpretFlow가 이 이름을 읽는다)
+                //   · `.reverse()`로 오름차순 적재(옛 `matches.reverse()`)
+                // 실 픽스처 20행에서 두 파서가 완전 일치함을 테스트가 고정한다
+                // (tests/scrapers/investorParserEquivalence.test.ts).
+                //
+                // ⚠️ individual은 null — 이 표에 **개인 순매매 컬럼이 없다**. 옛 코드는
+                //    `-(기관 + 외국인)`으로 역산했는데, 참여자가 셋뿐이라 순매수 합이 0이라는
+                //    가정이라 기타법인·기타외국인이 있는 실제와 맞지 않는다(측정 안 한 값 생성).
+                investorData = parseInvestorRows(investorHtml)
+                    .slice(0, 20)
+                    .map(r => ({
+                        date: r.date,
+                        institution: r.institution,
+                        foreign: r.foreign_net,
+                        individual: r.individual,
+                    }))
+                    .reverse();
 
                 // Persist investor data to investor_history
                 if (investorData.length > 0) {

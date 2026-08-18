@@ -111,7 +111,9 @@ export interface InvestorEntry {
   date: string;
   institution: number;
   foreign: number;
-  individual: number;
+  // 항상 null — 네이버 외국인·기관 표에 개인 순매매 컬럼이 없다. 응답 형태 호환을 위해
+  // 필드는 남기되 타입으로 "값이 없다"를 못박는다(누가 다시 숫자로 채우려 하면 tsc가 막는다).
+  individual: null;
 }
 
 export interface ChartDataPoint {

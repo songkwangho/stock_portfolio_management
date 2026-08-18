@@ -21,7 +21,7 @@ export default function InvestorChart({ stockDetail, onHelp }: InvestorChartProp
         <h3 className="text-lg font-semibold text-ink">투자자별 매매동향</h3>
         <span onClick={() => onHelp('supplyDemand')} className="text-faint hover:text-ink text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
       </div>
-      <p className="text-xs text-muted mb-1">최근 10거래일 동안 개인·외국인·기관이 주식을 사고판 양을 보여줘요</p>
+      <p className="text-xs text-muted mb-1">최근 10거래일 동안 외국인·기관이 주식을 사고판 양을 보여줘요</p>
           <p className="text-xs text-faint mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -34,7 +34,11 @@ export default function InvestorChart({ stockDetail, onHelp }: InvestorChartProp
                 <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
                 <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
                 <ReferenceLine y={0} stroke="#D4D4CE" />
-                <Bar dataKey="individual" name="개인 투자자 (일반인)" fill="#85878D" />
+                {/* 개인 막대는 제거했다 — 네이버 외국인·기관 표에 **개인 순매매 컬럼이 없다**.
+                    예전엔 `-(기관 + 외국인)`으로 역산한 값을 "개인 투자자"라 이름 붙여 그렸는데,
+                    참여자가 셋뿐이라 순매수 합이 0이라는 가정이라 기타법인·기타외국인이 있는
+                    실제와 맞지 않았다(측정하지 않은 값을 사용자에게 보여주던 것).
+                    빈 시리즈를 남기면 범례에 "개인 투자자"만 떠서 데이터가 있는 것처럼 읽힌다. */}
                 <Bar dataKey="foreign" name="외국인 투자자 (해외)" fill="#17181C" />
                 <Bar dataKey="institution" name="기관 투자자 (회사·펀드)" fill="#6E7076" />
               </BarChart>
