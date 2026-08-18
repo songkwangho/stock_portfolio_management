@@ -214,6 +214,8 @@ DATABASE_URL=postgres://... node scripts/backtest/run_holding.mjs  # 세션2: Ho
 node scripts/probe-krx-capability.mjs
 # 세션3 — 투자자 순매매 3년 backfill (네이버 페이지네이션, ≈35분). --resume/--dry-run 지원
 DATABASE_URL=postgres://... node scripts/backfill-investor-history.js
+# attention 사건성 프록시 — target=|forward return|. DART 유무에 robust(미적재면 move 단독)
+DATABASE_URL=postgres://... node scripts/backtest/run_attention.mjs
 
 # DART 적재 3종 (4.5a차) — 전부 --dry-run 지원. DART_API_KEY 필요
 DART_API_KEY=... node scripts/sync-dart-corpcodes.js
@@ -883,6 +885,20 @@ Google Labs DESIGN.md 포맷을 SSOT로 채택. 하드코딩된 임의값(text-[
 - ⚠️ **정정 — 직전 차수의 "`individual`을 읽는 곳 없음"이 틀렸다**: `InvestorChart:37`이 `<Bar dataKey="individual" name="개인 투자자 (일반인)">`로 **화면에 그리고 있었다**. 즉 역산값 `-(기관+외국인)`이 "개인 투자자"라는 이름으로 사용자에게 노출돼 왔다(단순 미사용이 아니라 R2 위반 노출). `individual: null` 전환 후엔 빈 시리즈 + 범례만 남아 데이터가 있는 것처럼 읽혀서, **개인 막대·범례 제거** + 안내 문구 "개인·외국인·기관" → "외국인·기관"으로 정리
 - **판단 — `InvestorEntry.individual` 타입을 `number` → `null`로**: 응답 형태 호환을 위해 필드는 남기되 타입으로 "값이 없다"를 못박는다. 누가 다시 숫자로 채우려 하면 tsc가 막는다
 - 검증: node --check · tsc 0 · next build ✓ · **npm test 435**(+7 동치) · 파서 1개(드리프트 구조적 불가)
+
+**부수 — attention 현저성 사건성 프록시 (2026-08-18)**
+
+세션 1~3(방향 예측)과 **목적·해석이 반대인** 가벼운 sanity check. attention은 조언·예측이 아니라 **"지금 볼 것" 트리아지**라, target도 부호 있는 수익이 아니라 **|forward return|(사건 크기)** 다. → **양(+) IC가 좋은 결과**(현저성 상위가 실제로 크게 움직였다 = 트리아지 정상 작동).
+
+- [x] **[AP-1]** `scripts/backtest/attention.mjs`(순수) — `disclosuresAsOf`(룩백 + **≤t 상한**) · `attentionAt`(관찰-only 현저성 + move/disc 단독 분해) · `absTarget`. **규칙 복제 0** — `score.js` `scoreItem`·`facts.js` `computePriceStats`/`summarizeDisclosures`를 그대로 호출하고 `ATTENTION_CONSTANTS`도 그대로
+- [x] **[AP-2]** `run_attention.mjs` + `loadDisclosures`(load.mjs) — 세션 1 `ic.mjs`(Spearman·Newey-West·BH)·`returns.mjs` 재사용. 산출 `attention_eventproxy.csv`·`attention_buckets.csv`·`attention_observations.csv`·`attention_meta.json`
+- **판단 — unrl·stake 제외가 개념적으로 옳다**: "이 종목이 얼마나 사건적인가"가 아니라 **"나에게 얼마나 중요한가"** 라 시장 이벤트 프록시에 넣으면 재는 대상이 섞인다. `held:false`로 넘기면 두 컴포넌트가 0을 반환(프로덕션 함수 그대로) → **부분 검증**임을 리포트에 명시
+- [x] **[AP-3 DART robust]** 러너가 스스로 `dart_disclosures` 깊이를 실측(§Step 0 게이트)하고 3갈래: ① 미적재 → disc 축 미보고, `moveOnly`가 1차 산출물 ② 얕음(공시 붙은 시점 < `ATTENTION_MIN_DISC_POINTS` 200) → 동일(disc가 상수 0이면 Rank IC 무의미) ③ 충분 → 3축. **disc·salience는 공시 커버 구간에서만, move는 전 구간 + 같은 커버 구간 둘 다** — 구간이 다르면 대소를 못 견준다
+- **발견 — 관찰-only의 구조적 상한**: noisy-OR에서 move 단독 최대 = `w_move` 0.45, move+disc = 0.5875. unrl(.85)·stake(.70)를 뺐으니 **상위 버킷이 비는 게 정상**(결함 아님). `scoreFloor` 0.15 환산 → 공시 없으면 **|5거래일 수익률| ≥ 5%** 여야 블록에 뜬다. 러너가 이 환산을 출력한다
+- **누수 차단**: 가격은 `≤t` 접두(단, `computePriceStats`는 뒤에서 고정 개수만 봐 접두 길이에 **무의존** — MACD와 다른 성질이라 테스트로 고정) · 공시는 `[t−14d, t]`, **상한이 이 축의 차단 지점**(프로덕션은 today가 상한이라 하한만 건다)
+- **측정 체인 양성 대조**: 합성 패널 2개 — 현저성이 |move|를 끌면 IC>0.4, 독립이면 |IC|<0.1. 없으면 라이브 0이 "신호 없음"인지 "배선 오류"인지 못 가른다
+- 검증: node --check · tsc 0 · **npm test 455**(+20) · DART 없는 경로 합성 스모크 완주(랜덤워크에서 IC≈0 = 올바른 null) · UI·프로덕션 무변경
+- ⚠️ **운영 대기**: `node scripts/backtest/run_attention.mjs` 실행(운영자) → 결과 전달받아 해석(양=트리아지 정상 / 음=현저성 재설계) + 그림. 재보정은 **봉인 구간 밖에서만**
 - **부대**: `.gitignore`에 `/phase4-*.md`·`/phase4-*.sql` 글롭 — 파일명 나열 방식은 **새 이름의 지시문에 매번 무방비**였다(3e5b946 재발 경로)
 - 검증: node --check 전 파일 · tsc 0 · next build ✓ · **npm test 427**(+27: 동치·누수 18 · 파서 9) · 프로덕션 무변경(반환값 동치 테스트로 고정)
 - ⚠️ **운영 대기**: ① `node scripts/backfill-investor-history.js` → ② `node scripts/backtest/run.mjs` 재실행 → 수급축 IC·버킷 전달받아 해석. ③ **판단 요청 2건** — KRX 회원계정(본인인증) 도입 여부(수정주가 + 단일소스 해소가 여기 묶임) · 위 프로덕션 버그 처리

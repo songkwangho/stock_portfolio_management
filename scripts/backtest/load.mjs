@@ -108,6 +108,45 @@ export async function loadBenchmark(symbol) {
     }
 }
 
+// attention 사건성 프록시 — 종목별 공시 전건(날짜 오름차순). 시점 t 룩백 슬라이스는
+// 호출부가 만든다(≤t 상한이 누수 차단 지점이라 한 곳에 모아 둔다).
+//
+// **DART 유무에 robust**: 테이블이 없거나 비어 있으면 `available:false`로 돌려주고
+// 호출부는 disc 축을 통째로 건너뛴다(500·중단 없음 — journal/dart 폴백 패턴).
+// 깊이 통계도 함께 낸다 — 지시문 §2 Step 0 게이트를 러너가 스스로 실측하도록.
+export async function loadDisclosures(codes) {
+    try {
+        const { rows } = await pool.query(
+            `SELECT code, rcept_dt, category FROM dart_disclosures
+             WHERE code = ANY($1) AND rcept_dt IS NOT NULL
+             ORDER BY code, rcept_dt ASC`,
+            [codes]
+        );
+        if (rows.length === 0) {
+            return { byCode: new Map(), available: false, reason: 'empty', totalRows: 0, codesWithData: 0, minDate: null, maxDate: null };
+        }
+
+        const byCode = new Map();
+        let minDate = null, maxDate = null;
+        for (const r of rows) {
+            const d = String(r.rcept_dt).replace(/-/g, '').slice(0, 8);
+            if (!/^\d{8}$/.test(d)) continue;
+            if (minDate == null || d < minDate) minDate = d;
+            if (maxDate == null || d > maxDate) maxDate = d;
+            if (!byCode.has(r.code)) byCode.set(r.code, []);
+            byCode.get(r.code).push({ rcept_dt: d, category: r.category || 'other' });
+        }
+        return {
+            byCode, available: byCode.size > 0, reason: null,
+            totalRows: rows.length, codesWithData: byCode.size, minDate, maxDate,
+        };
+    } catch (e) {
+        // 테이블 부재·스키마 불일치는 정상 경로다 — DART 적재는 운영자 수동이라 미적재가 기본 상태.
+        console.warn(`  [공시] 로드 실패 — disc 축을 건너뜁니다: ${e.message}`);
+        return { byCode: new Map(), available: false, reason: 'error', totalRows: 0, codesWithData: 0, minDate: null, maxDate: null };
+    }
+}
+
 // 세션 2 — 액면분할·무상증자 등 **무수정 종가를 기계적으로 튀게 하는** 공시 날짜.
 //
 // 왜 필요한가: stock_history.price는 수정주가가 아니다(액면분할·배당 미조정). 2:1 분할은

@@ -45,6 +45,14 @@ export const CONFIG = {
     //    사용자는 최소 1일 지연으로 움직인다. 손절 효과가 지연에 얼마나 민감한지가
     //    "−7%가 하방을 지킨다"는 결론의 강건성을 좌우하므로 **둘 다 낸다**.
     EXIT_LAG_DAYS: [0, 1],
+    // ── attention 사건성 프록시 (별도 러너 run_attention.mjs) ──
+    // ⚠️ target이 다르다: 부호 있는 수익이 아니라 **|forward return|**(사건 크기).
+    //    여기선 **양(+) IC가 좋은 결과**다 — 세션 1~3과 정반대 해석.
+    ATTENTION_AXES: ['salience', 'moveOnly', 'discOnly'],
+    // disc 축을 낼 최소 표본(공시가 붙은 시점 수). 미달이면 disc·salience를 보고하지 않는다
+    // — dart_disclosures가 최근 편중이면 disc는 사실상 상수 0이라 IC가 무의미해진다.
+    ATTENTION_MIN_DISC_POINTS: 200,
+
     // 액면분할·무상증자 등으로 무수정 종가가 기계적으로 튀는 표본 처리.
     // 'exclude' = 1차 표에서 제외(별도 카운트), 'flag' = 포함하되 표시만.
     SPLIT_SCREEN: 'exclude',
@@ -76,6 +84,14 @@ export const BUCKETS = {
         { label: '[0.5,1.0)', min: 0.5, max: 1.0 },
         { label: '[1.0,1.5)', min: 1.0, max: 1.5 },
         { label: '[1.5,2.0]', min: 1.5, max: 2.0001 },
+    ],
+    // attention 현저성 0~1(noisy-OR). 관찰-only(move+disc)라 상단이 얇을 수 있어
+    // 하단을 촘촘히 두고 n을 함께 본다. scoreFloor 0.15가 프로덕션 노출 문턱이라 경계로 넣었다.
+    salience: [
+        { label: '[0.00,0.15)  ← 노출 문턱 미만', min: -0.0001, max: 0.15 },
+        { label: '[0.15,0.30)', min: 0.15, max: 0.30 },
+        { label: '[0.30,0.50)', min: 0.30, max: 0.50 },
+        { label: '[0.50,1.00]', min: 0.50, max: 1.0001 },
     ],
     // 참고용 부분합(기술+추세, 0~5). **밸류·수급 제외** — MarketOpinion 7/4 컷 검증이 아니다.
     // ⚠️ 세션3에서 수급축이 붙어도 이 정의는 **바꾸지 않는다** — 바꾸면 세션1 결과와 같은
