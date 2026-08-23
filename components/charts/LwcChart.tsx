@@ -34,6 +34,12 @@ export type LineSpec = {
   dashed?: boolean;
   /** 밴드 상/하단처럼 마지막 값 라벨이 겹쳐 지저분해지는 선은 false */
   lastValueVisible?: boolean;
+  /**
+   * 범례에 띄울 라벨. 없으면 범례에 안 나온다(밴드 하단처럼 상단 라벨 하나로 충분한 선).
+   * ⚠️ 범례는 **이 배열에서 파생**시킨다 — 별도 목록을 들면 표본 부족으로 선이 빠졌을 때
+   *    범례만 남아 "표식은 있는데 선이 없는" 불일치가 생긴다.
+   */
+  legend?: string;
 };
 
 export type PriceLineSpec = { price: number; color: string; title: string };

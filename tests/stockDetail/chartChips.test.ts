@@ -1,7 +1,14 @@
 // 차트 칩 + "지금 눈에 띄는 것" 배너 — 관찰형 고정 + 금지어 전수 스윕.
 import { describe, it, expect } from 'vitest';
-import { CHIPS, DEFAULT_ON, MOBILE_PANEL_LIMIT, chartNotices, NOTICE_EMPTY } from '@/lib/stockDetail/chartChips';
-import { toBars } from '@/lib/stockDetail/chartSeries';
+import {
+  CHIPS, DEFAULT_ON, MOBILE_PANEL_LIMIT, chartNotices, NOTICE_EMPTY,
+  OVERLAY_MIN_BARS, PANEL_MIN_BARS, MACD_SIGNAL_MIN_BARS, STOCH_D_MIN_BARS,
+  OVERLAY_LEGEND, PANEL_LABEL, panelSampleNotice, type PanelIndicatorKey,
+} from '@/lib/stockDetail/chartChips';
+import { toBars, smaSeries } from '@/lib/stockDetail/chartSeries';
+import {
+  rsiSeries, macdSeries, bollingerSeries, stochasticSeries, regressionChannel, volumeMaSeries,
+} from '@/lib/stockDetail/indicatorSeries';
 import { FORBIDDEN_CHART } from '../forbiddenWords';
 import type { HistoryEntry } from '@/types/stock';
 
@@ -38,6 +45,86 @@ describe('칩 정의', () => {
 
   it('모든 칩이 도움말 키를 갖는다 — [?]가 빈 팝업을 열면 안 된다', () => {
     for (const c of CHIPS) expect(c.help).toBeTruthy();
+  });
+});
+
+// 최근 상장·확대적재 종목(스트라드비젼 475040 ≈ 35거래일 등)에서 실제로 걸리는 문턱.
+// 표의 숫자와 계산 함수가 갈리면 안내 문구가 거짓이 되고, 범례에 없는 선의 표식이 남는다.
+describe('표본 문턱 ↔ 실제 계산 (문구·범례의 근거)', () => {
+  // 종가가 다 같으면 회귀·표준편차가 0인 경계라 점 유무만 보기엔 오히려 안전하지만,
+  // 실제 형태에서 재기 위해 완만한 추세 + 매일 다른 거래량을 준다.
+  const bars = (n: number) => toBars(mk(n, i => 10000 + i * 13, i => 10000 + i * 7));
+
+  const overlays: Array<[keyof typeof OVERLAY_MIN_BARS, (n: number) => number]> = [
+    ['sma5', n => smaSeries(bars(n), 5).length],
+    ['sma20', n => smaSeries(bars(n), 20).length],
+    ['sma60', n => smaSeries(bars(n), 60).length],
+    ['bollinger', n => bollingerSeries(bars(n)).upper.length],
+    ['lrc', n => regressionChannel(bars(n), 20).mid.length],
+  ];
+  for (const [key, count] of overlays) {
+    it(`${key}: ${OVERLAY_MIN_BARS[key]}봉에서 생기고 그 직전엔 없다`, () => {
+      const min = OVERLAY_MIN_BARS[key];
+      expect(count(min - 1)).toBe(0);
+      expect(count(min)).toBeGreaterThan(0);
+    });
+  }
+
+  const panels: Array<[PanelIndicatorKey, (n: number) => number]> = [
+    ['rsi', n => rsiSeries(bars(n)).length],
+    ['macd', n => macdSeries(bars(n)).macd.length],
+    ['stochastic', n => stochasticSeries(bars(n)).k.length],
+  ];
+  for (const [key, count] of panels) {
+    it(`${key}: ${PANEL_MIN_BARS[key]}봉에서 패널이 그려지고 그 직전엔 안내로 빠진다`, () => {
+      const min = PANEL_MIN_BARS[key];
+      expect(count(min - 1)).toBe(0);
+      expect(count(min)).toBeGreaterThan(0);
+    });
+  }
+
+  // 보조선은 주선보다 늦게 붙는다 → 그 사이 구간은 안내가 아니라 **라벨**로 처리한다.
+  // (안내로 처리하면 "%K가 그려지는데 못 그린다"는 거짓말이 된다.)
+  it('MACD 시그널선은 본선보다 늦다 — 그 사이엔 본선만 그려진다', () => {
+    expect(macdSeries(bars(MACD_SIGNAL_MIN_BARS - 1)).signal.length).toBe(0);
+    expect(macdSeries(bars(MACD_SIGNAL_MIN_BARS - 1)).macd.length).toBeGreaterThan(0);
+    expect(macdSeries(bars(MACD_SIGNAL_MIN_BARS)).signal.length).toBeGreaterThan(0);
+    expect(MACD_SIGNAL_MIN_BARS).toBeGreaterThan(PANEL_MIN_BARS.macd);
+  });
+
+  it('스토캐스틱 %D는 %K보다 늦다 — 그 사이엔 %K만 그려진다', () => {
+    expect(stochasticSeries(bars(STOCH_D_MIN_BARS - 1)).d.length).toBe(0);
+    expect(stochasticSeries(bars(STOCH_D_MIN_BARS - 1)).k.length).toBeGreaterThan(0);
+    expect(stochasticSeries(bars(STOCH_D_MIN_BARS)).d.length).toBeGreaterThan(0);
+    expect(STOCH_D_MIN_BARS).toBeGreaterThan(PANEL_MIN_BARS.stochastic);
+  });
+
+  it('거래량 평균선이 없으면 라벨에서 "20일 평균"을 뺄 근거가 있다', () => {
+    expect(volumeMaSeries(bars(19), 20).length).toBe(0);
+    expect(volumeMaSeries(bars(20), 20).length).toBeGreaterThan(0);
+  });
+
+  it('짧은 히스토리 종목(≈35거래일)에서 빠지는 건 60일선뿐 — 5·20일선은 그려진다', () => {
+    const b = bars(35);
+    expect(smaSeries(b, 5).length).toBeGreaterThan(0);
+    expect(smaSeries(b, 20).length).toBeGreaterThan(0);
+    expect(smaSeries(b, 60).length).toBe(0);
+    // 서브패널 3종은 이 길이에서 전부 계산된다 → 안내가 아니라 정상 렌더가 맞다.
+    expect(rsiSeries(b).length).toBeGreaterThan(0);
+    expect(macdSeries(b).macd.length).toBeGreaterThan(0);
+    expect(stochasticSeries(b).k.length).toBeGreaterThan(0);
+  });
+});
+
+describe('panelSampleNotice — 사실만 (필요 거래일 + 현재 거래일)', () => {
+  it('지표별 조사를 규칙이 아니라 표로 고정한다 (RSI는 / 스토캐스틱은)', () => {
+    expect(panelSampleNotice('rsi', 8)).toContain('RSI는 최소 15거래일');
+    expect(panelSampleNotice('stochastic', 8)).toContain('스토캐스틱은 최소 14거래일');
+    expect(panelSampleNotice('macd', 8)).toContain('MACD는 최소 26거래일');
+  });
+
+  it('현재 표본 수를 그대로 말한다 — "부족하다"로 뭉개지 않는다', () => {
+    expect(panelSampleNotice('rsi', 8)).toContain('지금은 8거래일치');
   });
 });
 
@@ -92,6 +179,11 @@ describe('금지어 전수 스윕 — 칩 라벨 + 배너 출력', () => {
   const surfaces: string[] = [
     ...CHIPS.map(c => c.label),
     NOTICE_EMPTY,
+    ...Object.values(OVERLAY_LEGEND),
+    ...Object.values(PANEL_LABEL),
+    // 표본 부족 안내 — 문턱 근처 전 조합
+    ...(['rsi', 'macd', 'stochastic'] as PanelIndicatorKey[])
+      .flatMap(k => [1, 5, 13, 25, 33].map(n => panelSampleNotice(k, n))),
   ];
   const shapes: HistoryEntry[][] = [
     mk(40, () => 10000, i => (i === 39 ? 500000 : 10000)),
@@ -106,11 +198,13 @@ describe('금지어 전수 스윕 — 칩 라벨 + 배너 출력', () => {
   ];
   for (const s of shapes) surfaces.push(...chartNotices(toBars(s)).map(n => n.text));
 
-  it('스윕이 공회전하지 않는다 — 실제 배너 문구가 모였다', () => {
+  it('스윕이 공회전하지 않는다 — 실제 배너·범례·안내 문구가 모였다', () => {
     expect(surfaces.length).toBeGreaterThan(15);
     expect(surfaces.some(t => t.includes('거래량이 평소의'))).toBe(true);
     expect(surfaces.some(t => t.includes('볼린저'))).toBe(true);
     expect(surfaces.some(t => t.includes('최근 5거래일'))).toBe(true);
+    expect(surfaces.some(t => t.includes('아직 그릴 수 없어요'))).toBe(true);
+    expect(surfaces.some(t => t.includes('시그널선은'))).toBe(true);
   });
 
   for (const word of FORBIDDEN_CHART) {

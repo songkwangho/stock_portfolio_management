@@ -8,7 +8,10 @@ import {
   rsiSeries, macdSeries, bollingerSeries, stochasticSeries,
   regressionChannel, pivotLevels, volumeMaSeries,
 } from '@/lib/stockDetail/indicatorSeries';
-import { CHIPS, DEFAULT_ON, MOBILE_PANEL_LIMIT, chartNotices, NOTICE_EMPTY, type ChipKey } from '@/lib/stockDetail/chartChips';
+import {
+  CHIPS, DEFAULT_ON, MOBILE_PANEL_LIMIT, chartNotices, NOTICE_EMPTY,
+  panelSampleNotice, OVERLAY_LEGEND, PANEL_LABEL, type ChipKey, type PanelIndicatorKey,
+} from '@/lib/stockDetail/chartChips';
 import type { StockDetail, HistoryEntry, SignalResult } from '@/types/stock';
 import type { HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import type { SubPanelSpec, MarkerSpec, LineSpec, PriceLineSpec } from '@/components/charts/LwcChart';
@@ -83,20 +86,26 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
     if (bars.length === 0) return [];
     const out: LineSpec[] = [];
     if (on.has('ma')) {
-      out.push({ key: 'sma5', data: smaSeries(bars, 5), color: C.sma5, lineWidth: 1, dashed: true });
-      out.push({ key: 'sma20', data: smaSeries(bars, 20), color: C.sma20, lineWidth: 1, dashed: true });
-      const s60 = smaSeries(bars, 60);
-      // 60일선은 표본이 60봉 미만이면 점이 없다 — 빈 시리즈를 넣으면 범례만 생긴다.
-      if (s60.length) out.push({ key: 'sma60', data: s60, color: C.sma60, lineWidth: 1 });
+      // 표본 미달인 이동평균은 **선도 범례도** 만들지 않는다. 35거래일 종목에서 60일선은
+      // 점이 하나도 없는데, 빈 시리즈를 넣으면 "표식은 있고 선은 없는" 상태가 된다.
+      const mas = [
+        { p: 5, color: C.sma5, dashed: true, legend: OVERLAY_LEGEND.sma5 },
+        { p: 20, color: C.sma20, dashed: true, legend: OVERLAY_LEGEND.sma20 },
+        { p: 60, color: C.sma60, dashed: false, legend: OVERLAY_LEGEND.sma60 },
+      ];
+      for (const m of mas) {
+        const d = smaSeries(bars, m.p);
+        if (d.length) out.push({ key: `sma${m.p}`, data: d, color: m.color, lineWidth: 1, dashed: m.dashed, legend: m.legend });
+      }
     }
     if (on.has('bollinger')) {
       const b = bollingerSeries(bars);
       if (b.upper.length) {
-        out.push({ key: 'bbU', data: b.upper, color: C.band, lineWidth: 1 });
+        out.push({ key: 'bbU', data: b.upper, color: C.band, lineWidth: 1, legend: OVERLAY_LEGEND.bollinger });
         // ⚠️ 볼린저 중심선은 **20일 SMA와 같은 값**이다(둘 다 최근 20개 종가 평균을 Math.round).
         //    이동평균선 칩이 켜져 있으면 같은 선을 색만 달리해 두 번 그리는 셈이라 — 사용자에겐
         //    서로 다른 두 지표처럼 보인다. 이평선이 켜져 있으면 중심선을 생략한다.
-        if (!on.has('ma')) out.push({ key: 'bbM', data: b.middle, color: C.bandMid, lineWidth: 1, dashed: true });
+        if (!on.has('ma')) out.push({ key: 'bbM', data: b.middle, color: C.bandMid, lineWidth: 1, dashed: true, legend: OVERLAY_LEGEND.bollingerMid });
         out.push({ key: 'bbL', data: b.lower, color: C.band, lineWidth: 1 });
       }
     }
@@ -104,12 +113,15 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
       const r = regressionChannel(bars, 20);
       if (r.mid.length) {
         out.push({ key: 'lrcU', data: r.upper, color: C.lrc, lineWidth: 1 });
-        out.push({ key: 'lrcM', data: r.mid, color: C.lrc, lineWidth: 2 });
+        out.push({ key: 'lrcM', data: r.mid, color: C.lrc, lineWidth: 2, legend: OVERLAY_LEGEND.lrc });
         out.push({ key: 'lrcL', data: r.lower, color: C.lrc, lineWidth: 1 });
       }
     }
     return out;
   }, [bars, on]);
+
+  // 범례는 **그려진 선에서만** 파생된다 — 별도 목록을 들면 즉시 드리프트한다.
+  const legend = useMemo(() => lines.filter(l => l.legend && l.data.length > 0), [lines]);
 
   const priceLines = useMemo<PriceLineSpec[]>(() => {
     if (!on.has('supportResistance') || bars.length === 0) return [];
@@ -132,52 +144,71 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
   }, [signals, barTimes]);
 
   // ── 서브패널 ─────────────────────────────────────────────────
-  const subPanels = useMemo<SubPanelSpec[]>(() => {
-    if (bars.length === 0) return [];
+  // 표본 미달로 계산 자체가 안 되는 지표는 패널을 만들지 않고 `notices`로 넘긴다 —
+  // 칩을 켰는데 아무 일도 일어나지 않으면 칩이 고장 난 것처럼 보인다.
+  const { panels: subPanels, notices: panelNotices } = useMemo(() => {
     const out: SubPanelSpec[] = [];
+    const miss: { key: PanelIndicatorKey; text: string }[] = [];
+    if (bars.length === 0) return { panels: out, notices: miss };
     if (on.has('volume')) {
       const series: SubPanelSpec['series'] = [{ kind: 'histogram', key: 'vol', data: volumeSeries(bars), color: '#85878D40' }];
       const ma = volumeMaSeries(bars, 20);
       // 주황선 = 20일 평균. 배너의 "평소의 N배"와 같은 창을 쓴다.
       if (ma.length) series.push({ kind: 'line', key: 'volMa', data: ma, color: C.volMa, lineWidth: 1, lastValueVisible: false });
-      out.push({ key: 'volume', label: '거래량 (주황선 = 20일 평균)', heightClass: 'h-24', series, valueFormatter: formatVolumeAxis });
+      // 평균선이 없으면 라벨에서도 뺀다 — 없는 선을 설명하는 라벨은 거짓이다.
+      out.push({
+        key: 'volume', label: ma.length ? PANEL_LABEL.volume : PANEL_LABEL.volumeNoMa,
+        heightClass: 'h-24', series, valueFormatter: formatVolumeAxis,
+      });
     }
     if (on.has('rsi')) {
       const r = rsiSeries(bars);
-      if (r.length) out.push({
-        key: 'rsi', label: 'RSI (14)', heightClass: 'h-24',
-        series: [{ kind: 'line', key: 'rsi', data: r, color: C.ind, lineWidth: 2 }],
-        guides: [{ value: 70, color: C.guide }, { value: 30, color: C.guide }],
-        fixedRange: { min: 0, max: 100 },
-        valueFormatter: (v) => v.toFixed(0),
-      });
+      if (r.length) {
+        out.push({
+          key: 'rsi', label: PANEL_LABEL.rsi, heightClass: 'h-24',
+          series: [{ kind: 'line', key: 'rsi', data: r, color: C.ind, lineWidth: 2 }],
+          guides: [{ value: 70, color: C.guide }, { value: 30, color: C.guide }],
+          fixedRange: { min: 0, max: 100 },
+          valueFormatter: (v) => v.toFixed(0),
+        });
+      } else miss.push({ key: 'rsi', text: panelSampleNotice('rsi', bars.length) });
     }
     if (on.has('macd')) {
       const m = macdSeries(bars);
-      if (m.macd.length) out.push({
-        key: 'macd', label: 'MACD (12, 26, 9)', heightClass: 'h-24',
-        series: [
-          { kind: 'histogram', key: 'macdHist', data: m.histogram, color: C.ind2 },
-          { kind: 'line', key: 'macdLine', data: m.macd, color: C.ind, lineWidth: 2 },
-          { kind: 'line', key: 'macdSignal', data: m.signal, color: C.ind2, lineWidth: 1 },
-        ],
-        guides: [{ value: 0, color: C.guide }],
-      });
+      if (m.macd.length) {
+        // 시그널선(macd의 SMA9)은 본선보다 8봉 늦다 — 아직 없으면 라벨의 '9'도 빼고
+        // 빈 시리즈는 넣지 않는다(히스토그램도 시그널이 있어야 생긴다).
+        const hasSignal = m.signal.length > 0;
+        const series: SubPanelSpec['series'] = [];
+        if (m.histogram.length) series.push({ kind: 'histogram', key: 'macdHist', data: m.histogram, color: C.ind2 });
+        series.push({ kind: 'line', key: 'macdLine', data: m.macd, color: C.ind, lineWidth: 2 });
+        if (hasSignal) series.push({ kind: 'line', key: 'macdSignal', data: m.signal, color: C.ind2, lineWidth: 1 });
+        out.push({
+          key: 'macd',
+          label: hasSignal ? PANEL_LABEL.macd : PANEL_LABEL.macdNoSignal,
+          heightClass: 'h-24', series,
+          guides: [{ value: 0, color: C.guide }],
+        });
+      } else miss.push({ key: 'macd', text: panelSampleNotice('macd', bars.length) });
     }
     if (on.has('stochastic')) {
       const s = stochasticSeries(bars);
-      if (s.k.length) out.push({
-        key: 'stoch', label: '스토캐스틱 (%K 14, %D 3)', heightClass: 'h-24',
-        series: [
-          { kind: 'line', key: 'stochK', data: s.k, color: C.ind, lineWidth: 2 },
-          { kind: 'line', key: 'stochD', data: s.d, color: C.ind2, lineWidth: 1 },
-        ],
-        guides: [{ value: 80, color: C.guide }, { value: 20, color: C.guide }],
-        fixedRange: { min: 0, max: 100 },
-        valueFormatter: (v) => v.toFixed(0),
-      });
+      if (s.k.length) {
+        // %D(= %K의 SMA3)는 %K보다 2봉 늦다 — 아직 없으면 라벨에서도 뺀다(MACD 시그널과 동일).
+        const hasD = s.d.length > 0;
+        const series: SubPanelSpec['series'] = [{ kind: 'line', key: 'stochK', data: s.k, color: C.ind, lineWidth: 2 }];
+        if (hasD) series.push({ kind: 'line', key: 'stochD', data: s.d, color: C.ind2, lineWidth: 1 });
+        out.push({
+          key: 'stoch',
+          label: hasD ? PANEL_LABEL.stochastic : PANEL_LABEL.stochasticNoD,
+          heightClass: 'h-24', series,
+          guides: [{ value: 80, color: C.guide }, { value: 20, color: C.guide }],
+          fixedRange: { min: 0, max: 100 },
+          valueFormatter: (v) => v.toFixed(0),
+        });
+      } else miss.push({ key: 'stochastic', text: panelSampleNotice('stochastic', bars.length) });
     }
-    return out;
+    return { panels: out, notices: miss };
   }, [bars, on]);
 
   // 모바일 동시 서브패널 상한 — 넘으면 세로가 끝없이 길어진다(§4-4).
@@ -249,6 +280,18 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
         })}
       </div>
 
+      {/* 범례 — 실제 그려진 선만. 표본 미달로 빠진 선(예: 35거래일 종목의 60일선)은 표식도 없다. */}
+      {legend.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+          {legend.map(l => (
+            <span key={l.key} className="flex items-center gap-1.5 text-xs text-faint">
+              <span className="w-3 h-0.5 rounded-full" style={{ backgroundColor: l.color }} />
+              {l.legend}
+            </span>
+          ))}
+        </div>
+      )}
+
       {bars.length === 0 ? (
         <div className="h-72 w-full flex items-center justify-center text-xs text-faint">
           차트를 그릴 데이터가 아직 부족해요.
@@ -265,6 +308,13 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
           priceFormatter={formatPriceAxis}
         />
       )}
+
+      {/* 계산 불가 서브패널 — 빈 칸 대신 그 자리에 사실 안내. 칩은 그대로 토글된다. */}
+      {panelNotices.map(n => (
+        <div key={n.key} className="mt-1 border border-line rounded-xl bg-inset px-3 py-4">
+          <p className="text-xs text-muted leading-relaxed">{n.text}</p>
+        </div>
+      ))}
 
       {hiddenPanelCount > 0 && (
         <p className="text-xs text-faint mt-2">

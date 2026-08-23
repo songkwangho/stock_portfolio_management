@@ -62,3 +62,7 @@ scripts/backtest/out/
 # 세션 지시문 (추가분)
 /phase4-session1-instruction.md
 /phase4-session1-validation.sql
+
+# 차트 지표 오버레이 스펙 (세션 산출물)
+/chart-indicator-overlays-spec.md
+/chart-overlay-edgecase-polish-spec.md
