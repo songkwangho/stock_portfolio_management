@@ -277,13 +277,22 @@ router.get('/stock/:code/themes', async (req, res) => {
 // market_opinion 내부 계산은 유지된다(다른 소비처) — 이 응답에서 **노출만** 끊는다.
 router.get('/recommendations', async (req, res) => {
     try {
-        const { rows: curated } = await query(`
-            SELECT r.*, s.name, s.category
+        // ⚠️ 이 응답은 `stocks` 스냅샷만으로 완성된다 — 쓰는 필드가 전부 그 테이블에 있다.
+        //
+        // 예전엔 큐레이션 종목마다 `getStockData`를 호출했다. 그건 **풀 분석**이라
+        // (stock_history 조회 + MarketOpinion 4축 채점 + 캐시 미스 시 네이버 스크래핑)
+        // 콜드 캐시에서 20종목 ÷ 배치3 × ~15초 ≈ **110초**가 걸렸다. 클라 axios 타임아웃은
+        // 30초(M-1)라 **첫 사용자·캐시 만료 후 사용자는 빈 화면**을 봤다. 목록에 필요한 건
+        // 큐레이션 텍스트 + 시세·밸류 스냅샷뿐이라 분석·스크래핑이 아예 필요 없다.
+        //
+        // 판정 필드(market_opinion·targetPrice·analysis·advice)는 **넣지 않는다** — D1에서
+        // 걷어낸 것이라 여기로 되돌아오면 목록이 다시 매수 신호처럼 읽힌다.
+        const { rows } = await query(`
+            SELECT r.code, s.name, s.category, r.reason, r.score, r.source,
+                   s.price AS "currentPrice", s.per, s.pbr, s.roe
             FROM recommended_stocks r
             JOIN stocks s ON r.code = s.code
         `);
-
-        const combined = curated.map(r => ({ ...r, source: r.source || 'manual' }));
 
         const deviceId = getDeviceId(req);
         let holdingCodes = [];
@@ -291,38 +300,34 @@ router.get('/recommendations', async (req, res) => {
             const { rows: hrows } = await query('SELECT code FROM holding_stocks WHERE device_id = $1', [deviceId]);
             holdingCodes = hrows.map(h => h.code);
         }
-        const nonHoldings = combined.filter(c => !holdingCodes.includes(c.code));
 
-        // 배치 처리 (Neon 풀 max=5 + getStockData 내부 withTransaction connection 점유 고려).
-        // Promise.all로 97종목 동시 호출 시 캐시 미스 구간에서 풀 경합 발생 → BATCH=3으로 직렬화.
-        const RECOMMEND_BATCH_SIZE = 3;
-        const results = [];
-        for (let i = 0; i < nonHoldings.length; i += RECOMMEND_BATCH_SIZE) {
-            const chunk = nonHoldings.slice(i, i + RECOMMEND_BATCH_SIZE);
-            const chunkResults = await Promise.all(chunk.map(async (rec) => {
-                const stockData = await getStockData(rec.code, rec.name);
-                if (!stockData) return null;
+        // per/pbr/roe는 NUMERIC(10,4) → pg가 **문자열**로 준다("7.7100"). 기존 응답은 숫자였으므로
+        // 캐스팅해서 형태를 유지한다(service.js buildFallback의 num()과 동일 동작 — null은 null).
+        const num = (v) => {
+            if (v === null || v === undefined) return null;
+            const n = Number(v);
+            return Number.isNaN(n) ? null : n;
+        };
 
-                // 적정가·목표가·상승여력 게이트 없음(D1). 시세를 못 가져온 종목만 빠진다.
-                return {
-                    code: rec.code,
-                    name: rec.name,
-                    category: rec.category,
-                    reason: rec.reason,
-                    score: rec.score,          // 큐레이션 순서용(정렬). 화면에는 노출하지 않는다.
-                    currentPrice: stockData.price,
-                    per: stockData.per,
-                    pbr: stockData.pbr,
-                    roe: stockData.roe,
-                    source: rec.source || 'manual',
-                    tossUrl: stockData.tossUrl,
-                };
+        const available = rows
+            .filter(r => !holdingCodes.includes(r.code))
+            .map(r => ({
+                code: r.code,
+                name: r.name,
+                category: r.category,
+                reason: r.reason,
+                score: r.score,          // 큐레이션 순서용(정렬). 화면에는 노출하지 않는다.
+                currentPrice: r.currentPrice,
+                per: num(r.per),
+                pbr: num(r.pbr),
+                roe: num(r.roe),
+                source: r.source || 'manual',
+                // 예전엔 stock_analysis.toss_url을 읽었는데 값이 이 형식으로 저장돼 있었다 → 즉석 생성.
+                tossUrl: `https://tossinvest.com/stocks/${r.code}/order`,
             }));
-            results.push(...chunkResults);
-        }
 
         // 큐레이션 순서만 남는다 — 판정 게이트(market_opinion==='긍정적') 제거(D1).
-        const available = results.filter(r => r !== null);
+        // 정렬은 SQL ORDER BY가 아니라 기존 JS 비교자를 그대로 둔다(score NULL 처리 순서 불변).
         available.sort((a, b) => b.score - a.score);
         res.json(available);
     } catch (error) {

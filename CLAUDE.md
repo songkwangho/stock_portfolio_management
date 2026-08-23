@@ -837,6 +837,17 @@ Phase 2 배포 후 라이브 확인에서 나온 소규모 폴리시 2건. 최�
 - ⚠️ **범위 밖 발견 — `/recommendations`가 실서버에서 110초**: 클라이언트 axios 타임아웃 30초를 넘겨 **실사용자에게도 로딩 실패**한다(QA는 응답을 캐시해 진행). 반응형 문제가 아니라 백엔드 성능 문제 → 별도 처리 필요
 - ⚠️ **의도적 허용**: 자산배분 범례에서 768~1023·xl은 카드가 좁아(사이드바 점유) 가장 긴 종목명이 `…`로 잘린다. 지시문이 허용한 처리(truncate + `title`)이고 완전 숨김은 없다
 
+**오픈 블로커 — `/recommendations` 110초 → 단일 JOIN (2026-08-24)**
+
+반응형 QA 2차에서 범위 밖으로 발견한 것. `GET /api/recommendations`가 큐레이션 20종목 **각각에 `getStockData`를 호출**했다 — 그건 풀 분석(`stock_history` 조회 + MarketOpinion 4축 채점 + **캐시 미스 시 네이버 스크래핑**)이라 콜드 캐시에서 20 ÷ 배치3 × ~15초 ≈ **110초**. 클라 axios 타임아웃 30초(M-1)를 넘겨 **빈 화면**이었다.
+
+- [x] **[REC-1]** `getStockData` 루프 → **단일 SQL JOIN**(`recommended_stocks ⋈ stocks`). 이 응답이 쓰는 필드(`name·category·price·per·pbr·roe`)는 **전부 `stocks` 스냅샷에 있다**(일 1회 배치 갱신 — 앱 대부분이 같은 스냅샷을 쓴다). `tossUrl`은 코드로 즉석 생성. 쿼리 2개(추천 JOIN + 보유 코드)로 끝
+- **응답 형태·필드명 불변**(프론트 무변경): `per/pbr/roe`는 NUMERIC → pg가 **문자열**("7.7100")로 주므로 `num()` 캐스팅으로 숫자 유지(`buildFallback`과 같은 동작, null은 null). 정렬은 SQL `ORDER BY`로 옮기지 않고 **기존 JS 비교자 유지** — score NULL 처리 순서가 달라지지 않게
+- **D1 중립성 유지**: `market_opinion·targetPrice·analysis·advice` 미포함(회귀 금지). 판정 필드가 이 목록에 돌아오면 "살펴볼 종목"이 다시 매수 신호로 읽힌다
+- ⚠️ **심각도 정정 — "첫 사용자만"이 아니다**: `CACHE_TTL`이 **10분**이라(`server/helpers/cache.js`) **10분 이상 방문이 없으면 매 사용자가** 110초 경로를 탔다. 저트래픽 앱에서는 사실상 상시. QA가 이걸 못 본 이유는 직전 호출로 캐시가 더워져 있었기 때문(warm 0.47s 실측)
+- 검증: node --check · tsc 0 · next build ✓ · npm test 597 · **라이브 콜드 응답 측정**(배포 후 첫 요청)
+- **후속(범위 밖)**: Render 무료 티어 cold start(첫 요청 30~50초)는 그대로 남는다 — 헬스체크·워밍으로 별도 대응
+
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
 - [x] **[M1]** 차트 `components/charts/` 분리 + dynamic import — 위 Phase 1에서 완료
 - [x] **[M2]** 캔들차트 lightweight-charts 전환 — 위 Phase 1에서 완료
