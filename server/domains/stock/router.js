@@ -327,8 +327,15 @@ router.get('/recommendations', async (req, res) => {
             }));
 
         // 큐레이션 순서만 남는다 — 판정 게이트(market_opinion==='긍정적') 제거(D1).
-        // 정렬은 SQL ORDER BY가 아니라 기존 JS 비교자를 그대로 둔다(score NULL 처리 순서 불변).
-        available.sort((a, b) => b.score - a.score);
+        // 정렬은 SQL ORDER BY로 옮기지 않는다 — Postgres는 DESC에서 NULL을 먼저 놓는데
+        // 기존 JS 비교자는 다르게 처리한다(순서가 조용히 바뀌면 안 된다).
+        //
+        // 동률은 **코드 오름차순으로 고정**한다. 이전엔 `ORDER BY` 없는 SELECT의 행 순서가
+        // 그대로 타이브레이크였다(Array.sort는 안정 정렬) → 같은 점수 종목의 앞뒤가 방문마다
+        // 흔들렸다(실측: score 83에서 하이브 ↔ POSCO홀딩스 교체). 큐레이션 목록은 사용자가
+        // 다시 찾아오는 화면이라 순서가 고정돼야 한다(D차 기여 분해의 동률 규칙과 동일).
+        // score가 null이면 차가 NaN(falsy)이라 자연히 코드 순으로 떨어진다.
+        available.sort((a, b) => (b.score - a.score) || a.code.localeCompare(b.code));
         res.json(available);
     } catch (error) {
         console.error('Recommendations API Error:', error.message);

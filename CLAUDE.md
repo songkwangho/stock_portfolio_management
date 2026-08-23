@@ -845,7 +845,8 @@ Phase 2 배포 후 라이브 확인에서 나온 소규모 폴리시 2건. 최�
 - **응답 형태·필드명 불변**(프론트 무변경): `per/pbr/roe`는 NUMERIC → pg가 **문자열**("7.7100")로 주므로 `num()` 캐스팅으로 숫자 유지(`buildFallback`과 같은 동작, null은 null). 정렬은 SQL `ORDER BY`로 옮기지 않고 **기존 JS 비교자 유지** — score NULL 처리 순서가 달라지지 않게
 - **D1 중립성 유지**: `market_opinion·targetPrice·analysis·advice` 미포함(회귀 금지). 판정 필드가 이 목록에 돌아오면 "살펴볼 종목"이 다시 매수 신호로 읽힌다
 - ⚠️ **심각도 정정 — "첫 사용자만"이 아니다**: `CACHE_TTL`이 **10분**이라(`server/helpers/cache.js`) **10분 이상 방문이 없으면 매 사용자가** 110초 경로를 탔다. 저트래픽 앱에서는 사실상 상시. QA가 이걸 못 본 이유는 직전 호출로 캐시가 더워져 있었기 때문(warm 0.47s 실측)
-- 검증: node --check · tsc 0 · next build ✓ · npm test 597 · **라이브 콜드 응답 측정**(배포 후 첫 요청)
+- [x] **[REC-2] 동률 정렬 고정** — 라이브 대조에서 발견. 필드 값은 **전건 일치**했는데 순서가 하나 달랐다(score 83에서 하이브 ↔ POSCO홀딩스). 원인은 내 변경이 아니라 **원래부터** `ORDER BY` 없는 SELECT의 행 순서가 타이브레이크였던 것(`Array.sort`는 안정 정렬) → 방문마다 순서가 흔들린다. `|| a.code.localeCompare(b.code)`로 고정(D차 기여 분해의 동률 규칙과 동일). score null도 차가 NaN(falsy)이라 자연히 코드 순으로 떨어진다
+- 검증: node --check · tsc 0 · next build ✓ · npm test 597 · **라이브 콜드 측정 1.69초**(수정 전 동일 조건 110초) · **응답 전건 대조**: 20종목·필드 집합 동일·값 불일치 **0**·타입 정상(currentPrice int / per·pbr·roe float / score int)·판정 필드 유출 없음
 - **후속(범위 밖)**: Render 무료 티어 cold start(첫 요청 30~50초)는 그대로 남는다 — 헬스체크·워밍으로 별도 대응
 
 **4차 — 성능 최적화 (Sprint 3, 배포 후)**
