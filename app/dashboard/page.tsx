@@ -197,7 +197,10 @@ export default function DashboardPage() {
                     2자리로 두면 한 값이 헤드라인과 본문에서 다르게 찍힌다(-29.01% vs -29.0%).
                     formatRatePct는 부호까지 붙여 문장과 완전히 같은 문자열을 낸다
                     (직접 toFixed(1)을 쓰면 |손익률|<0.05%에서 히어로만 '-0.0%'가 된다). */}
-                <p className={`text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
+                {/* 320px 실측: 가용폭 288px인데 80px 글리프는 '-25.6%'에 290px, '-100.0%'에 342px가
+                    필요하다(360px도 '-100.0%'는 넘친다). 400px 미만에서만 한 단계 줄인다 —
+                    VIS-6의 80px 히어로는 그 위에서 그대로 유지된다. */}
+                <p className={`text-[64px] min-[400px]:text-[80px] leading-none font-extrabold tabular-nums tracking-[-0.02em] ${gain ? 'text-rise' : 'text-fall'}`}>
                   {formatRatePct(avgProfitRate)}
                 </p>
                 <p className={`text-[22px] font-bold tabular-nums mt-1 ${gain ? 'text-rise' : 'text-fall'}`}>
@@ -234,24 +237,28 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  // 도넛 180px + 범례는 우측 세로 배치. 2~5조각에 400px는 과하다 (TASK 6).
-                  <div className="flex items-center gap-6">
-                    <div className="w-[180px] h-[180px] shrink-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={54} outerRadius={90} paddingAngle={2} dataKey="value">
-                            {portfolioData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                          </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                  // 도넛 180px + 범례. **md 미만은 세로 스택** — 가로 배치를 유지하면 좁은 폭에서
+                  // 범례 이름 컬럼이 0폭까지 눌려 "62%가 어느 종목인지" 알 수 없게 된다(정보 손실).
+                  // 실측 @360: 가로 배치에서 가장 긴 종목명 폭 0px, 나머지도 17~26px(한 글자).
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                    <div className="w-[180px] h-[180px] shrink-0 self-center sm:self-auto">
+                      {/* ResponsiveContainer를 쓰지 않는다 — 상자가 이미 180×180 고정이라 측정할 게
+                          없고, 부모 레이아웃 확정 전에 0을 재면 차트가 통째로 사라진다(iframe·지연
+                          마운트에서 관측). 고정 px를 직접 주면 그 실패 모드 자체가 없어진다. */}
+                      <PieChart width={180} height={180}>
+                        <Pie data={portfolioData} cx="50%" cy="50%" innerRadius={54} outerRadius={90} paddingAngle={2} dataKey="value">
+                          {portfolioData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #E7E7E3', borderRadius: '10px' }} />
+                      </PieChart>
                     </div>
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="w-full sm:flex-1 min-w-0 space-y-2">
                       {portfolioData.map((item) => (
                         <div key={item.name} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }}></span>
-                            <span className="text-sm text-muted truncate">{item.name}</span>
+                            {/* 이름은 절대 숨기지 않는다 — 넘치면 truncate(…)까지. title로 전체를 남긴다. */}
+                            <span className="text-sm text-muted truncate" title={item.name}>{item.name}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {holdings.length >= 2 && item.value > CONCENTRATION_THRESHOLD && (
@@ -391,9 +398,11 @@ export default function DashboardPage() {
 
       {/* 본문 — 도넛이 히어로로 갔으므로 3열 해제. 차트·원장 모두 풀폭(차트는 넓을수록 유리). */}
       <div className="bg-surface border border-line rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-ink">포트폴리오 수익률 추이</h3>
-          <span className="text-xs text-faint tabular-nums">최근 {portfolioHistory.length}거래일 기준</span>
+        {/* 320px에서 제목이 "추/이"로 쪼개졌다 — 한글 기본 줄바꿈이 글자 단위라 폭이 부족하면
+            단어 중간에서 끊긴다. break-keep(단어 단위) + 우측 라벨을 줄이지 않게 shrink-0. */}
+        <div className="flex items-start justify-between gap-3 mb-6">
+          <h3 className="text-lg font-semibold text-ink break-keep">포트폴리오 수익률 추이</h3>
+          <span className="text-xs text-faint tabular-nums whitespace-nowrap shrink-0 mt-1">최근 {portfolioHistory.length}거래일 기준</span>
         </div>
         {chartData.length > 1 && (
           <p className="text-xs text-faint mb-1 tabular-nums">
