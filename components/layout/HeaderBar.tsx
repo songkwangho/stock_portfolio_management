@@ -56,10 +56,14 @@ export default function HeaderBar({ nickname }: Props) {
   };
 
   return (
-    <header className="h-16 md:h-20 bg-surface border-b border-line px-4 md:px-10 flex items-center justify-between z-10">
-      <div className="flex items-center space-x-6">
+    // D4 — md~xl 전 대역에서 헤더 내용이 가용폭을 넘고 있었다(사이드바가 272px를 먹는다).
+    // 실측 넘침: 768 +388 · 860 +296 · 940 +216 · 1024 +132 · 1100 +56 (1280부터 정상).
+    // 검색창 고정 420px + 지수 213px + 우측 프로필이 동시에 들어갈 폭이 아니다 →
+    // 장식(지수·프로필)은 여유가 생기는 폭으로 미루고, 검색창은 단계적으로 넓힌다.
+    <header className="h-16 md:h-20 bg-surface border-b border-line px-4 md:px-10 flex items-center justify-between gap-3 z-10">
+      <div className="flex items-center space-x-6 min-w-0">
         {marketIndices.length > 0 && (
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-4 shrink-0">
             {marketIndices.map(idx => (
               <div key={idx.symbol} className="flex items-center space-x-2 tabular-nums">
                 <span className="text-xs font-bold text-faint">{idx.symbol}</span>
@@ -74,7 +78,7 @@ export default function HeaderBar({ nickname }: Props) {
           </div>
         )}
         <div className="relative">
-          <div className="flex items-center bg-surface border border-line-strong rounded-xl px-3 md:px-5 py-2.5 w-full md:w-[420px] focus-within:border-ink transition-colors">
+          <div className="flex items-center bg-surface border border-line-strong rounded-xl px-3 md:px-5 py-2.5 w-full md:w-[220px] lg:w-[260px] xl:w-[420px] focus-within:border-ink transition-colors">
             <Search size={18} className="text-faint mr-3" />
             <input
               type="text"
@@ -155,7 +159,7 @@ export default function HeaderBar({ nickname }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center space-x-5">
+      <div className="flex items-center space-x-5 shrink-0">
         <button
           title="알림"
           onClick={() => router.push('/alerts')}
@@ -168,8 +172,8 @@ export default function HeaderBar({ nickname }: Props) {
             </span>
           )}
         </button>
-        <div className="h-6 w-px bg-line hidden md:block"></div>
-        <div className="hidden md:flex items-center space-x-3 cursor-pointer group" onClick={() => router.push('/portfolio')}>
+        <div className="h-6 w-px bg-line hidden xl:block"></div>
+        <div className="hidden xl:flex items-center space-x-3 cursor-pointer group" onClick={() => router.push('/portfolio')}>
           <div className="text-right">
             <p className="text-sm font-bold leading-none mb-1 text-ink">{nickname || '투자자'}</p>
             <p className="text-xs text-faint font-medium">내 포트폴리오</p>

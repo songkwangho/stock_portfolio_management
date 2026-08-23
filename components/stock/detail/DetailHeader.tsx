@@ -34,9 +34,11 @@ export default function DetailHeader({
   const [editForm, setEditForm] = useState({ avgPrice: '', quantity: '' });
 
   return (
-    // D2 — md 미만은 세로 스택. 좁은 폭에서 좌우 2열을 유지하면 폭 경쟁으로 종목명이
-    // 중간에서 쪼개진다("유유/제약"). 한글은 기본 줄바꿈이 글자 단위라 break-keep도 함께 건다.
-    <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-start mb-8">
+    // D2 — 좁은 폭은 세로 스택. 좌우 2열을 유지하면 폭 경쟁으로 종목명이 중간에서 쪼개진다
+    // ("유유/제약"). 한글 기본 줄바꿈이 글자 단위라 break-keep도 함께 건다.
+    // 전환점은 md가 아니라 **lg**다 — 사이드바가 272px를 먹어 md(768)의 본문은 416px뿐이고,
+    // 거기서 2열로 쪼개면 좌측이 ~180px가 되어 테마 태그가 카드를 넘친다(실측 +23px).
+    <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start mb-8">
       <div className="min-w-0">
         <div className="flex items-center space-x-3 mb-2">
           <span className="px-2 py-1 bg-inset text-muted border border-line text-xs font-bold rounded whitespace-nowrap">{stock.category}</span>
@@ -61,7 +63,7 @@ export default function DetailHeader({
             </button>
           )}
         </div>
-        <h2 className="text-3xl md:text-4xl font-bold text-ink break-keep">{stockDetail?.name || stock.name}</h2>
+        <h2 className="text-3xl lg:text-4xl font-bold text-ink break-keep">{stockDetail?.name || stock.name}</h2>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
           <p className="text-faint tabular-nums">{stock.code}</p>
           {stockDetail?.last_updated && (
@@ -85,13 +87,13 @@ export default function DetailHeader({
           </div>
         )}
       </div>
-      <div className="md:text-right md:shrink-0">
+      <div className="lg:text-right lg:shrink-0">
         <p className="text-sm text-muted mb-1">현재가</p>
-        <div className={`text-3xl md:text-4xl font-black tabular-nums ${trend === '상승' ? 'text-rise' : 'text-fall'}`}>
+        <div className={`text-3xl lg:text-4xl font-black tabular-nums ${trend === '상승' ? 'text-rise' : 'text-fall'}`}>
           ₩{latestPrice.toLocaleString()}
         </div>
         {isHolding && (
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 md:justify-end">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 lg:justify-end">
             {/* 두 조각을 각각 nowrap으로 묶는다 — 통째로 nowrap이면 320px에서 넘치고,
                 아무 처리도 안 하면 "매수가: ₩4,/469"처럼 숫자 중간에서 끊긴다. */}
             <p className={`text-sm font-bold tabular-nums ${parseFloat(profitRate || '0') >= 0 ? 'text-rise' : 'text-fall'}`}>

@@ -301,7 +301,10 @@ function PortfolioContent() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* D3 — 2열을 md(768)에서 켜면 사이드바(272px)를 뺀 본문이 416px라 카드 내용이 ~148px가 된다.
+          실측: 종목명이 0폭으로 사라지고, 버튼이 세로로 뭉개지고, 수익률이 옆 카드 위로 넘쳤다.
+          카드 내용이 340px 이상 확보되는 폭에서만 2열로 쪼갠다. */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {holdings.map((stock) => {
           const profit = stock.currentPrice && stock.avgPrice ? (stock.currentPrice - stock.avgPrice) : 0;
           const profitRate = stock.avgPrice ? (profit / stock.avgPrice * 100).toFixed(2) : '0';
@@ -318,7 +321,7 @@ function PortfolioContent() {
               )}
               <div className="flex justify-between items-start mb-5">
                 <div className="cursor-pointer min-w-0" onClick={() => onDetailClick({ ...stock, category: '보유 종목' })}>
-                  <h3 className="text-lg font-bold text-ink transition-colors truncate">{stock.name}</h3>
+                  <h3 className="text-lg font-bold text-ink transition-colors truncate" title={stock.name}>{stock.name}</h3>
                   <p className="text-xs text-faint tabular-nums">{stock.code}</p>
                 </div>
                 <div className="text-right relative shrink-0 ml-3">
@@ -336,25 +339,29 @@ function PortfolioContent() {
                   <p className={`text-xl font-extrabold tabular-nums ${parseFloat(profitRate) >= 0 ? 'text-rise' : 'text-fall'}`}>
                     {parseFloat(profitRate) >= 0 ? '+' : ''}{profitRate}%
                   </p>
-                  {/* 내 손익 서술 — 판정 뱃지가 사라졌으므로 '매도'일 때 숨기던 가드도 제거(N2).
-                      아래 관찰 문장은 평균 가격 위치를, 이 줄은 내 손익을 말한다(축이 달라 중복 아님). */}
-                  <p className={`text-xs mt-0.5 ${
-                    parseFloat(profitRate) >= 0 ? 'text-rise' :
-                    parseFloat(profitRate) >= -3 ? 'text-muted' :
-                    parseFloat(profitRate) >= -7 ? 'text-caution' :
-                    'text-fall'
-                  }`}>
-                    {/* B3 — 방향 넛지("목표 수익 달성!"·"추세를 유지해 보세요"·"지켜보세요") 제거.
-                        내 손익이 어느 구간인지 사실로만 말한다. */}
-                    {parseFloat(profitRate) >= 20 ? '매수가보다 20% 넘게 올라 있어요' :
-                     parseFloat(profitRate) >= 10 ? '매수가보다 10% 넘게 올라 있어요' :
-                     parseFloat(profitRate) >= 0 ? '매수가보다 조금 올라 있어요' :
-                     parseFloat(profitRate) >= -3 ? '매수가보다 조금 내려 있어요. 주식은 단기 등락이 있어요' :
-                     parseFloat(profitRate) >= -7 ? '매수가보다 3% 넘게 내려 있어요' :
-                     '매수가보다 7% 넘게 내려 있어요. 해당 종목의 분석을 다시 확인해보세요'}
-                  </p>
                 </div>
               </div>
+
+              {/* 내 손익 서술 — 판정 뱃지가 사라졌으므로 '매도'일 때 숨기던 가드도 제거(N2).
+                  아래 관찰 문장은 평균 가격 위치를, 이 줄은 내 손익을 말한다(축이 달라 중복 아님).
+                  D3 — 이 문장은 위 우측 블록 안에 있었다. 그 블록은 shrink-0라서 문장의 max-content
+                  (최대 40자 ≈ 375px)가 그대로 블록 폭이 되어 카드를 뚫고 나갔다. 문장은 우측 정렬
+                  숫자가 아니라 한 줄 서술이므로 카드 전폭 행으로 내린다. 읽는 순서는 그대로. */}
+              <p className={`text-xs mb-4 -mt-3 leading-relaxed break-keep ${
+                parseFloat(profitRate) >= 0 ? 'text-rise' :
+                parseFloat(profitRate) >= -3 ? 'text-muted' :
+                parseFloat(profitRate) >= -7 ? 'text-caution' :
+                'text-fall'
+              }`}>
+                {/* B3 — 방향 넛지("목표 수익 달성!"·"추세를 유지해 보세요"·"지켜보세요") 제거.
+                    내 손익이 어느 구간인지 사실로만 말한다. */}
+                {parseFloat(profitRate) >= 20 ? '매수가보다 20% 넘게 올라 있어요' :
+                 parseFloat(profitRate) >= 10 ? '매수가보다 10% 넘게 올라 있어요' :
+                 parseFloat(profitRate) >= 0 ? '매수가보다 조금 올라 있어요' :
+                 parseFloat(profitRate) >= -3 ? '매수가보다 조금 내려 있어요. 주식은 단기 등락이 있어요' :
+                 parseFloat(profitRate) >= -7 ? '매수가보다 3% 넘게 내려 있어요' :
+                 '매수가보다 7% 넘게 내려 있어요. 해당 종목의 분석을 다시 확인해보세요'}
+              </p>
 
               {stock.holding_opinion && (
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -440,16 +447,17 @@ function PortfolioContent() {
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <button onClick={() => onDetailClick({ ...stock, category: '보유 종목' })} className="flex-1 py-3 min-h-[44px] bg-surface border border-line-strong text-ink hover:bg-inset rounded-xl text-xs font-bold transition-colors flex items-center justify-center">
+              {/* 카드가 좁아지면 3개가 한 줄에 안 들어가 글자가 세로로 쌓였다 → 줄바꿈 허용. */}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => onDetailClick({ ...stock, category: '보유 종목' })} className="flex-1 min-w-[120px] py-3 min-h-[44px] bg-surface border border-line-strong text-ink hover:bg-inset rounded-xl text-xs font-bold transition-colors flex items-center justify-center whitespace-nowrap">
                   상세 분석 →
                 </button>
                 {!isEditing && (
-                  <button onClick={() => startEdit(stock)} className="py-3 px-4 min-h-[44px] bg-surface border border-line text-muted hover:bg-inset hover:text-ink rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5">
+                  <button onClick={() => startEdit(stock)} className="py-3 px-4 min-h-[44px] bg-surface border border-line text-muted hover:bg-inset hover:text-ink rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap">
                     <Pencil size={12} /><span>수정</span>
                   </button>
                 )}
-                <button onClick={() => handleDelete(stock)} className="py-3 px-4 min-h-[44px] bg-surface border border-line text-muted hover:bg-inset hover:text-ink rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5">
+                <button onClick={() => handleDelete(stock)} className="py-3 px-4 min-h-[44px] bg-surface border border-line text-muted hover:bg-inset hover:text-ink rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap">
                   <Trash2 size={14} /><span>삭제</span>
                 </button>
               </div>

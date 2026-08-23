@@ -40,7 +40,11 @@ export default function DisclosureList({ data }: { data: DartDisclosuresResult |
                   {it.categoryLabel}
                 </span>
                 <span className="flex-1 min-w-0">
-                  <span className="text-sm text-ink group-hover:underline break-keep">{it.reportNm}</span>
+                  {/* 공시 제목은 기계 생성이라 공백 없는 긴 토큰이 온다
+                      ("[기재정정]유형자산취득결정(종속회사의주요경영사항)"). break-keep만 걸면
+                      끊을 자리가 없어 320px에서 컨테이너를 +23px 넘친다 → break-words를 함께 걸어
+                      **한 줄에 안 들어가는 토큰만** 강제로 넘긴다(일반 단어는 그대로 유지). */}
+                  <span className="text-sm text-ink group-hover:underline break-keep break-words min-w-0">{it.reportNm}</span>
                   {it.isRevised && <span className="ml-1 text-xs text-caution whitespace-nowrap">· 이후 정정된 공시예요</span>}
                   {it.isWithdrawn && <span className="ml-1 text-xs text-caution whitespace-nowrap">· 철회된 공시예요</span>}
                 </span>
