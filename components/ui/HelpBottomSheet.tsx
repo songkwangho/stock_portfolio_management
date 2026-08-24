@@ -1,5 +1,6 @@
 'use client';
 import { X } from 'lucide-react';
+import { INDICATOR_ILLUS, indicatorGraphicKey } from '@/lib/stockDetail/indicatorGraphics';
 
 export type HelpTermKey =
   | 'per' | 'pbr' | 'roe' | 'peg'
@@ -207,13 +208,19 @@ interface HelpBottomSheetProps {
 const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
   if (!termKey) return null;
   const content = HELP_CONTENTS[termKey];
+  // 그림이 있는 지표(차트 칩 9종)만 삽화를 얹는다. PER·PBR 등은 null → 슬롯 자체가 없다.
+  const graphic = indicatorGraphicKey(termKey);
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[200] flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-surface border border-line rounded-t-xl md:rounded-xl p-6 max-w-md w-full space-y-4 shadow-lg animate-in slide-in-from-bottom-4 duration-200"
+        // 삽화가 얹히면 세로가 길어져 작은 화면에서 '닫기'가 밀려난다 → 시트 높이를 제한하고
+        // **본문만** 스크롤시킨다. '닫기'는 스크롤 밖에 고정 — 스크롤해야 나타나면 작은 화면에서
+        // 닫는 법을 찾아야 한다(MOB-4에서 DisclaimerModal에 적용한 것과 같은 처리).
+        className="bg-surface border border-line rounded-t-xl md:rounded-xl max-w-md w-full max-h-[88vh] flex flex-col shadow-lg animate-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+      <div className="overflow-y-auto p-6 space-y-4">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-lg font-bold text-ink">{content.title}</h3>
@@ -223,6 +230,13 @@ const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
             <X size={20} />
           </button>
         </div>
+        {/* 삽화 — 글보다 먼저 모양을 보여준다. 주석은 관찰형 사실만(indicatorGraphics SSOT).
+            폭을 300px로 묶는 이유: viewBox가 그대로 확대되면 주석 글자가 본문보다 커진다. */}
+        {graphic && (
+          <div className="bg-inset border border-line rounded-lg p-3">
+            <div className="mx-auto w-full max-w-[300px]">{INDICATOR_ILLUS[graphic]}</div>
+          </div>
+        )}
         <div className="space-y-2">
           {content.body.map((line, i) => (
             <p key={i} className="text-sm text-muted leading-relaxed">{line}</p>
@@ -247,12 +261,15 @@ const HelpBottomSheet = ({ termKey, onClose }: HelpBottomSheetProps) => {
             <p className="text-xs text-muted leading-relaxed">⚠️ {content.caveat}</p>
           </div>
         )}
+      </div>
+      <div className="shrink-0 border-t border-line px-6 py-4">
         <button
           onClick={onClose}
           className="w-full py-3 bg-ink hover:opacity-90 text-surface text-sm font-bold rounded-xl transition-opacity"
         >
           닫기
         </button>
+      </div>
       </div>
     </div>
   );

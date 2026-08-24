@@ -12,6 +12,7 @@ import {
   CHIPS, DEFAULT_ON, MOBILE_PANEL_LIMIT, chartNotices, NOTICE_EMPTY,
   panelSampleNotice, OVERLAY_LEGEND, PANEL_LABEL, type ChipKey, type PanelIndicatorKey,
 } from '@/lib/stockDetail/chartChips';
+import { INDICATOR_ICON, indicatorGraphicKey } from '@/lib/stockDetail/indicatorGraphics';
 import type { StockDetail, HistoryEntry, SignalResult } from '@/types/stock';
 import type { HelpTermKey } from '@/components/ui/HelpBottomSheet';
 import type { SubPanelSpec, MarkerSpec, LineSpec, PriceLineSpec } from '@/components/charts/LwcChart';
@@ -255,27 +256,42 @@ export default function ChartSection({ code, stockDetail, signals, onHelp }: Cha
         )}
       </div>
 
-      {/* 지표 칩 — 칩 본체 = 그리기 토글, [?] = 읽는 법 팝업 */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      {/* 지표 칩 — 그림 + 이름. 칩 본체 = 그리기 토글, [?] = 읽는 법 팝업.
+          두 버튼은 **형제**다(중첩 금지 — /themes UX-F와 같은 처리). */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 xl:grid-cols-9 gap-2 mb-4">
         {CHIPS.map(chip => {
           const active = on.has(chip.key);
+          const graphic = indicatorGraphicKey(chip.help);
           return (
-            <span key={chip.key}
-              className={`inline-flex items-center rounded-lg border text-xs font-bold transition-colors ${
-                active ? 'bg-ink text-surface border-ink' : 'bg-inset text-muted border-line'
-              }`}>
+            <div key={chip.key} className="relative">
               <button onClick={() => toggle(chip.key)}
-                className="pl-3 pr-1.5 py-2 min-h-[36px]"
+                className={`w-full rounded-lg border overflow-hidden transition-colors ${
+                  active ? 'border-ink' : 'border-line hover:border-line-strong'
+                }`}
                 aria-pressed={active}
                 aria-label={`${chip.label} ${active ? '숨기기' : '표시'}`}>
-                {chip.label}
+                {/* 아이콘 칸은 항상 흰 바탕 — on일 때 배경을 뒤집으면 어두운 선이 안 보인다.
+                    off는 흐리게 해서 "지금 안 그려짐"을 나타낸다(아이콘 자체는 상태가 아니다). */}
+                <span className={`block bg-surface px-2 pt-2 pb-1 ${active ? '' : 'opacity-40'}`}>
+                  <span className="block mx-auto w-full max-w-[56px]">
+                    {graphic && INDICATOR_ICON[graphic]}
+                  </span>
+                </span>
+                {/* 이름 띠 — on/off 대비는 기존 칩과 같은 방식(어두운 배경 = 그려짐)으로 남긴다. */}
+                <span className={`block px-1 py-1.5 text-xs font-bold leading-tight break-keep ${
+                  active ? 'bg-ink text-surface' : 'bg-inset text-muted'
+                }`}>
+                  {chip.label}
+                </span>
               </button>
               <button onClick={() => onHelp(chip.help)}
-                className={`pr-2.5 pl-1 py-2 min-h-[36px] ${active ? 'text-surface/70 hover:text-surface' : 'text-faint hover:text-ink'}`}
+                className={`absolute top-0 right-0 px-1.5 py-1 text-xs rounded-bl-lg ${
+                  active ? 'text-muted hover:text-ink' : 'text-faint hover:text-ink'
+                }`}
                 aria-label={`${chip.label} 읽는 법`}>
                 [?]
               </button>
-            </span>
+            </div>
           );
         })}
       </div>
