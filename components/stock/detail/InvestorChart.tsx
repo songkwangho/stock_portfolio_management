@@ -3,6 +3,7 @@
 import {
   ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine, Bar,
 } from 'recharts';
+import { INVESTOR_SECTION_COPY } from '@/lib/stockDetail/helpTexts';
 import type { StockDetail } from '@/types/stock';
 import type { HelpTermKey } from '@/components/ui/HelpBottomSheet';
 
@@ -21,8 +22,10 @@ export default function InvestorChart({ stockDetail, onHelp }: InvestorChartProp
         <h3 className="text-lg font-semibold text-ink">투자자별 매매동향</h3>
         <span onClick={() => onHelp('supplyDemand')} className="text-faint hover:text-ink text-xs min-w-[24px] min-h-[24px] flex items-center justify-center cursor-pointer" aria-label="수급 도움말">[?]</span>
       </div>
-      <p className="text-xs text-muted mb-1">최근 10거래일 동안 외국인·기관이 주식을 사고판 양을 보여줘요</p>
-          <p className="text-xs text-faint mb-4">외국인·기관이 함께 매수하면 긍정적 신호로 보는 경우가 많아요. 단, 단기 흐름만으로 판단하지 마세요.</p>
+      {/* 문구는 lib/stockDetail/helpTexts.ts의 상수를 쓴다 — 컴포넌트에 인라인하면
+          금지어 스윕 밖으로 새고, 실제로 여기만 "긍정적 신호" 프레이밍이 남아 있었다. */}
+      <p className="text-xs text-muted mb-1">{INVESTOR_SECTION_COPY.what}</p>
+          <p className="text-xs text-faint mb-4">{INVESTOR_SECTION_COPY.caveat}</p>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stockDetail.investorData.slice(-10).map((d) => ({

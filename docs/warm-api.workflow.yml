@@ -1,0 +1,61 @@
+# ⚠️ 배치 필요 — 이 파일을 `.github/workflows/warm-api.yml`로 옮겨야 동작한다.
+#
+#     mkdir -p .github/workflows
+#     git mv docs/warm-api.workflow.yml .github/workflows/warm-api.yml
+#     git commit -m "ci: /api/health 크론 워밍" && git push
+#
+# 왜 여기에 있나: CC의 GitHub 토큰 스코프가 `gist, read:org, repo`뿐이라
+# `.github/workflows/` 경로 생성이 거부된다("refusing to allow an OAuth App to
+# create or update workflow ... without `workflow` scope"). 운영자가 위 3줄로 옮기거나,
+# `gh auth refresh -s workflow`(브라우저 인증) 후 CC가 옮길 수 있다.
+# 내용은 검증됐다: YAML 구조·cron 5필드·step 셸 문법(bash -n) 확인.
+
+name: warm-api
+
+# Render 무료 플랜은 15분 비활성 후 sleep → 첫 요청 30~50초. 오픈 첫인상 대응으로
+# `/api/health`를 주기 핑해 인스턴스를 깨워 둔다.
+#
+# ⚠️ 워밍의 한계(문서화 필수 — docs/DEPLOY.md 참조)
+#  · 인스턴스만 깨운다. **종목 캐시(TTL 10분)는 채우지 않는다** → `/stock/:code`는 여전히
+#    캐시 미스 시 네이버 스크래핑으로 ~15초. `/recommendations`는 `stocks` 스냅샷이라 무관.
+#  · GitHub `schedule`은 **최소 5분 간격 + 지연·누락이 흔하다**(수 분~수십 분). 15분 sleep
+#    문턱을 항상 이기지는 못한다. 확실히 하려면 외부 크론(UptimeRobot 등)이 낫다.
+#  · **60일간 레포 활동이 없으면 스케줄이 자동 비활성화**된다(재활성화는 수동).
+#
+# 왜 24시간이 아닌가: Render 무료는 월 **750 인스턴스-시간**. 24시간 워밍은 ~720시간으로
+# 여유가 거의 없다. 07:00~24:00 KST(17h/일 ≈ 510h/월)만 깨워 두고 그 밖은 자연 sleep.
+on:
+  schedule:
+    # UTC 기준. 22:00~14:59 UTC = 07:00~23:59 KST
+    - cron: '*/10 0-14,22-23 * * *'
+  workflow_dispatch:
+
+# 동시 실행 금지 — 스케줄이 밀려 겹쳐도 핑은 하나면 충분하다.
+concurrency:
+  group: warm-api
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: ping /api/health
+        env:
+          # 도메인이 바뀌면 레포 Variables에 RENDER_API_URL을 넣으면 된다(기본값 폴백).
+          URL: ${{ vars.RENDER_API_URL || 'https://stock-portfolio-management.onrender.com/api/health' }}
+        run: |
+          set -u
+          code=""
+          for attempt in 1 2 3; do
+            # cold start가 30~50초라 --max-time을 넉넉히. curl은 HTTP 4xx/5xx에도 exit 0이므로
+            # 코드 자체를 판정에 쓴다(연결 실패면 code가 비어 있다).
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "$URL" || echo "")
+            echo "attempt $attempt: HTTP ${code:-connect-failed}"
+            [ "$code" = "200" ] && break
+            sleep 15
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::health 핑이 3회 모두 실패했어요 (마지막: ${code:-connect-failed})"
+            exit 1
+          fi
